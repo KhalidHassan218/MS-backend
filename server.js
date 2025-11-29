@@ -32,7 +32,6 @@ const serviceAccount = require(path.resolve(process.env.GOOGLE_APPLICATION_CREDE
 const { v4: uuidv4 } = require("uuid");
 const admin = require("firebase-admin");
 const puppeteer = require('puppeteer');
-const path = require('path');
 const sendEmailWithAttachment = require("./Utils/sendEmailWithAttachment");
 admin.initializeApp({
   // credential: admin.credential.cert({
