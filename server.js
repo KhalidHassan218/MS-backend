@@ -1004,11 +1004,11 @@ async function generateInvoicePDFBuffer(session, orderId, productsWithKeys) {
     const htmlContent = generateInvoiceHTML(session, orderId, productsWithKeys);
 
     browser = await puppeteer.launch({ 
-      args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
+      args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'], // Use chromium's recommended args
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(), // <--- KEY CHANGE
-      headless: chromium.headless,
-      ignoreHTTPSErrors: true,
+      executablePath: await chromium.executablePath(), // <-- THIS is the key line
+      headless: chromium.headless, 
+      ignoreHTTPSErrors: true
     });
 
     const page = await browser.newPage();
@@ -1100,8 +1100,11 @@ async function generateLicencePDFBuffer(session, orderId, productsWithKeys) {
     const htmlContent = generateLicenceHTML(session, orderId, productsWithKeys);
 
     browser = await puppeteer.launch({ 
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'], // Use chromium's recommended args
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(), // <-- THIS is the key line
+      headless: chromium.headless, 
+      ignoreHTTPSErrors: true
     });
 
     const page = await browser.newPage();
