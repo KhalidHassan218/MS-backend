@@ -7,28 +7,10 @@ const sendEmail = require("./Utils/sendEmail");
 const { getFirestore, Timestamp, FieldValue, Filter } = require('firebase-admin/firestore');
 const fs = require('fs'); // Use synchronous version for initial setup
 
-// let serviceAccount;
 
-// if (process.env.RENDER === 'true') {
-//   // 🚀 Production on Render: Read file content and parse JSON
-//   try {
-//     const filePath = "/etc/secrets/firebase-service-account.json";
-//     const fileContent = fs.readFileSync(filePath, 'utf8');
-//     serviceAccount = JSON.parse(fileContent);
-//     console.log("✅ Service account loaded from Render secret file.");
-//   } catch (error) {
-//     console.error("❌ ERROR: Could not read or parse Render secret file:", error);
-//     // You might want to throw or exit here if critical
-//     serviceAccount = {}; // Fallback, though likely to cause admin.initializeApp to fail
-//   }
-// } else {
-//   // 🖥️ Local development
-//   serviceAccount = require("./serviceAccountKey.json");
-//   console.log("✅ Service account loaded from local file.");
-// }
 const path = require('path');
-// const serviceAccount = require(path.resolve(process.env.GOOGLE_APPLICATION_CREDENTIALS));
-const serviceAccount = require('./firebase/service-account.json');
+const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+// const serviceAccount = require('./firebase/service-account.json');
 
 const { v4: uuidv4 } = require("uuid");
 const admin = require("firebase-admin");
