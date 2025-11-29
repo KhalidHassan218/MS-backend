@@ -16,25 +16,15 @@ const { v4: uuidv4 } = require("uuid");
 const admin = require("firebase-admin");
 const puppeteer = require('puppeteer');
 const sendEmailWithAttachment = require("./Utils/sendEmailWithAttachment");
-admin.initializeApp({
-  // credential: admin.credential.cert({
-  //   "type": "service_account",
-  //   "project_id": "supplier-34b95",
-  //   "private_key_id": "c6c49b52bb7fa7a73e2022440e61c4431e8e2136",
-  //   "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC4s63ZhpwdeKrl\nnv1wpCdn+9Bvoq/zmagzqAa3ljD6FwhfIOnwkxZ49P8UKRoFtOm1NyN7NcpMrjvz\nAShIrsG7+T2DQ9TFzR+8o1BPpc+Il2HeRebQFaGd07fQ4H6ZFVvjAotJTSOhBNaq\nAFRmxkl/i93nx/30pQLGQ6upxWu5gLiRyiSqKcbd02vDrk+V/QfgyeSpEM/SiZ7M\nPae2eRDWdJ/Ox9TCKkzM6sqP1EF/4CeT8Vbn8lItc9OWnr/dv2nznXLcXVug074T\ncF/RmSeNI2QSE5BGRighJhX2M48iGRfd3cydgHmakH1QQaq3d9uwXrEp2wFyd8hj\neErHnX/FAgMBAAECggEAC5D06hJL5GySBx8Vr+AXt6NFQjhl3FNa/SEgio6VMpQO\nqiZdf/s2BQ0SjCimwIS7veVeC3Eq4fJnPqhr5WFMMIFDIN02jcxymFWByfsQK/WO\n42RtN8qi/Ect0567TsrPnj+iiUyTVpn+91Zd8rGoGJyhoModVRygN9o0/cSnIk6Z\nq55Hm3TgiqOK7UWzg4ItVAfiDglJiY3nD1B9HOhiSk2JeXdFPwt9bY2hDFzZQ7Qo\n9uMs+af3zVHriadFvenfp1pd1JmmXfNwEPtkkD0RkFP1xOyaNTNKFXlPI/7bqvkV\nBSUxQCeKdXqgYSG+jMGCZwd07/XH0cDMUSmLSMr3YQKBgQD/BJrdtd+NYdOPVmds\nqeXujK4DoYY64wp6l2KhntYo3TnnpgVP2eLJGRdMucS3PSGeacRuUl9ivhmOfzwD\nnpGKPjdvFrS+860W7CmzhUIxFCn6l04JI0BMolISuLA+/ZI1oH7mxHZ+XKhH0MVW\nVwCtWwqGO8BgJ4uTUPu4LR/5hwKBgQC5acHKFvEmDXXIaj5anOOlqp0++dvzEvZe\nxBqfdJx4Bjb9lf/6yEu6B/iBtEIW849WEvZGGYHgoiVR19WMhBGUxzzFdVkU92Sn\n4DLdeaYyBNsXFdIOwl46wvull3ZcAUx/ixSkpBfKhfLSdN+nzr8X1/Ua/2Z+45X/\nDiD5QcXfUwKBgQDpG0p8k30vfVanVXHgsETPk6SVCRbryRGREcREvC5C2EXP68A7\nR424CMl1hvG8FZMffMrjlUQ/vEkcKk2veUjMNybw0q6RRajYpTNRN+RTfH0K5Ted\nvq1N36pqFox0Z9E4V+boBnnR89yXGMzpqUmjLO8n2IJ24m8BUCtoJUdvDQKBgFVZ\ncXNtjCRQHd/byEg94CzqlOfgbHdAS1jkPL0aGMzHT5j765Gtke5YrPRH3gRiqaCd\nqfAq3bZh7Xv3Nr4wLUenTzo2AoO8PgFpGwEIdpCf25qM2N0ia+3ww5Y+WqWPk39C\nroX7Y1g+wMBQPIQqj5ySNKnw12WhrfJytosG0+cxAoGAUPaiQ7oRmZ7Y90G8ovd0\nRcXuNjGhaRbnj3Id5mWLah5wXxkt60xGvbadxyDZbm0WaTdU467uR/KfPQqhO4kl\nlZpxn3ydvt/ZRbSVAW+RmrD0SQJGezW2QBJ2CI8X8x6D6mpTQfK6whKa2F/Ch5Rr\nI4p2/XYkdUelZqg2NcK2X0k=\n-----END PRIVATE KEY-----\n",
-  //   "client_email": "firebase-adminsdk-k9g6x@supplier-34b95.iam.gserviceaccount.com",
-  //   "client_id": "116137845221379301887",
-  //   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  //   "token_uri": "https://oauth2.googleapis.com/token",
-  //   "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  //   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-k9g6x%40supplier-34b95.iam.gserviceaccount.com",
-  //   "universe_domain": "googleapis.com"
-  // }
-  // ),
-  credential: admin.credential.cert(serviceAccount),
-  storageBucket: 'supplier-34b95.appspot.com', // ← ADD THIS LINE
-  // databaseURL: "https://supplier-34b95-default-rtdb.firebaseio.com" // only if using Realtime DB
-});
+const firebaseConfig = {
+  apiKey: "AIzaSyCbcz_6j1JnaSlzBw-jEMVczq3itPCk1bM",
+  authDomain: "supplier-34b95.firebaseapp.com",
+  projectId: "supplier-34b95",
+  storageBucket: "supplier-34b95.appspot.com",
+  messagingSenderId: "802599623168",
+  appId: "1:802599623168:web:6c7475fee5bd9da3d0d6e5"
+};
+admin.initializeApp(firebaseConfig);
 const db = admin.firestore();
 // YOUR_DOMAIN = "https://microsoftsupplier.com";
 YOUR_DOMAIN = "http://localhost:3000";
