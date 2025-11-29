@@ -7,7 +7,12 @@ const sendEmail = require("./Utils/sendEmail");
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore, Timestamp, FieldValue, Filter } = require('firebase-admin/firestore');
 const fs = require('fs'); // Use synchronous version for initial setup
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
 
+// --- Corrected Import ---
+const chromium = require('@sparticuz/chromium');
 
 const path = require('path');
 // const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
@@ -21,7 +26,7 @@ const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 // const serviceAccount = require('./firebase/service-account.json');
 
 const { v4: uuidv4 } = require("uuid");
-const puppeteer = require('puppeteer');
+// const puppeteer = require('puppeteer');
 const sendEmailWithAttachment = require("./Utils/sendEmailWithAttachment");
 initializeApp({
   credential: cert(serviceAccount),
@@ -999,13 +1004,11 @@ async function generateInvoicePDFBuffer(session, orderId, productsWithKeys) {
     const htmlContent = generateInvoiceHTML(session, orderId, productsWithKeys);
 
     browser = await puppeteer.launch({ 
-      headless: true,
-      enableExtensions: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage'
-      ]
+      args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(), // <--- KEY CHANGE
+      headless: chromium.headless,
+      ignoreHTTPSErrors: true,
     });
 
     const page = await browser.newPage();
