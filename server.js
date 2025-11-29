@@ -27,7 +27,8 @@ const fs = require('fs'); // Use synchronous version for initial setup
 //   console.log("✅ Service account loaded from local file.");
 // }
 const path = require('path');
-const serviceAccount = require(path.resolve(process.env.GOOGLE_APPLICATION_CREDENTIALS));
+// const serviceAccount = require(path.resolve(process.env.GOOGLE_APPLICATION_CREDENTIALS));
+const serviceAccount = require('./firebase/service-account.json');
 
 const { v4: uuidv4 } = require("uuid");
 const admin = require("firebase-admin");
