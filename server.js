@@ -10,6 +10,7 @@ const fs = require('fs'); // Use synchronous version for initial setup
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
+const { getStorage } = require('firebase-admin/storage');
 
 // --- Corrected Import ---
 const chromium = require('@sparticuz/chromium');
@@ -1032,7 +1033,7 @@ async function generateInvoicePDFBuffer(session, orderId, productsWithKeys) {
   }
 }
 async function uploadPDFToFirebaseStorage(orderId, pdfBuffer) {
-  const bucket = admin.storage().bucket('supplier-34b95.appspot.com'); // requires admin.initializeApp()
+  const bucket = getStorage().bucket('supplier-34b95.appspot.com'); // requires admin.initializeApp()
   const file = bucket.file(`licence/Invoice-${orderId}.pdf`);
 
   await file.save(pdfBuffer, {
