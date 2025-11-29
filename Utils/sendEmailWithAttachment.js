@@ -32,7 +32,7 @@ const sendEmailWithAttachment = async (
   //     rejectUnauthorized: false
   //   }
   // });
-   const transporter = createTransport({
+   const transporter = nodemailer.createTransport({
     host: "smtp-relay.brevo.com",
     port: 587,
     auth: {
