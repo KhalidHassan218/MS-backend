@@ -20,17 +20,26 @@ const sendEmailWithAttachment = async (
   //   },
   //   tls: { rejectUnauthorized: false },
   // });
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",    // Gmail SMTP server
-    port: 587,                  // TLS port
-    secure: false,              // true for 465, false for 587
+  // const transporter = nodemailer.createTransport({
+  //   host: "smtp.gmail.com",    // Gmail SMTP server
+  //   port: 587,                  // TLS port
+  //   secure: false,              // true for 465, false for 587
+  //   auth: {
+  //     user: "omar3691113@gmail.com",       // your Gmail address
+  //     pass: "rfsh gplk ymmo wqnb",          // Gmail App Password, not your normal password
+  //   },
+  //   tls: {
+  //     rejectUnauthorized: false
+  //   }
+  // });
+   const transporter = createTransport({
+    host: "smtp-relay.brevo.com",
+    port: 587,
     auth: {
-      user: "omar3691113@gmail.com",       // your Gmail address
-      pass: "rfsh gplk ymmo wqnb",          // Gmail App Password, not your normal password
+      user: '9cdd6e001@smtp-brevo.com',
+      pass: 'bskuptBWkrHKv5V',
     },
-    tls: {
-      rejectUnauthorized: false
-    }
+    secure: false,
   });
   const mailOptions = {
     from: sent_from,
