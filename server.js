@@ -4,28 +4,31 @@ const stripe = require("stripe")("sk_test_51LbU1MHfTVIOkODVDGnp8QhsHfVIMExL6SS0U
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const sendEmail = require("./Utils/sendEmail");
+const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore, Timestamp, FieldValue, Filter } = require('firebase-admin/firestore');
 const fs = require('fs'); // Use synchronous version for initial setup
 
 
 const path = require('path');
-const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+// const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+// 1. Check if the environment variable is set
+if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+  throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set.");
+}
+
+// 2. Parse the single-line string back into a JavaScript object
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 // const serviceAccount = require('./firebase/service-account.json');
 
 const { v4: uuidv4 } = require("uuid");
-const admin = require("firebase-admin");
 const puppeteer = require('puppeteer');
 const sendEmailWithAttachment = require("./Utils/sendEmailWithAttachment");
-const firebaseConfig = {
-  apiKey: "AIzaSyCbcz_6j1JnaSlzBw-jEMVczq3itPCk1bM",
-  authDomain: "supplier-34b95.firebaseapp.com",
-  projectId: "supplier-34b95",
-  storageBucket: "supplier-34b95.appspot.com",
-  messagingSenderId: "802599623168",
-  appId: "1:802599623168:web:6c7475fee5bd9da3d0d6e5"
-};
-admin.initializeApp(firebaseConfig);
-const db = admin.firestore();
+initializeApp({
+  credential: cert(serviceAccount),
+  storageBucket: 'supplier-34b95.appspot.com', // ← ADD THIS LINE
+  // databaseURL: "https://supplier-34b95-default-rtdb.firebaseio.com" // only if using Realtime DB
+});
+const db = getFirestore();
 // YOUR_DOMAIN = "https://microsoftsupplier.com";
 YOUR_DOMAIN = "http://localhost:3000";
 const app = express();
