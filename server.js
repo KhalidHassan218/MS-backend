@@ -1000,6 +1000,7 @@ async function generateInvoicePDFBuffer(session, orderId, productsWithKeys) {
 
     browser = await puppeteer.launch({ 
       headless: true,
+      enableExtensions: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
