@@ -788,9 +788,10 @@ async function assignKeysToProducts(orderId, products) {
 
   for (const product of products) {
     const needed = product.quantity || 0;
+    const productId = product.id; // or product.productId (whichever your data uses)
 
-    // Reserve keys for this product
-    const assignedKeys = await reserveLicenseKeys(orderId, needed);
+    // Reserve keys for this specific product
+    const assignedKeys = await reserveLicenseKeys(orderId, productId, needed);
 
     results.push({
       ...product,
@@ -800,38 +801,39 @@ async function assignKeysToProducts(orderId, products) {
 
   return results;
 }
+
 /**
  * Reserve `neededQty` keys from licenseKeys collection and mark them used with orderId.
  * Returns array of key strings (e.g. ["11111-11111-..."])
  * Throws if not enough keys.
  */
-async function reserveLicenseKeys(orderId, neededQty) {
+async function reserveLicenseKeys(orderId, productId, neededQty) {
   if (neededQty <= 0) return [];
 
   const licenseKeysRef = db.collection("licenseKeys");
 
   return await db.runTransaction(async (tx) => {
-    console.log(`🔄 Transaction started for order ${orderId}`);
+    console.log(`🔄 Transaction started: order=${orderId}, product=${productId}`);
 
-    // 1️⃣ Read available keys INSIDE the transaction
+    // 1️⃣ Read available keys ONLY for this product
     const snapshot = await tx.get(
       licenseKeysRef
         .where("status", "==", "available")
-        .where("productId", "==", orderId) // ⬅️ filter by product      .limit(neededQty)
+        .where("productId", "==", productId)
+        .limit(neededQty)
     );
 
-    console.log(`📦 Needed: ${neededQty}, Found: ${snapshot.size}`);
+    console.log(`📦 Needed=${neededQty}, Found=${snapshot.size} for product=${productId}`);
 
-    // Not enough keys → fail gracefully (transaction retries automatically)
     if (snapshot.size < neededQty) {
       throw new Error(
-        `Not enough license keys (needed ${neededQty}, found ${snapshot.size})`
+        `Not enough keys for product ${productId} (needed ${neededQty}, found ${snapshot.size})`
       );
     }
 
     const reservedKeys = [];
 
-    // 2️⃣ Update them atomically inside the transaction
+    // 2️⃣ Update them atomically
     snapshot.docs.forEach((doc) => {
       const data = doc.data();
 
@@ -844,11 +846,12 @@ async function reserveLicenseKeys(orderId, neededQty) {
       });
     });
 
-    console.log(`✅ Reserved keys for order ${orderId}:`, reservedKeys);
+    console.log(`✅ Reserved keys for product ${productId}:`, reservedKeys);
 
     return reservedKeys;
   });
 }
+
 
 app.post(
   "/webhooks",
