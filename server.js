@@ -45,7 +45,8 @@ initializeApp({
 });
 const db = getFirestore();
 // YOUR_DOMAIN = "https://microsoftsupplier.com";
-YOUR_DOMAIN = "http://localhost:3000";
+// YOUR_DOMAIN = "http://localhost:3000";
+YOUR_DOMAIN = "https://ms-test-ser.vercel.app";
 const app = express();
 
 app.use(cors());
