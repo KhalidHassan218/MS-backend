@@ -788,7 +788,7 @@ async function assignKeysToProducts(orderId, products) {
 
   for (const product of products) {
     const needed = product.quantity || 0;
-    const productId = product.id; // or product.productId (whichever your data uses)
+    const productId = product?.productId; // or product.productId (whichever your data uses)
 
     // Reserve keys for this specific product
     const assignedKeys = await reserveLicenseKeys(orderId, productId, needed);
