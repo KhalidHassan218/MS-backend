@@ -905,7 +905,7 @@ async function processOrder(session) {
       currency: fullSession?.currency,
       createdAt: new Date(fullSession?.created * 1000),
       products: fullSession?.line_items?.data?.map((item) => ({
-        productId: item?.price?.product?.id,
+        productId: item?.price?.product?.metadata?.id,
         name: item?.price?.product?.name,
         quantity: item?.quantity,
         unitPrice: item?.price?.unit_amount / 100,
@@ -1192,6 +1192,7 @@ app.post("/create-checkout-session", async (req, res) => {
         language: product.selectedLangObj.lang,
         isDigital: isDigital,
         PN: PN,
+        id:product?.id
       };
       description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.PN}`;
     } else {
@@ -1199,6 +1200,7 @@ app.post("/create-checkout-session", async (req, res) => {
         language: `Language: English`,
         isDigital: isDigital,
         PN: PN,
+        id:product?.id
       };
       description = `Language: English`;
     }
