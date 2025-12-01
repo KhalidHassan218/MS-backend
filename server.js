@@ -1,25 +1,34 @@
 require("dotenv").config();
 const express = require("express");
-const stripe = require("stripe")("sk_test_51LbU1MHfTVIOkODVDGnp8QhsHfVIMExL6SS0UajaTfhs8ytFXrFw7X2raMn26h2QJWFTjHU4fClQUelQ4PAxmXg700PZ4tyKYv");
+const stripe = require("stripe")(
+  "sk_test_51LbU1MHfTVIOkODVDGnp8QhsHfVIMExL6SS0UajaTfhs8ytFXrFw7X2raMn26h2QJWFTjHU4fClQUelQ4PAxmXg700PZ4tyKYv"
+);
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const sendEmail = require("./Utils/sendEmail");
-const { initializeApp, cert } = require('firebase-admin/app');
-const { getFirestore, Timestamp, FieldValue, Filter } = require('firebase-admin/firestore');
-const fs = require('fs'); // Use synchronous version for initial setup
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const { initializeApp, cert } = require("firebase-admin/app");
+const {
+  getFirestore,
+  Timestamp,
+  FieldValue,
+  Filter,
+} = require("firebase-admin/firestore");
+const fs = require("fs"); // Use synchronous version for initial setup
+const puppeteer = require("puppeteer-extra");
+const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 puppeteer.use(StealthPlugin());
-const { getStorage } = require('firebase-admin/storage');
+const { getStorage } = require("firebase-admin/storage");
 
 // --- Corrected Import ---
-const chromium = require('@sparticuz/chromium');
+const chromium = require("@sparticuz/chromium");
 
-const path = require('path');
+const path = require("path");
 // const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
 // 1. Check if the environment variable is set
 if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-  throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set.");
+  throw new Error(
+    "FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set."
+  );
 }
 
 // 2. Parse the single-line string back into a JavaScript object
@@ -31,7 +40,7 @@ const { v4: uuidv4 } = require("uuid");
 const sendEmailWithAttachment = require("./Utils/sendEmailWithAttachment");
 initializeApp({
   credential: cert(serviceAccount),
-  storageBucket: 'supplier-34b95.appspot.com', // ← ADD THIS LINE
+  storageBucket: "supplier-34b95.appspot.com", // ← ADD THIS LINE
   // databaseURL: "https://supplier-34b95-default-rtdb.firebaseio.com" // only if using Realtime DB
 });
 const db = getFirestore();
@@ -40,23 +49,22 @@ YOUR_DOMAIN = "http://localhost:3000";
 const app = express();
 
 app.use(cors());
-app.use(express.static('public'));
-
+app.use(express.static("public"));
 
 // async function generateLicencePDFBuffer(session, orderId) {
 //   let browser;
-  
+
 //   try {
 //     const htmlContent = generateLicenceHTML(session, orderId);
-    
-//     browser = await puppeteer.launch({ 
+
+//     browser = await puppeteer.launch({
 //       headless: true,
 //       args: ['--no-sandbox', '--disable-setuid-sandbox']
 //     });
-    
+
 //     const page = await browser.newPage();
 //     await page.setContent(htmlContent);
-    
+
 //     const pdfBuffer = await page.pdf({
 //       format: 'A4',
 //       printBackground: true,
@@ -70,7 +78,7 @@ app.use(express.static('public'));
 
 //     console.log('✅ PDF buffer generated, ready for download');
 //     return pdfBuffer;
-    
+
 //   } catch (error) {
 //     console.error('❌ Error generating PDF buffer:', error);
 //     throw error;
@@ -85,35 +93,42 @@ function generateLicenceHTML(session, orderId, productsWithKeys) {
   const customer = session.customer_details || {};
   const address = customer.address || {};
   const total = (session.amount_total || 0) / 100;
-  const currency = (session.currency || '').toUpperCase();
-  const invoiceDate = new Date(session.created * 1000).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  });
+  const currency = (session.currency || "").toUpperCase();
+  const invoiceDate = new Date(session.created * 1000).toLocaleDateString(
+    "fr-FR",
+    {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    }
+  );
 
   // Map productsWithKeys to HTML blocks
-  const productsHtml = (productsWithKeys || []).map((product, idx) => {
-    const keysHtml = (product.licenseKeys || [])
-      .map(k => `<div class="license-key">${k}</div>`)
-      .join('');
-    return `
+  const productsHtml = (productsWithKeys || [])
+    .map((product, idx) => {
+      const keysHtml = (product.licenseKeys || [])
+        .map((k) => `<div class="license-key">${k}</div>`)
+        .join("");
+      return `
       <div class="product-section">
-        <div class="product-title">${escapeHtml(product.name || '')} (x${product.quantity || 0})</div>
+        <div class="product-title">${escapeHtml(product.name || "")} (x${
+        product.quantity || 0
+      })</div>
         <div class="license-keys-title">Clés de licence:</div>
         <div class="license-keys-grid">
           ${keysHtml}
         </div>
         <div class="installation-support">
           <strong>*Support d'installation</strong><br>
-          <strong>${escapeHtml(product.name || '')}</strong><br>
+          <strong>${escapeHtml(product.name || "")}</strong><br>
           <a href="https://www.microsoft.com/fr-fr/software-download/windows11">
             https://www.microsoft.com/fr-fr/software-download/windows11
           </a>
         </div>
       </div>
     `;
-  }).join('');
+    })
+    .join("");
 
   return `
   <!DOCTYPE html>
@@ -325,18 +340,22 @@ function generateLicenceHTML(session, orderId, productsWithKeys) {
 </div>
     <div class="content">
       <div class="company-address">
-        <div>${escapeHtml(customer.name || customer.business_name || '')}</div>
-        <div>${escapeHtml(address.line1 || '')}</div>
-        <div>${escapeHtml(address.postal_code || '')}</div>
-        <div>${escapeHtml(address.country || '')}</div>
+        <div>${escapeHtml(customer.name || customer.business_name || "")}</div>
+        <div>${escapeHtml(address.line1 || "")}</div>
+        <div>${escapeHtml(address.postal_code || "")}</div>
+        <div>${escapeHtml(address.country || "")}</div>
       </div>
       
       <div class="document-header">
-        <div class="document-number">Document de licence: ${escapeHtml(orderId)}</div>
+        <div class="document-number">Document de licence: ${escapeHtml(
+          orderId
+        )}</div>
         <div class="document-date">Date: ${invoiceDate}</div>
       </div>
       
-      <div class="document-title">Document de licence: ${escapeHtml(orderId)}</div>
+      <div class="document-title">Document de licence: ${escapeHtml(
+        orderId
+      )}</div>
       
       <div class="items-section">
         <div class="items-header">
@@ -344,13 +363,19 @@ function generateLicenceHTML(session, orderId, productsWithKeys) {
           <div>Description</div>
           <div class="text-right">Quantité</div>
         </div>
-        ${(productsWithKeys || []).map((p, i) => `
+        ${(productsWithKeys || [])
+          .map(
+            (p, i) => `
           <div class="items-row">
-            <div>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(p.sku || '')}</div>
-            <div><a href="#">${escapeHtml(p.name || '')}</a></div>
+            <div>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(
+              p.sku || ""
+            )}</div>
+            <div><a href="#">${escapeHtml(p.name || "")}</a></div>
             <div class="text-right">${p.quantity || 0}</div>
           </div>
-        `).join('')}
+        `
+          )
+          .join("")}
       </div>
       
       ${productsHtml}
@@ -369,42 +394,47 @@ function generateInvoiceHTML(session, invoiceNumber, productsWithKeys) {
   const total = (session.amount_total || 0) / 100;
   const subtotal = total; // Assuming no tax in this case
   const tax = 0;
-  const currency = (session.currency || 'eur').toUpperCase();
-  const currencySymbol = currency === 'EUR' ? '€' : currency;
-  
-  const invoiceDate = new Date(session.created * 1000).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  });
-  
+  const currency = (session.currency || "eur").toUpperCase();
+  const currencySymbol = currency === "EUR" ? "€" : currency;
+
+  const invoiceDate = new Date(session.created * 1000).toLocaleDateString(
+    "fr-FR",
+    {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    }
+  );
+
   // Due date is 30 days after invoice date
   const dueDate = new Date(session.created * 1000);
   dueDate.setDate(dueDate.getDate() + 30);
-  const dueDateFormatted = dueDate.toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
+  const dueDateFormatted = dueDate.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
   });
 
   // Map productsWithKeys to table rows
-  const productsRows = (productsWithKeys || []).map((product) => {
-    const unitPrice = (product.unitPrice || 0);
-    const quantity = product.quantity || 0;
-    const totalPrice = product?.totalPrice;
-    
-    return `
+  const productsRows = (productsWithKeys || [])
+    .map((product) => {
+      const unitPrice = product.unitPrice || 0;
+      const quantity = product.quantity || 0;
+      const totalPrice = product?.totalPrice;
+
+      return `
       <tr>
         <td>${invoiceDate}</td>
         <td>
-          ${escapeHtml(product.name || '')}
+          ${escapeHtml(product.name || "")}
         </td>
         <td class="text-right">${currencySymbol} ${unitPrice.toFixed(2)}</td>
         <td class="text-center">${quantity}</td>
         <td class="text-right">${currencySymbol} ${totalPrice.toFixed(2)}</td>
       </tr>
     `;
-  }).join('');
+    })
+    .join("");
 
   return `
   <!DOCTYPE html>
@@ -636,15 +666,21 @@ function generateInvoiceHTML(session, invoiceNumber, productsWithKeys) {
     <div class="content">
       <div class="top-section">
         <div class="customer-info">
-          <div><strong>${escapeHtml(customer.name || customer.business_name || 'COMPANY NAME')}</strong></div>
-          <div>${escapeHtml(address.line1 || 'STREET NAME & STREET NUMBER')}</div>
-          <div>${escapeHtml(address.postal_code || 'POSTAL CODE')}</div>
-          <div>${escapeHtml(address.country || 'COUNTRY')}</div>
-          <div>${escapeHtml(customer.tax_id || 'TAX NUMBER')}</div>
+          <div><strong>${escapeHtml(
+            customer.name || customer.business_name || "COMPANY NAME"
+          )}</strong></div>
+          <div>${escapeHtml(
+            address.line1 || "STREET NAME & STREET NUMBER"
+          )}</div>
+          <div>${escapeHtml(address.postal_code || "POSTAL CODE")}</div>
+          <div>${escapeHtml(address.country || "COUNTRY")}</div>
+          <div>${escapeHtml(customer.tax_id || "TAX NUMBER")}</div>
         </div>
         
         <div class="invoice-info">
-          <div class="invoice-number">Numéro de facture : #${escapeHtml(invoiceNumber)}</div>
+          <div class="invoice-number">Numéro de facture : #${escapeHtml(
+            invoiceNumber
+          )}</div>
           <div class="invoice-dates">
             <div><strong>Date de facture:</strong> ${invoiceDate}</div>
             <div><strong>Date d'échéance:</strong> ${dueDateFormatted}</div>
@@ -724,25 +760,24 @@ function generateInvoiceHTML(session, invoiceNumber, productsWithKeys) {
 // Helper function to escape HTML
 function escapeHtml(text) {
   const map = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;'
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
   };
-  return String(text).replace(/[&<>"']/g, m => map[m]);
+  return String(text).replace(/[&<>"']/g, (m) => map[m]);
 }
 
 // Simple HTML-escape to avoid injection in generated HTML
 function escapeHtml(str) {
-  return String(str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
-
 
 /**
  * products: [{ productId, name, quantity, unitPrice, totalPrice }, ...]
@@ -773,84 +808,75 @@ async function assignKeysToProducts(orderId, products) {
 async function reserveLicenseKeys(orderId, neededQty) {
   if (neededQty <= 0) return [];
 
-  const licenseKeysRef = db.collection('licenseKeys');
-  
-  // Query for available keys
-  const snapshot = await licenseKeysRef
-    .where('status', '==', 'available')
-    .limit(neededQty)
-    .get();
+  const licenseKeysRef = db.collection("licenseKeys");
 
-  console.log('neededQty:', neededQty);
-  console.log('found:', snapshot.size);
-
-  if (snapshot.size < neededQty) {
-    throw new Error(`Not enough license keys available (needed ${neededQty}, found ${snapshot.size})`);
-  }
-
-  // Use transaction to update atomically
   return await db.runTransaction(async (tx) => {
-    const keys = [];
-    const docsToUpdate = [];
-    
-    // First: Do ALL reads
-    for (const doc of snapshot.docs) {
-      const freshDoc = await tx.get(doc.ref);
-      
-      if (freshDoc.exists && freshDoc.data().status === 'available') {
-        docsToUpdate.push({
-          ref: doc.ref,
-          key: freshDoc.data().key
-        });
-      }
+    console.log(`🔄 Transaction started for order ${orderId}`);
+
+    // 1️⃣ Read available keys INSIDE the transaction
+    const snapshot = await tx.get(
+      licenseKeysRef
+        .where("status", "==", "available")
+        .where("productId", "==", orderId) // ⬅️ filter by product      .limit(neededQty)
+    );
+
+    console.log(`📦 Needed: ${neededQty}, Found: ${snapshot.size}`);
+
+    // Not enough keys → fail gracefully (transaction retries automatically)
+    if (snapshot.size < neededQty) {
+      throw new Error(
+        `Not enough license keys (needed ${neededQty}, found ${snapshot.size})`
+      );
     }
 
-    if (docsToUpdate.length < neededQty) {
-      throw new Error('Some keys were taken by another transaction');
-    }
+    const reservedKeys = [];
 
-    // Second: Do ALL writes
-    docsToUpdate.forEach(doc => {
-      keys.push(doc.key);
+    // 2️⃣ Update them atomically inside the transaction
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+
+      reservedKeys.push(data.key);
+
       tx.update(doc.ref, {
-        status: 'used',
-        orderId: orderId,
+        status: "used",
+        orderId,
         usedAt: FieldValue.serverTimestamp(),
       });
     });
 
-    return keys;
+    console.log(`✅ Reserved keys for order ${orderId}:`, reservedKeys);
+
+    return reservedKeys;
   });
 }
 
-
 app.post(
-  '/webhooks',
-  express.raw({ type: 'application/json' }),
+  "/webhooks",
+  express.raw({ type: "application/json" }),
   async (request, response) => {
-    const sig = request.headers['stripe-signature'];
+    const sig = request.headers["stripe-signature"];
 
     try {
       const event = stripe.webhooks.constructEvent(
         request.body,
         sig,
         // 'whsec_ed16e1c24a67aaf05721441157b18ea73c196a633594f43803fca553ba780c9d'
-        'whsec_n9vgs7GOQKS1uOzF9Ufoxct5NMX11inK'
+        "whsec_n9vgs7GOQKS1uOzF9Ufoxct5NMX11inK"
       );
 
-      console.log('🔔 Webhook received:', event.type);
+      console.log("🔔 Webhook received:", event.type);
 
       // 🔥 Respond immediately before doing any slow work
       response.json({ received: true });
 
       // Continue processing in background
-      if (event.type === 'checkout.session.completed') {
+      if (event.type === "checkout.session.completed") {
         const session = event.data.object;
 
         processOrder(session); // Fire and forget
       }
     } catch (err) {
-      console.log('❌ Webhook verification failed:', err.message);
+      console.log("❌ Webhook verification failed:", err.message);
       return response.status(400).json({ error: err.message });
     }
   }
@@ -860,19 +886,8 @@ async function processOrder(session) {
     console.log("⏳ Processing order...");
 
     const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
-      expand: ['line_items.data.price.product']
+      expand: ["line_items.data.price.product"],
     });
-console.log('fullSession?.line_items?.data?',fullSession?.line_items?.data[0].product);
-    const test = fullSession?.line_items?.data?.map((item) => {
-      console.log('item23',item?.price?.product?.metadata)
-      return ({
-      productId: item?.price?.product?.id,
-      name: item?.price?.product?.name,
-      quantity: item?.quantity,
-      unitPrice: item?.price?.unit_amount / 100,
-      totalPrice: item?.amount_total / 100,
-      // isDigital: item?.price?.product?.metadata?.isDigital === 'true' // Retrieve from metadata
-  })})
     const data = {
       internalEntryStatus: "pending",
       email: fullSession?.customer_details?.email,
@@ -891,26 +906,32 @@ console.log('fullSession?.line_items?.data?',fullSession?.line_items?.data[0].pr
         quantity: item?.quantity,
         unitPrice: item?.price?.unit_amount / 100,
         totalPrice: item?.amount_total / 100,
-        isDigital: item?.price?.product?.metadata?.isDigital === 'true' // Retrieve from metadata
+        isDigital: item?.price?.product?.metadata?.isDigital === "true", // Retrieve from metadata
+        PN: item?.price?.product?.metadata?.PN,
       })),
     };
 
     // Store order as pending
-    const orderDocRef = await db.collection('orders').add(data);
+    const orderDocRef = await db.collection("orders").add(data);
     const orderId = orderDocRef.id;
-    
+
     // Assign keys to products (this will update licenseKeys docs in firestore)
-    let digitalProducts = data.products?.filter(product => product.isDigital) ?? []
-    let phisycalProducts = data.products?.filter(product => !product.isDigital) ?? []
+    let digitalProducts =
+      data.products?.filter((product) => product.isDigital) ?? [];
+    let phisycalProducts =
+      data.products?.filter((product) => !product.isDigital) ?? [];
     let productsWithKeys;
     try {
       productsWithKeys = await assignKeysToProducts(orderId, digitalProducts);
     } catch (err) {
-      console.error('❌ Not enough license keys or error reserving keys:', err.message);
+      console.error(
+        "❌ Not enough license keys or error reserving keys:",
+        err.message
+      );
 
       // Update order as failed or out-of-stock
-      await db.collection('orders').doc(orderId).update({
-        internalEntryStatus: 'failed',
+      await db.collection("orders").doc(orderId).update({
+        internalEntryStatus: "failed",
         failureReason: err.message,
         invoiceGeneratedAt: null,
       });
@@ -918,43 +939,56 @@ console.log('fullSession?.line_items?.data?',fullSession?.line_items?.data[0].pr
       // optional: notify admin or send email to customer here
       return;
     }
-    const allProducts = [...productsWithKeys, ...phisycalProducts]
+    const allProducts = [...productsWithKeys, ...phisycalProducts];
     // Update stored order to include the assigned keys per product (so DB has complete record)
-    await db.collection('orders').doc(orderId).update({
+    console.log("allProducts", allProducts);
+
+    await db.collection("orders").doc(orderId).update({
       products: allProducts,
-      internalEntryStatus: 'keys_assigned'
+      internalEntryStatus: "keys_assigned",
     });
 
     // Generate PDF with the assigned keys embedded
-    const pdfBuffer = await generateLicencePDFBuffer(fullSession, orderId, productsWithKeys);
-    const invoicePdfBuffer = await generateInvoicePDFBuffer(fullSession, orderId, allProducts);
-
+    const pdfBuffer = await generateLicencePDFBuffer(
+      fullSession,
+      orderId,
+      productsWithKeys
+    );
+    const invoicePdfBuffer = await generateInvoicePDFBuffer(
+      fullSession,
+      orderId,
+      allProducts
+    );
 
     // Save file locally
     // await savePDFToFile(pdfBuffer, orderId);
     const licensePdfUrl = await uploadPDFToFirebaseStorage(orderId, pdfBuffer);
-    const invoicePdfUrl = await uploadPDFToFirebaseStorage(`${orderId}-invoice`, invoicePdfBuffer);
+    const invoicePdfUrl = await uploadPDFToFirebaseStorage(
+      `${orderId}-invoice`,
+      invoicePdfBuffer
+    );
 
-
-// Save Firestore PDF record
-// await savePDFRecord(orderId, pdfUrl);
-await savePDFRecord(`${orderId}-license`, licensePdfUrl);
-await savePDFRecord(`${orderId}-invoice`, invoicePdfUrl);
-    let emailAttachemnts = [{
-      filename: `Invoice-${orderId}.pdf`,
-      content: invoicePdfBuffer,            // Buffer or string
-      contentType: invoicePdfBuffer.contentType || "application/pdf",
-    }]
-    if(productsWithKeys?.length > 0 ){
+    // Save Firestore PDF record
+    // await savePDFRecord(orderId, pdfUrl);
+    await savePDFRecord(`${orderId}-license`, licensePdfUrl);
+    await savePDFRecord(`${orderId}-invoice`, invoicePdfUrl);
+    let emailAttachemnts = [
+      {
+        filename: `Invoice-${orderId}.pdf`,
+        content: invoicePdfBuffer, // Buffer or string
+        contentType: invoicePdfBuffer.contentType || "application/pdf",
+      },
+    ];
+    if (productsWithKeys?.length > 0) {
       emailAttachemnts.push({
         filename: `License-${orderId}.pdf`,
-        content: pdfBuffer,            // Buffer or string
+        content: pdfBuffer, // Buffer or string
         contentType: pdfBuffer.contentType || "application/pdf",
-      })
+      });
     }
     await sendEmailWithAttachment(
       `Votre commande chez Microsoft Supplier – Licences et documentation`,
-      `<p>Bonjour ${data?.name || ''},</p>
+      `<p>Bonjour ${data?.name || ""},</p>
        <p>Merci pour votre commande.<br>
        Les licences ont ÈtÈ traitÈes avec succËs et les documents sont dÈsormais disponibles.</p>
     
@@ -981,22 +1015,19 @@ await savePDFRecord(`${orderId}-invoice`, invoicePdfUrl);
       process.env.EMAIL_USER,
       process.env.EMAIL_USER,
       emailAttachemnts
-    );    
+    );
     // Update order as completed with both URLs
-    await db.collection('orders').doc(orderId).update({
+    await db.collection("orders").doc(orderId).update({
       invoiceGeneratedAt: new Date(),
       internalEntryStatus: "completed",
       invoiceUrl: invoicePdfUrl,
       licenseUrl: licensePdfUrl,
     });
     console.log("✅ Order completed:", orderId);
-
   } catch (err) {
     console.error("❌ Error processing order:", err);
   }
 }
-
-
 
 // New function for generating invoice PDF
 async function generateInvoicePDFBuffer(session, orderId, productsWithKeys) {
@@ -1004,27 +1035,30 @@ async function generateInvoicePDFBuffer(session, orderId, productsWithKeys) {
   try {
     const htmlContent = generateInvoiceHTML(session, orderId, productsWithKeys);
 
-    browser = await puppeteer.launch({ 
-      args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'], // Use chromium's recommended args
+    browser = await puppeteer.launch({
+      args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"], // Use chromium's recommended args
       defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(), // <-- THIS is the key line
-      headless: chromium.headless, 
-      ignoreHTTPSErrors: true
+      headless: chromium.headless,
+      ignoreHTTPSErrors: true,
     });
 
     const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0', timeout: 60000 });
-
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '0', right: '0', bottom: '0', left: '0' }
+    await page.setContent(htmlContent, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
     });
 
-    console.log('✅ Invoice PDF buffer generated');
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "0", right: "0", bottom: "0", left: "0" },
+    });
+
+    console.log("✅ Invoice PDF buffer generated");
     return pdfBuffer;
   } catch (error) {
-    console.error('❌ Error generating invoice PDF buffer:', error);
+    console.error("❌ Error generating invoice PDF buffer:", error);
     throw error;
   } finally {
     if (browser) {
@@ -1033,11 +1067,11 @@ async function generateInvoicePDFBuffer(session, orderId, productsWithKeys) {
   }
 }
 async function uploadPDFToFirebaseStorage(orderId, pdfBuffer) {
-  const bucket = getStorage().bucket('supplier-34b95.appspot.com'); // requires admin.initializeApp()
+  const bucket = getStorage().bucket("supplier-34b95.appspot.com"); // requires admin.initializeApp()
   const file = bucket.file(`licence/Invoice-${orderId}.pdf`);
 
   await file.save(pdfBuffer, {
-    metadata: { contentType: 'application/pdf' }
+    metadata: { contentType: "application/pdf" },
   });
 
   // Make file public OR use signed URL
@@ -1046,19 +1080,18 @@ async function uploadPDFToFirebaseStorage(orderId, pdfBuffer) {
   return `https://storage.googleapis.com/${bucket.name}/licence/Invoice-${orderId}.pdf`;
 }
 async function savePDFRecord(orderId, pdfUrl) {
-  await db.collection('pdfDocuments').add({
+  await db.collection("pdfDocuments").add({
     orderId,
     pdfUrl,
-    createdAt: new Date()
+    createdAt: new Date(),
   });
 }
-
 
 // Add this function to save PDF to file
 // async function savePDFToFile(pdfBuffer, orderId) {
 //   try {
 //     const pdfsDir = path.join(__dirname, 'pdfs');
-    
+
 //     // Create PDFs directory if it doesn't exist
 //     try {
 //       await fs.access(pdfsDir);
@@ -1069,11 +1102,11 @@ async function savePDFRecord(orderId, pdfUrl) {
 //     const filename = `invoice-${orderId}.pdf`;
 //     const filePath = path.join(pdfsDir, filename);
 //     await fs.writeFile(filePath, pdfBuffer);
-    
+
 //     console.log('📁 PDF saved to:', filePath);
-    
+
 //     return filePath;
-    
+
 //   } catch (error) {
 //     console.log('⚠️ Could not save PDF to file:', error.message);
 //   }
@@ -1100,27 +1133,27 @@ async function generateLicencePDFBuffer(session, orderId, productsWithKeys) {
   try {
     const htmlContent = generateLicenceHTML(session, orderId, productsWithKeys);
 
-    browser = await puppeteer.launch({ 
-      args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'], // Use chromium's recommended args
+    browser = await puppeteer.launch({
+      args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"], // Use chromium's recommended args
       defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(), // <-- THIS is the key line
-      headless: chromium.headless, 
-      ignoreHTTPSErrors: true
+      headless: chromium.headless,
+      ignoreHTTPSErrors: true,
     });
 
     const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    await page.setContent(htmlContent, { waitUntil: "networkidle0" });
 
     const pdfBuffer = await page.pdf({
-      format: 'A4',
+      format: "A4",
       printBackground: true,
-      margin: { top: '0', right: '0', bottom: '0', left: '0' }
+      margin: { top: "0", right: "0", bottom: "0", left: "0" },
     });
 
-    console.log('✅ PDF buffer generated, ready for download');
+    console.log("✅ PDF buffer generated, ready for download");
     return pdfBuffer;
   } catch (error) {
-    console.error('❌ Error generating PDF buffer:', error);
+    console.error("❌ Error generating PDF buffer:", error);
     throw error;
   } finally {
     if (browser) {
@@ -1133,34 +1166,35 @@ app.get("/", (req, res) => {
   res.send("welcome to microsoftsupplier website");
 });
 
-app.post('/create-checkout-session', async (req, res) => {
+app.post("/create-checkout-session", async (req, res) => {
   const cart = req.body.cart;
   const useremail = req.body.useremail;
   const cat = req.body.foundUser;
-  
-  console.log('here' , cart);
+
+  console.log("here", cart);
 
   const lineItems = cart?.map((product) => {
     let priceWVat = parseFloat(product?.priceWVat);
     let b2bpriceWVat = parseFloat(product?.b2bpriceWVat);
-    const priceCopy = cat === "B2B" ? b2bpriceWVat.toFixed(2) : priceWVat.toFixed(2);
-    const isDigital = product?.type === "digital software"
+    const priceCopy =
+      cat === "B2B" ? b2bpriceWVat.toFixed(2) : priceWVat.toFixed(2);
+    const isDigital = product?.type === "digital software";
     let customFields = null;
-    let description = '';
-    
-    console.log('here', product.selectedLangObj);
-    
+    let description = "";
+    const PN = product?.PN;
     if (product?.selectedLangObj?.id) {
       customFields = {
         PN: product.selectedLangObj.PN,
         language: product.selectedLangObj.lang,
-        isDigital: isDigital
+        isDigital: isDigital,
+        PN: PN,
       };
       description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.PN}`;
     } else {
       customFields = {
         language: `Language: English`,
-        isDigital: isDigital
+        isDigital: isDigital,
+        PN: PN,
       };
       description = `Language: English`;
     }
@@ -1172,25 +1206,26 @@ app.post('/create-checkout-session', async (req, res) => {
           name: product.name,
           images: [product.imageUrl],
           metadata: customFields,
-          description: description
+          description: description,
         },
-        unit_amount: priceCopy * 100
+        unit_amount: priceCopy * 100,
       },
       quantity: product.calculatequantity || 1,
     };
   });
-
+  const expirationTime = Math.floor(Date.now() / 1000) + 30 * 60; // 30 minutes in seconds
   const sessionData = {
     line_items: lineItems,
-    mode: 'payment',
-    billing_address_collection: 'required',
+    mode: "payment",
+    billing_address_collection: "required",
     name_collection: {
       business: {
-        enabled: true,      // show Business Name field
-        optional: false     // make it required
-      }
+        enabled: true, // show Business Name field
+        optional: false, // make it required
+      },
     },
-        success_url: `${YOUR_DOMAIN}/success`,
+    expires_at: expirationTime,
+    success_url: `${YOUR_DOMAIN}/success`,
     cancel_url: `${YOUR_DOMAIN}?canceled=true`,
   };
 
@@ -1202,12 +1237,9 @@ app.post('/create-checkout-session', async (req, res) => {
   res.status(200).send(session.url);
 });
 
-
-
-
 app.post("/api/sendemail", async (req, res) => {
   const { email, companyName, messages } = req.body;
-  
+
   try {
     const send_to = process.env.EMAIL_USER;
     const sent_from = process.env.EMAIL_USER;
