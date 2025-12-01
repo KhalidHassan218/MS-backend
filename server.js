@@ -785,6 +785,7 @@ function escapeHtml(str) {
  */
 async function assignKeysToProducts(orderId, products) {
   const results = [];
+  console.log('digitalProducts',products);
 
   for (const product of products) {
     const needed = product.quantity || 0;
@@ -924,7 +925,7 @@ async function processOrder(session) {
     let phisycalProducts =
       data.products?.filter((product) => !product.isDigital) ?? [];
     let productsWithKeys;
-    try {
+    try {      
       productsWithKeys = await assignKeysToProducts(orderId, digitalProducts);
     } catch (err) {
       console.error(
