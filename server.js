@@ -868,7 +868,8 @@ app.post(
         request.body,
         sig,
         // 'whsec_ed16e1c24a67aaf05721441157b18ea73c196a633594f43803fca553ba780c9d'
-        "whsec_n9vgs7GOQKS1uOzF9Ufoxct5NMX11inK"
+        // "whsec_n9vgs7GOQKS1uOzF9Ufoxct5NMX11inK" //omar test webook
+        "whsec_3v6ak8Zl2sGGPyoBt2XUxdJEzGsIHLP9" //sertic test webook
       );
 
       console.log("🔔 Webhook received:", event.type);
