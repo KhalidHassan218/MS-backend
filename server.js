@@ -998,22 +998,22 @@ async function processOrder(session) {
       `Votre commande chez Microsoft Supplier – Licences et documentation`,
       `<p>Bonjour ${data?.name || ""},</p>
        <p>Merci pour votre commande.<br>
-       Les licences ont ÈtÈ traitÈes avec succËs et les documents sont dÈsormais disponibles.</p>
+       Les licences ont ètè traitèes avec succËs et les documents sont dèsormais disponibles.</p>
     
        <p>Vous trouverez en piËces jointes :</p>
        <ul>
-         <li>La facture (TVA autoliquidÈe ñ Article 196 de la directive TVA de líUE)</li>
-         <li>Le document de licence (contenant toutes les clÈs de licence)</li>
+         <li>La facture (TVA autoliquidèe ñ Article 196 de la directive TVA de líue)</li>
+         <li>Le document de licence (contenant toutes les clès de licence)</li>
        </ul>
     
        <p><strong>Informations importantes :</strong></p>
        <ul>
-         <li>Les licences síactivent directement en ligne (aucune activation tÈlÈphonique níest nÈcessaire)</li>
+         <li>Les licences síactivent directement en ligne (aucune activation tèlèphonique níest nècessaire)</li>
          <li>Garantie : 12 mois</li>
          <li>Les licences proviennent de notre systËme interne de distribution</li>
        </ul>
     
-       <p>Si vous avez des questions ou si vous avez besoin de licences supplÈmentaires, vous pouvez nous contacter ‡ :
+       <p>Si vous avez des questions ou si vous avez besoin de licences supplèmentaires, vous pouvez nous contacter ‡ :
        <a href="mailto:info@sertic.nl">info@sertic.nl</a></p>
     
        <p>Cordialement,<br>
