@@ -627,7 +627,7 @@ function generateInvoiceHTML(session, invoiceNumber, productsWithKeys) {
         width: 200px;
       }
       .signature-image {
-        width: 150px;
+        width: 80px;
         height: 80px;
         border-bottom: 2px solid #333;
         margin-bottom: 10px;
