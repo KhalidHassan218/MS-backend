@@ -622,23 +622,25 @@ function generateInvoiceHTML(session, invoiceNumber, productsWithKeys) {
         margin-bottom: 15px;
         line-height: 1.6;
       }
-      .signature-section {
-        text-align: center;
-        width: 200px;
-      }
-      .signature-image {
-        width: 80px;
-        height: 80px;
-        border-bottom: 2px solid #333;
-        margin-bottom: 10px;
-        margin-inline:0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .signature-image img{
-      width:100%;
-      }
+.signature-section {
+  text-align: center;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.signature-image {
+  width: 80px;
+  height: 80px;
+  border-bottom: 2px solid #333;
+  margin: 0 auto 10px auto;
+  display: block;
+}
+.signature-image img{
+  width: 100%;
+  display: block;
+  margin: 0;
+}
       .signature-label {
         font-weight: bold;
         font-size: 14px;
