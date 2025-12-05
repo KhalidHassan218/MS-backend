@@ -627,8 +627,8 @@ function generateInvoiceHTML(session, invoiceNumber, productsWithKeys) {
         width: 200px;
       }
       .signature-image {
-        width: 80px;
-        height: 80px;
+        width: 50px;
+        height: 50px;
         border-bottom: 2px solid #333;
         margin-bottom: 10px;
         display: flex;
@@ -637,6 +637,9 @@ function generateInvoiceHTML(session, invoiceNumber, productsWithKeys) {
         font-family: 'Brush Script MT', cursive;
         font-size: 36px;
         color: #333;
+      }
+      .signature-image img{
+      width:100%;
       }
       .signature-label {
         font-weight: bold;
