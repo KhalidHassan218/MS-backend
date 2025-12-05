@@ -631,12 +631,10 @@ function generateInvoiceHTML(session, invoiceNumber, productsWithKeys) {
         height: 80px;
         border-bottom: 2px solid #333;
         margin-bottom: 10px;
+        margin-inline:0;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-family: 'Brush Script MT', cursive;
-        font-size: 36px;
-        color: #333;
       }
       .signature-image img{
       width:100%;
@@ -748,7 +746,7 @@ function generateInvoiceHTML(session, invoiceNumber, productsWithKeys) {
         
         <div class="signature-section">
           <div class="signature-image">
-        <img src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2Fsergio-signature.png?alt=media&token=2e31ff09-3cac-4f42-8458-365ec0f4f147" alt="Microsoft Supplier Logo">
+        <img src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2Fsergio-signature.png?alt=media&token=18a1b49b-ae58-4494-b99d-34f3c32fae73" alt="Microsoft Supplier Logo">
           </div>
           <div class="signature-label">Signature</div>
         </div>
