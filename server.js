@@ -1,10 +1,8 @@
 require("dotenv").config();
 const express = require("express");
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY //sergio test
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY; //sergio test
 // "sk_test_51LbU1MHfTVIOkODVDGnp8QhsHfVIMExL6SS0UajaTfhs8ytFXrFw7X2raMn26h2QJWFTjHU4fClQUelQ4PAxmXg700PZ4tyKYv" omar test
-const stripe = require("stripe")(
-  stripeSecretKey
-);
+const stripe = require("stripe")(stripeSecretKey);
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const sendEmail = require("./Utils/sendEmail");
@@ -746,7 +744,9 @@ function generateInvoiceHTML(session, invoiceNumber, productsWithKeys) {
         </div>
         
         <div class="signature-section">
-          <div class="signature-image">Sertic</div>
+          <div class="signature-image">
+        <img src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2Fsergio-signature.png?alt=media&token=aae2797a-4be8-48fc-a6db-ced301a42670" alt="Microsoft Supplier Logo">
+          </div>
           <div class="signature-label">Signature</div>
         </div>
       </div>
@@ -788,7 +788,7 @@ function escapeHtml(str) {
  */
 async function assignKeysToProducts(orderId, products) {
   const results = [];
-  console.log('digitalProducts',products);
+  console.log("digitalProducts", products);
 
   for (const product of products) {
     const needed = product.quantity || 0;
@@ -817,7 +817,9 @@ async function reserveLicenseKeys(orderId, productId, neededQty) {
   const licenseKeysRef = db.collection("licenseKeys");
 
   return await db.runTransaction(async (tx) => {
-    console.log(`🔄 Transaction started: order=${orderId}, product=${productId}`);
+    console.log(
+      `🔄 Transaction started: order=${orderId}, product=${productId}`
+    );
 
     // 1️⃣ Read available keys ONLY for this product
     const snapshot = await tx.get(
@@ -827,7 +829,9 @@ async function reserveLicenseKeys(orderId, productId, neededQty) {
         .limit(neededQty)
     );
 
-    console.log(`📦 Needed=${neededQty}, Found=${snapshot.size} for product=${productId}`);
+    console.log(
+      `📦 Needed=${neededQty}, Found=${snapshot.size} for product=${productId}`
+    );
 
     if (snapshot.size < neededQty) {
       throw new Error(
@@ -855,7 +859,6 @@ async function reserveLicenseKeys(orderId, productId, neededQty) {
     return reservedKeys;
   });
 }
-
 
 app.post(
   "/webhooks",
@@ -929,7 +932,7 @@ async function processOrder(session) {
     let phisycalProducts =
       data.products?.filter((product) => !product.isDigital) ?? [];
     let productsWithKeys;
-    try {      
+    try {
       productsWithKeys = await assignKeysToProducts(orderId, digitalProducts);
     } catch (err) {
       console.error(
@@ -1196,7 +1199,7 @@ app.post("/create-checkout-session", async (req, res) => {
         language: product.selectedLangObj.lang,
         isDigital: isDigital,
         PN: PN,
-        id:product?.id
+        id: product?.id,
       };
       description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.PN}`;
     } else {
@@ -1204,7 +1207,7 @@ app.post("/create-checkout-session", async (req, res) => {
         language: `Language: English`,
         isDigital: isDigital,
         PN: PN,
-        id:product?.id
+        id: product?.id,
       };
       description = `Language: English`;
     }
