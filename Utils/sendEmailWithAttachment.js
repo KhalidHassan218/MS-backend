@@ -43,7 +43,7 @@ const sendEmailWithAttachment = async (
     secure: false,
   });
   const mailOptions = {
-    from: '"MicrosoftSupplier" <omar3691113@gmail.com>',
+    from: '<info@microsoftsupplier.com>',
     to: send_to,
     replyTo: reply_to,
     subject: subject,
