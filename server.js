@@ -89,8 +89,30 @@ app.use(express.static("public"));
 //     }
 //   }
 // }
-
-function generateLicenceHTML(session, orderId, productsWithKeys) {
+async function getNextOrderNumber() {
+  const counterRef = db.collection('counters').doc('orderCounter');
+  
+  return await db.runTransaction(async (transaction) => {
+    const counterDoc = await transaction.get(counterRef);
+    
+    if (!counterDoc.exists) {
+      // Initialize if doesn't exist
+      transaction.set(counterRef, { current: 6250 });
+      return 6250;
+    }
+    
+    const current = counterDoc.data().current;
+    const next = current + 1;
+    
+    transaction.update(counterRef, {
+      current: next,
+      lastUpdated: new Date()
+    });
+    
+    return next;
+  });
+}
+function generateLicenceHTML(session, orderId,orderNumber, productsWithKeys) {
   const customer = session.customer_details || {};
   const address = customer.address || {};
   const total = (session.amount_total || 0) / 100;
@@ -349,13 +371,13 @@ function generateLicenceHTML(session, orderId, productsWithKeys) {
       
       <div class="document-header">
         <div class="document-number">Document de licence: ${escapeHtml(
-          orderId
+          orderNumber
         )}</div>
         <div class="document-date">Date: ${invoiceDate}</div>
       </div>
       
       <div class="document-title">Document de licence: ${escapeHtml(
-        orderId
+        orderNumber
       )}</div>
       
       <div class="items-section">
@@ -389,7 +411,7 @@ function generateLicenceHTML(session, orderId, productsWithKeys) {
   </html>
   `;
 }
-function generateInvoiceHTML(session, invoiceNumber, productsWithKeys) {
+function generateInvoiceHTML(session, invoiceNumber,orderNumber, productsWithKeys) {
   const customer = session.customer_details || {};
   const address = customer.address || {};
   const total = (session.amount_total || 0) / 100;
@@ -442,7 +464,7 @@ function generateInvoiceHTML(session, invoiceNumber, productsWithKeys) {
   <html>
   <head>
     <meta charset="UTF-8">
-    <title>Facture ${escapeHtml(invoiceNumber)}</title>
+    <title>Facture ${escapeHtml(orderNumber)}</title>
     <style>
       * {
         margin: 0;
@@ -789,7 +811,7 @@ function escapeHtml(str) {
  * products: [{ productId, name, quantity, unitPrice, totalPrice }, ...]
  * returns productsWithKeys: same objects + licenseKeys: [...]
  */
-async function assignKeysToProducts(orderId, products) {
+async function assignKeysToProducts(orderId,orderNumber, products) {
   const results = [];
   console.log("digitalProducts", products);
 
@@ -798,7 +820,7 @@ async function assignKeysToProducts(orderId, products) {
     const productId = product?.productId; // or product.productId (whichever your data uses)
 
     // Reserve keys for this specific product
-    const assignedKeys = await reserveLicenseKeys(orderId, productId, needed);
+    const assignedKeys = await reserveLicenseKeys(orderId,orderNumber, productId, needed);
 
     results.push({
       ...product,
@@ -814,7 +836,7 @@ async function assignKeysToProducts(orderId, products) {
  * Returns array of key strings (e.g. ["11111-11111-..."])
  * Throws if not enough keys.
  */
-async function reserveLicenseKeys(orderId, productId, neededQty) {
+async function reserveLicenseKeys(orderId,orderNumber, productId, neededQty) {
   if (neededQty <= 0) return [];
 
   const licenseKeysRef = db.collection("licenseKeys");
@@ -853,6 +875,7 @@ async function reserveLicenseKeys(orderId, productId, neededQty) {
       tx.update(doc.ref, {
         status: "used",
         orderId,
+        orderNumber,
         usedAt: FieldValue.serverTimestamp(),
       });
     });
@@ -898,11 +921,13 @@ app.post(
 async function processOrder(session) {
   try {
     console.log("⏳ Processing order...");
+    const orderNumber = await getNextOrderNumber();
 
     const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
       expand: ["line_items.data.price.product"],
     });
     const data = {
+      orderNumber:orderNumber,
       internalEntryStatus: "pending",
       email: fullSession?.customer_details?.email,
       country: fullSession?.customer_details?.address?.country,
@@ -936,7 +961,7 @@ async function processOrder(session) {
       data.products?.filter((product) => !product.isDigital) ?? [];
     let productsWithKeys;
     try {
-      productsWithKeys = await assignKeysToProducts(orderId, digitalProducts);
+      productsWithKeys = await assignKeysToProducts(orderId, orderNumber, digitalProducts);
     } catch (err) {
       console.error(
         "❌ Not enough license keys or error reserving keys:",
@@ -966,36 +991,38 @@ async function processOrder(session) {
     const pdfBuffer = await generateLicencePDFBuffer(
       fullSession,
       orderId,
+      orderNumber,
       productsWithKeys
     );
     const invoicePdfBuffer = await generateInvoicePDFBuffer(
       fullSession,
       orderId,
+      orderNumber,
       allProducts
     );
 
     // Save file locally
     // await savePDFToFile(pdfBuffer, orderId);
-    const licensePdfUrl = await uploadPDFToFirebaseStorage(orderId, pdfBuffer);
+    const licensePdfUrl = await uploadPDFToFirebaseStorage(orderId,orderNumber, pdfBuffer);
     const invoicePdfUrl = await uploadPDFToFirebaseStorage(
-      `${orderId}-invoice`,
+      `${orderNumber}-invoice`,
       invoicePdfBuffer
     );
 
     // Save Firestore PDF record
     // await savePDFRecord(orderId, pdfUrl);
-    await savePDFRecord(`${orderId}-license`, licensePdfUrl);
-    await savePDFRecord(`${orderId}-invoice`, invoicePdfUrl);
+    await savePDFRecord(`${orderNumber}-license`, licensePdfUrl);
+    await savePDFRecord(`${orderNumber}-invoice`, invoicePdfUrl);
     let emailAttachemnts = [
       {
-        filename: `Invoice-${orderId}.pdf`,
+        filename: `Invoice-${orderNumber}.pdf`,
         content: invoicePdfBuffer, // Buffer or string
         contentType: invoicePdfBuffer.contentType || "application/pdf",
       },
     ];
     if (productsWithKeys?.length > 0) {
       emailAttachemnts.push({
-        filename: `License-${orderId}.pdf`,
+        filename: `License-${orderNumber}.pdf`,
         content: pdfBuffer, // Buffer or string
         contentType: pdfBuffer.contentType || "application/pdf",
       });
@@ -1044,10 +1071,10 @@ async function processOrder(session) {
 }
 
 // New function for generating invoice PDF
-async function generateInvoicePDFBuffer(session, orderId, productsWithKeys) {
+async function generateInvoicePDFBuffer(session, orderId,orderNumber, productsWithKeys) {
   let browser;
   try {
-    const htmlContent = generateInvoiceHTML(session, orderId, productsWithKeys);
+    const htmlContent = generateInvoiceHTML(session, orderId,orderNumber, productsWithKeys);
 
     browser = await puppeteer.launch({
       args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"], // Use chromium's recommended args
@@ -1080,7 +1107,7 @@ async function generateInvoicePDFBuffer(session, orderId, productsWithKeys) {
     }
   }
 }
-async function uploadPDFToFirebaseStorage(orderId, pdfBuffer) {
+async function uploadPDFToFirebaseStorage(orderId,orderNumber, pdfBuffer) {
   const bucket = getStorage().bucket("supplier-34b95.appspot.com"); // requires admin.initializeApp()
   const file = bucket.file(`licence/Invoice-${orderId}.pdf`);
 
@@ -1142,10 +1169,10 @@ const calculateOrderAmount = (price) => {
 // Add this test endpoint with detailed error handling
 // Updated test endpoint with compatible wait method
 // Updated test endpoint - completely compatible
-async function generateLicencePDFBuffer(session, orderId, productsWithKeys) {
+async function generateLicencePDFBuffer(session, orderId,orderNumber, productsWithKeys) {
   let browser;
   try {
-    const htmlContent = generateLicenceHTML(session, orderId, productsWithKeys);
+    const htmlContent = generateLicenceHTML(session, orderId,orderNumber, productsWithKeys);
 
     browser = await puppeteer.launch({
       args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"], // Use chromium's recommended args
