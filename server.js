@@ -1006,6 +1006,7 @@ async function processOrder(session) {
     const licensePdfUrl = await uploadPDFToFirebaseStorage(orderId,orderNumber, pdfBuffer);
     const invoicePdfUrl = await uploadPDFToFirebaseStorage(
       `${orderNumber}-invoice`,
+      orderNumber,
       invoicePdfBuffer
     );
 
