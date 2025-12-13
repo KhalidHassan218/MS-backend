@@ -7,6 +7,7 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const sendEmail = require("./Utils/sendEmail");
 const { initializeApp, cert } = require("firebase-admin/app");
+const { getAuth } = require('firebase-admin/auth');
 const {
   getFirestore,
   Timestamp,
@@ -38,6 +39,8 @@ const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
 const { v4: uuidv4 } = require("uuid");
 // const puppeteer = require('puppeteer');
 const sendEmailWithAttachment = require("./Utils/sendEmailWithAttachment");
+const generateRegistrationEmailHTML = require("./templates/newRegisteredCompaniesrequest");
+const sendAdminEmail = require("./Utils/sendAdminEmail");
 initializeApp({
   credential: cert(serviceAccount),
   storageBucket: "supplier-34b95.appspot.com", // ← ADD THIS LINE
@@ -705,7 +708,7 @@ function generateInvoiceHTML(session, invoiceNumber,orderNumber, productsWithKey
         
         <div class="invoice-info">
           <div class="invoice-number">Numéro de facture : #${escapeHtml(
-            invoiceNumber
+            orderNumber
           )}</div>
           <div class="invoice-dates">
             <div><strong>Date de facture:</strong> ${invoiceDate}</div>
@@ -1032,9 +1035,9 @@ async function processOrder(session) {
       `Votre commande chez Microsoft Supplier – Licences et documentation`,
       `<p>Bonjour ${data?.name || ""},</p>
        <p>Merci pour votre commande.<br>
-       Les licences ont ètè traitèes avec succËs et les documents sont dèsormais disponibles.</p>
+       Les licences ont ètè traitèes avec succës et les documents sont dèsormais disponibles.</p>
     
-       <p>Vous trouverez en piËces jointes :</p>
+       <p>Vous trouverez en piëces jointes :</p>
        <ul>
          <li>La facture (TVA autoliquidèe ñ Article 196 de la directive TVA de líue)</li>
          <li>Le document de licence (contenant toutes les clès de licence)</li>
@@ -1301,6 +1304,53 @@ app.post("/api/sendemail", async (req, res) => {
 
     await sendEmail(subject, message, send_to, sent_from, reply_to);
     res.status(200).json({ success: true, message: "Email Sent" });
+  } catch (error) {
+    res.status(500).json(error.message);
+  }
+});
+app.post("/api/checkUserByEmail", async (req, res) => {
+  const { email } = req.body;
+  console.log('email23',email);
+  let userFound
+  try {
+    await getAuth()
+    .getUserByEmail(email)
+    .then((userRecord) => {
+      // See the UserRecord reference doc for the contents of userRecord.
+      userFound = true
+      console.log("Successfully fetched user data:", JSON.stringify(userRecord.toJSON(), null, 2));
+
+    })
+    .catch((error) => {
+      if (error.code === "auth/user-not-found") {
+        console.log("No user exists with this email.");
+        userFound = false
+        return null;
+      }
+    });
+    res.status(200).json({ success: true, userFound: userFound});
+  } catch (error) {
+    res.status(500).json(error.message);
+  }
+});
+app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
+  const { email, companyName, taxId, companyCountry } = req.body;
+
+  let userFound
+  try {
+    await sendAdminEmail(
+      `pending Registration`,
+      generateRegistrationEmailHTML({
+        email: email,
+        company: companyName,
+        country: companyCountry,
+        type: taxId,
+      }),
+      'omar3691113@gmail.com',
+      process.env.EMAIL_USER,
+      process.env.EMAIL_USER,
+    );
+    res.status(200).json({ success: true, message: 'email to admin sent successfully'});
   } catch (error) {
     res.status(500).json(error.message);
   }
