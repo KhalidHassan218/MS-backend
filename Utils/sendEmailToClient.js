@@ -1,8 +1,10 @@
 const nodemailer = require("nodemailer");
 
-const sendEmailToAdmin = async (
+const sendEmailToClient = async (
   subject,
   message,
+  send_to,
+  sent_from,
   reply_to,
   attachment,
   maxRetries = 5
@@ -20,7 +22,7 @@ const sendEmailToAdmin = async (
   });
   const mailOptions = {
     from: '<info@microsoftsupplier.com>',
-    to: 'info@microsoftsupplier.com',
+    to: send_to,
     replyTo: reply_to,
     subject: subject,
     html: message,
@@ -54,4 +56,4 @@ const sendEmailToAdmin = async (
   throw new Error("❌ Email failed after maximum retries.");
 };
 
-module.exports = sendEmailToAdmin;
+module.exports = sendEmailToClient;

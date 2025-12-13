@@ -40,7 +40,9 @@ const { v4: uuidv4 } = require("uuid");
 // const puppeteer = require('puppeteer');
 const sendEmailWithAttachment = require("./Utils/sendEmailWithAttachment");
 const generateRegistrationEmailHTML = require("./templates/newRegisteredCompaniesrequest");
-const sendAdminEmail = require("./Utils/sendAdminEmail");
+const sendEmailToClient = require("./Utils/sendEmailToClient");
+const sendEmailToAdmin = require("./Utils/sendAdminEmail");
+const generateClientStatusEmailHTML = require("./templates/ClientNewRegisterationResponse");
 initializeApp({
   credential: cert(serviceAccount),
   storageBucket: "supplier-34b95.appspot.com", // ← ADD THIS LINE
@@ -1308,26 +1310,47 @@ app.post("/api/sendemail", async (req, res) => {
     res.status(500).json(error.message);
   }
 });
-app.post("/api/checkUserByEmail", async (req, res) => {
-  const { email } = req.body;
+app.post("/api/registerNewPendingUser", async (req, res) => {
+  const { email, companyName, taxId, companyCountry, password } = req.body;
   console.log('email23',email);
   let userFound
   try {
-    await getAuth()
-    .getUserByEmail(email)
-    .then((userRecord) => {
-      // See the UserRecord reference doc for the contents of userRecord.
-      userFound = true
-      console.log("Successfully fetched user data:", JSON.stringify(userRecord.toJSON(), null, 2));
+    // await getAuth()
+    // .getUserByEmail(email)
+    // .then((userRecord) => {
+    //   // See the UserRecord reference doc for the contents of userRecord.
+    //   userFound = true
+    //   console.log("Successfully fetched user data:", JSON.stringify(userRecord.toJSON(), null, 2));
 
-    })
-    .catch((error) => {
-      if (error.code === "auth/user-not-found") {
-        console.log("No user exists with this email.");
-        userFound = false
-        return null;
-      }
+    // })
+    // .catch((error) => {
+    //   if (error.code === "auth/user-not-found") {
+    //     console.log("No user exists with this email.");
+    //     userFound = false
+    //     return null;
+    //   }
+    // });
+    await getAuth()
+    .createUser({
+      email: email,
+      emailVerified: false,
+      disabled: true,
+      password:password
+    }).then((createdUser) => {
+      console.log('createdUser',createdUser);
+      
+     db.collection("pending_registrations").add({
+      uid:createdUser?.uid,
+      email: email,
+      taxId: taxId,
+      companyName: companyName,
+      companyCountry: companyCountry,
+      createdAt: Date.now(),
     });
+    }).catch((error) => {
+      console.log('error creating a new registered user' , error);
+      return null
+    })
     res.status(200).json({ success: true, userFound: userFound});
   } catch (error) {
     res.status(500).json(error.message);
@@ -1338,7 +1361,7 @@ app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
 
   let userFound
   try {
-    await sendAdminEmail(
+    await sendEmailToAdmin(
       `pending Registration`,
       generateRegistrationEmailHTML({
         email: email,
@@ -1355,6 +1378,73 @@ app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
     res.status(500).json(error.message);
   }
 });
+app.post("/api/accept-pendingRegistration", async (req, res) => {
+  const {uid, email, docId} = req.body;
 
+  let userFound
+  try {
+    await getAuth()
+    .updateUser(uid, {
+      disabled: false,
+    })
+    .then((userRecord) => {
+      // See the UserRecord reference doc for the contents of userRecord.
+      sendEmailToClient(
+        `pending Registration response`,
+        generateClientStatusEmailHTML(email, 'accepted'),
+        email,
+        process.env.EMAIL_USER,
+        process.env.EMAIL_USER,
+      );
+      db
+      .collection('pending_registrations')
+      .doc(docId)
+      .delete();
+
+      db.collection("registrations_history").add({
+        uid:uid,
+        email: email,
+        status: 'Accepted',
+        createdAt: Date.now(),
+      });
+    })
+    .catch((error) => {
+      console.log('Error updating user:', error);
+    });
+    res.status(200).json({ success: true, message: 'email to admin sent successfully'});
+  } catch (error) {
+    res.status(500).json(error.message);
+  }
+});
+app.post("/api/decline-pendingRegistration", async (req, res) => {
+  const {uid, email, docId} = req.body;
+
+  let userFound
+  try {
+
+      // See the UserRecord reference doc for the contents of userRecord.
+      await sendEmailToClient(
+        `pending Registration response`,
+        generateClientStatusEmailHTML(email, 'declined'),
+        email,
+        process.env.EMAIL_USER,
+        process.env.EMAIL_USER,
+      );
+      await db
+      .collection('pending_registrations')
+      .doc(docId)
+      .delete();
+      
+      await db.collection("registrations_history").add({
+        uid:uid,
+        email: email,
+        status: 'Declined',
+        createdAt: Date.now(),
+      });
+    res.status(200).json({ success: true, message: 'email to admin sent successfully'});
+  } catch (error) {
+    res.status(500).json(error.message);
+  }
+});
 const PORT = process.env.PORT || 4242;
 app.listen(PORT, () => console.log(`Node server listening on port ${PORT}`));
