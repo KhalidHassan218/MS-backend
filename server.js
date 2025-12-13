@@ -1346,7 +1346,7 @@ app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
         country: companyCountry,
         type: taxId,
       }),
-      'omar3691113@gmail.com',
+      'info@microsoftsupplier.com',
       process.env.EMAIL_USER,
       process.env.EMAIL_USER,
     );
