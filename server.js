@@ -1378,17 +1378,34 @@ app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
     res.status(500).json(error.message);
   }
 });
+
+async function getPendingDetails(docId) {
+  const docRef = db.collection('pending_registrations').doc(docId);
+  
+  // Await the promise to get the DocumentSnapshot
+  const pendingRegistrationSnapshot = await docRef.get(); 
+
+  if (pendingRegistrationSnapshot.exists) {
+    // Access the data using .data()
+    const pendingRegistrationDetails = pendingRegistrationSnapshot.data(); 
+    return pendingRegistrationDetails;
+  } else {
+    return null;
+  }
+}
 app.post("/api/accept-pendingRegistration", async (req, res) => {
   const {uid, email, docId} = req.body;
 
-  let userFound
   try {
+    // 1. Enable the user account in Firebase Auth
     await getAuth()
     .updateUser(uid, {
       disabled: false,
     })
-    .then((userRecord) => {
-      // See the UserRecord reference doc for the contents of userRecord.
+    .then( async (userRecord) => {
+      console.log(userRecord , "UserRecord");
+      
+      // 2. Send Acceptance Email
       sendEmailToClient(
         `pending Registration response`,
         generateClientStatusEmailHTML(email, 'accepted'),
@@ -1396,24 +1413,57 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
         process.env.EMAIL_USER,
         process.env.EMAIL_USER,
       );
-      db
-      .collection('pending_registrations')
-      .doc(docId)
-      .delete();
+      
+      // 3. Get Pending Registration Details
+      const pendingRegistrationSnapshot = await getPendingDetails(docId)
+      console.log(pendingRegistrationSnapshot,"pendingReg");
 
-      db.collection("registrations_history").add({
-        uid:uid,
+      // 4. *** CONSOLIDATE AND CREATE USER DOCUMENT ***
+      const newUserData = {
+        uid: uid,
+        email: email,
+        isB2B:true,
+        companyName: pendingRegistrationSnapshot.companyName,
+        companyCountry: pendingRegistrationSnapshot.companyCountry,
+        taxId: pendingRegistrationSnapshot.taxId,
+        status: 'active', // Set the initial status
+        creationTime: userRecord.metadata.creationTime, // From Auth metadata
+        acceptedAt: Date.now(), // Timestamp for acceptance
+      };
+      
+      await db
+        .collection('users')
+        .doc(uid) // Use UID as the document ID
+        .set(newUserData);
+      // **********************************************
+
+      // 5. Delete the pending registration document
+      await db
+        .collection('pending_registrations')
+        .doc(docId)
+        .delete();
+
+      // 6. Record the history
+      await db.collection("registrations_history").add({
+        uid: uid,
         email: email,
         status: 'Accepted',
         createdAt: Date.now(),
       });
-    })
+
+    }) // End of .then(async (userRecord) => { ...
     .catch((error) => {
       console.log('Error updating user:', error);
+      // Re-throw the error to be caught by the outer try/catch
+      throw new Error(`Auth Update Error: ${error.message}`); 
     });
-    res.status(200).json({ success: true, message: 'email to admin sent successfully'});
+    
+    // Success Response
+    res.status(200).json({ success: true, message: 'User accepted and created successfully'});
+    
   } catch (error) {
-    res.status(500).json(error.message);
+    // Catch errors from Auth update, Firestore operations, etc.
+    res.status(500).json({ success: false, message: error.message || "An unknown error occurred" });
   }
 });
 app.post("/api/decline-pendingRegistration", async (req, res) => {
