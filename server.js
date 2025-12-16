@@ -1393,10 +1393,43 @@ async function getPendingDetails(docId) {
     return null;
   }
 }
+
+
+// Function to safely generate the next sequential B2B Account ID
+const getNextB2BAccountId = async () => {
+  const counterRef = db.collection('settings').doc('b2b_account_id_counter');
+
+  // Use a transaction to ensure atomic increment and prevent race conditions
+  const newId = await db.runTransaction(async (t) => {
+    const doc = await t.get(counterRef);
+    
+    // Check if the counter exists (initial setup check)
+    if (!doc.exists) {
+      throw new Error("B2B ID counter not set up!");
+    }
+
+    const currentId = doc.data().last_id;
+    const prefix = doc.data().prefix || '';
+    
+    // 1. Increment the ID number
+    const nextIdNumber = currentId + 1;
+    
+    // 2. Update the counter in the transaction
+    t.update(counterRef, { last_id: nextIdNumber });
+
+    // 3. Return the fully formatted ID
+    // Example: 'B2B-10001'
+    return `${prefix}${nextIdNumber}`; 
+  });
+  
+  return newId;
+};
+
 app.post("/api/accept-pendingRegistration", async (req, res) => {
   const {uid, email, docId} = req.body;
 
   try {
+    const b2bSupplierId = await getNextB2BAccountId();
     // 1. Enable the user account in Firebase Auth
     await getAuth()
     .updateUser(uid, {
@@ -1416,13 +1449,13 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
       
       // 3. Get Pending Registration Details
       const pendingRegistrationSnapshot = await getPendingDetails(docId)
-      console.log(pendingRegistrationSnapshot,"pendingReg");
 
       // 4. *** CONSOLIDATE AND CREATE USER DOCUMENT ***
       const newUserData = {
         uid: uid,
         email: email,
         isB2B:true,
+        b2bSupplierId: b2bSupplierId,
         companyName: pendingRegistrationSnapshot.companyName,
         companyCountry: pendingRegistrationSnapshot.companyCountry,
         taxId: pendingRegistrationSnapshot.taxId,
