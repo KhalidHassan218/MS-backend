@@ -1315,7 +1315,7 @@ async function processOrder(session) {
     const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
       expand: ["line_items.data.price.product"],
     });
-    const companyCountry = item?.price?.product?.metadata?.companyCountry
+    const companyCountry = fullSession?.line_items?.data?.[0].price?.product?.metadata?.companyCountry || "US"
     const data = {
       orderNumber:orderNumber,
       internalEntryStatus: "pending",
