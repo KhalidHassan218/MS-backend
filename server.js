@@ -117,13 +117,82 @@ async function getNextOrderNumber() {
     return next;
   });
 }
-function generateLicenceHTML(session, orderId,orderNumber, productsWithKeys) {
+
+const templates = {
+  NL: {
+    language: 'nl-NL',
+    translations: {
+      documentTitle: 'Licentie document',
+      date: 'Datum',
+      position: 'Pos',
+      itemNo: 'Item-no.',
+      description: 'Beschrijving',
+      quantity: 'Aantal',
+      licenseKeys: 'Licentiesleutels',
+      installationMedia: '*Installatiemedia',
+      location: 'Europa – Nederland - Utrecht',
+      city: 'IJsselstein – Osakastraat 9, 3404DR'
+    },
+    downloadUrl: 'https://www.microsoft.com/nl-nl/software-download/windows11'
+  },
+  FR: {
+    language: 'fr-FR',
+    translations: {
+      documentTitle: 'Document de licence',
+      date: 'Date',
+      position: 'Pos',
+      itemNo: 'N° d\'article',
+      description: 'Description',
+      quantity: 'Quantité',
+      licenseKeys: 'Clés de licence',
+      installationMedia: '*Support d\'installation',
+      location: 'Europe – Pays-Bas – Utrecht',
+      city: 'IJsselstein – Osakastaat 9, 3404DR'
+    },
+    downloadUrl: 'https://www.microsoft.com/fr-fr/software-download/windows11'
+  },
+  EN: {
+    language: 'en-US',
+    translations: {
+      documentTitle: 'License document',
+      date: 'Date',
+      position: 'Pos',
+      itemNo: 'Item-no.',
+      description: 'Description',
+      quantity: 'Amount',
+      licenseKeys: 'Licensecodes',
+      installationMedia: '*Installation Media',
+      location: 'Europe – Netherlands - Utrecht',
+      city: 'IJsselstein - Osakastraat 9, 3404DR'
+    },
+    downloadUrl: 'https://www.microsoft.com/en-en/software-download/windows11'
+  },
+  DE: {
+    language: 'de-DE',
+    translations: {
+      documentTitle: 'Lizenzdokument',
+      date: 'Datum',
+      position: 'Pos',
+      itemNo: 'Artikel-Nr.',
+      description: 'Beschreibung',
+      quantity: 'Menge',
+      licenseKeys: 'Lizenzschlüssel',
+      installationMedia: '*Installationsmedien',
+      location: 'Europa – Niederlande – Utrecht',
+      city: 'IJsselstein – Osakastraat 9, 3404DR'
+    },
+    downloadUrl: 'https://www.microsoft.com/de-de/software-download/windows11'
+  }
+};
+function generateLicenceHTML(session, orderId,orderNumber, productsWithKeys,companyCountryCode = 'EN') {
+  const template = templates[companyCountryCode.toUpperCase()] || templates.EN;
+  const t = template.translations;
   const customer = session.customer_details || {};
   const address = customer.address || {};
   const total = (session.amount_total || 0) / 100;
   const currency = (session.currency || "").toUpperCase();
   const invoiceDate = new Date(session.created * 1000).toLocaleDateString(
-    "fr-FR",
+    template.language,
     {
       day: "2-digit",
       month: "long",
@@ -133,300 +202,444 @@ function generateLicenceHTML(session, orderId,orderNumber, productsWithKeys) {
 
   // Map productsWithKeys to HTML blocks
   const productsHtml = (productsWithKeys || [])
-    .map((product, idx) => {
-      const keysHtml = (product.licenseKeys || [])
-        .map((k) => `<div class="license-key">${k}</div>`)
-        .join("");
-      return `
-      <div class="product-section">
-        <div class="product-title">${escapeHtml(product.name || "")} (x${
-        product.quantity || 0
-      })</div>
-        <div class="license-keys-title">Clés de licence:</div>
-        <div class="license-keys-grid">
-          ${keysHtml}
-        </div>
-        <div class="installation-support">
-          <strong>*Support d'installation</strong><br>
-          <strong>${escapeHtml(product.name || "")}</strong><br>
-          <a href="https://www.microsoft.com/fr-fr/software-download/windows11">
-            https://www.microsoft.com/fr-fr/software-download/windows11
-          </a>
-        </div>
+  .map((product, idx) => {
+    const keysHtml = (product.licenseKeys || [])
+      .map((k) => `<div class="license-key">${k}</div>`)
+      .join("");
+    return `
+    <div class="product-section">
+      <div class="product-title">${escapeHtml(product.name || "")} (x${
+      product.quantity || 0
+    })</div>
+      <div class="license-keys-title">${t.licenseKeys}:</div>
+      <div class="license-keys-grid">
+        ${keysHtml}
       </div>
-    `;
-    })
-    .join("");
+      <div class="installation-support">
+        <strong>${t.installationMedia}</strong><br>
+        <strong>${escapeHtml(product.name || "")}</strong><br>
+        <a href="${template.downloadUrl}">
+          ${template.downloadUrl}
+        </a>
+      </div>
+    </div>
+  `;
+  })
+  .join("");
 
-  return `
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <meta charset="UTF-8">
-    <title>Document de licence</title>
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      html, body {
-        width: 100%;
-        min-height: 100%;
-        font-family: Arial, sans-serif;
-        color: #333;
-        line-height: 1.4;
-      }
-      .banner {
-        width: 100%;
-        aspect-ratio: 4 / 1;
-        background-image: url("https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2Fimage.png?alt=media&token=104e6658-bbf5-482e-8f0a-314a9d3875e0");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0 40px;
-        color: white;
-      }
-        .left h1 {
-        font-size: 32px;
-        margin: 0;
-        font-family: "Helvetica", "Arial", sans-serif;
-        font-weight: 800; /* extra bold */
-      }
-    
-      .right {
-        text-align: right;
-        font-size: 16px;
-        line-height: 1.4;
-        font-family: "Helvetica", "Arial", sans-serif;
-        font-weight: 400;
-      }
-        .text-icon{
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        }
-        .text-icon .text{
-        text-align: center;
-        }
-      .icon-block {
-        margin-top: 20px;
-        font-size: 30px;
-      }
-    
-      .icon-block span {
-        display: block;
-        margin-bottom: 10px;
-      }
-      .header-image {
-        width: 100%;
-        height: auto;
-        display: block;
-      }
-      .content {
-        padding: 15mm;
-        width: 100%;
-        height: auto;
-      }
-      .company-address {
-        margin-bottom: 15px;
-        font-size: 14px;
-      }
-      .company-address div:first-child {
-        font-weight: bold;
-        font-size: 16px;
-      }
-      .document-header {
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-        align-items: flex-end;
-        font-size: 14px;
-        margin-bottom: 15px;
-      }
-      .document-number {
-        background: #2c5aa0;
-        color: white;
-        font-weight: bold;
-        padding: 4px 8px;
-        font-size: 14px;
-      }
-      .document-title {
-        font-size: 18px;
-        font-weight: bold;
-        margin: 10px 0 15px 0;
-      }
-      .items-section {
-        margin-bottom: 30px;
-        font-size: 14px;
-      }
-      .items-header, .items-row {
-        display: grid;
-        grid-template-columns: 200px 1fr 100px;
-        gap: 10px;
-        padding: 8px 0;
-      }
-      .items-header {
-        font-weight: bold;
-        border-top: 2px solid #ddd;
-        border-bottom: 1px solid #ddd;
-        background: #f8f9fa;
-      }
-      .items-row {
-        border-bottom: 1px solid #eee;
-      }
-      .items-row a {
-        color: #2c5aa0;
-        text-decoration: none;
-        font-weight: bold;
-      }
-      .text-right {
-        text-align: right;
-      }
-      .product-section {
-        margin: 10px 0;
-        font-size: 14px;
-      }
-      .product-title {
-        color: #2c5aa0;
-        font-weight: bold;
-        margin-bottom: 10px;
-        font-size: 16px;
-      }
-      .license-keys-title {
-        font-weight: bold;
-        margin-bottom: 10px;
-        font-size: 14px;
-      }
-      .license-keys-grid {
-        display: grid;
-        grid-template-columns: repeat(2, max-content);
-        gap: 5px;
-      }
-      .license-key {
-        background: #000;
-        color: white;
-        padding: 2px 5px;
-        font-family: 'Courier New', monospace;
-        font-size: 12px;
-        letter-spacing: 1px;
-        font-weight: bold;
-        border-radius: 3px;
-        width: fit-content;
-      }
-      .installation-support {
-        border: 2px solid #2c5aa0;
-        padding: 10px 0 0 0;
-        margin: 15px 0 0;
-        font-size: 13px;
-        background: #f8f9fa;
-        width: 70%;
-      }
-      .installation-support strong {
-        color: #2c5aa0;
-        font-size: 14px;
-      }
-      .installation-support a {
-        color: #2c5aa0;
-        word-break: break-all;
-        font-weight: bold;
-      }
-      .footer {
-        margin-top: 20px;
-        text-align: center;
-      }
-      .footer img {
-        max-width: 200px;
-        height: auto;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="banner">
-  <div class="left">
-    <h1>Sertic</h1>
-  </div>
-  <div class="right">
-    <div class='text-icon'>
-    <span class='text'>Sertic.nl</span>
-      <span>🌐</span>
+return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${t.documentTitle}</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100%;
+      min-height: 100%;
+      font-family: Arial, sans-serif;
+      color: #333;
+      line-height: 1.4;
+    }
+    .banner {
+      width: 100%;
+      aspect-ratio: 4 / 1;
+      background-image: url("https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2Fimage.png?alt=media&token=104e6658-bbf5-482e-8f0a-314a9d3875e0");
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 40px;
+      color: white;
+    }
+    .left h1 {
+      font-size: 32px;
+      margin: 0;
+      font-family: "Helvetica", "Arial", sans-serif;
+      font-weight: 800;
+    }
+    .right {
+      text-align: right;
+      font-size: 16px;
+      line-height: 1.4;
+      font-family: "Helvetica", "Arial", sans-serif;
+      font-weight: 400;
+    }
+    .text-icon {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .text-icon .text {
+      text-align: right;
+    }
+    .icon-block {
+      margin-top: 20px;
+      font-size: 30px;
+    }
+    .icon-block span {
+      display: block;
+      margin-bottom: 10px;
+    }
+    .header-image {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .content {
+      padding: 15mm;
+      width: 100%;
+      height: auto;
+    }
+    .company-address {
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+    .company-address div:first-child {
+      font-weight: bold;
+      font-size: 16px;
+    }
+    .document-header {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      align-items: flex-end;
+      font-size: 14px;
+      margin-bottom: 15px;
+    }
+    .document-number {
+      background: #2c5aa0;
+      color: white;
+      font-weight: bold;
+      padding: 4px 8px;
+      font-size: 14px;
+    }
+    .document-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin: 10px 0 15px 0;
+    }
+    .items-section {
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    .items-header, .items-row {
+      display: grid;
+      grid-template-columns: 200px 1fr 100px;
+      gap: 10px;
+      padding: 8px 0;
+    }
+    .items-header {
+      font-weight: bold;
+      border-top: 2px solid #ddd;
+      border-bottom: 1px solid #ddd;
+      background: #f8f9fa;
+    }
+    .items-row {
+      border-bottom: 1px solid #eee;
+    }
+    .items-row a {
+      color: #2c5aa0;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    .text-right {
+      text-align: right;
+    }
+    .product-section {
+      margin: 10px 0;
+      font-size: 14px;
+    }
+    .product-title {
+      color: #2c5aa0;
+      font-weight: bold;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+    .license-keys-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+    .license-keys-grid {
+      display: grid;
+      grid-template-columns: repeat(2, max-content);
+      gap: 5px;
+    }
+    .license-key {
+      background: #000;
+      color: white;
+      padding: 2px 5px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      letter-spacing: 1px;
+      font-weight: bold;
+      border-radius: 3px;
+      width: fit-content;
+    }
+    .installation-support {
+      border: 2px solid #2c5aa0;
+      padding: 10px;
+      margin: 15px 0 0;
+      font-size: 13px;
+      background: #f8f9fa;
+      width: 70%;
+    }
+    .installation-support strong {
+      color: #2c5aa0;
+      font-size: 14px;
+    }
+    .installation-support a {
+      color: #2c5aa0;
+      word-break: break-all;
+      font-weight: bold;
+    }
+    .footer {
+      margin-top: 20px;
+      text-align: center;
+    }
+    .footer img {
+      max-width: 200px;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="banner">
+    <div class="left">
+      <h1>Sertic</h1>
     </div>
-    <div class='text-icon'>
-    <span class='text'>info@sertic.nl</span>
-      <span>✉️</span>
-    </div>
-    <div class='text-icon'>
-    <span class='text'>Europe – Pays-Bas – Utrecht</span>
-      <span>📍</span>
-    </div>
-    <div>IJsselstein – Osakastaat 9, 3404DR</div>
-  </div>
-</div>
-    <div class="content">
-      <div class="company-address">
-        <div>${escapeHtml(customer.name || customer.business_name || "")}</div>
-        <div>${escapeHtml(address.line1 || "")}</div>
-        <div>${escapeHtml(address.postal_code || "")}</div>
-        <div>${escapeHtml(address.country || "")}</div>
+    <div class="right">
+      <div class='text-icon'>
+        <span class='text'>Sertic.nl</span>
+        <span>🌐</span>
       </div>
-      
-      <div class="document-header">
-        <div class="document-number">Document de licence: ${escapeHtml(
-          orderNumber
-        )}</div>
-        <div class="document-date">Date: ${invoiceDate}</div>
+      <div class='text-icon'>
+        <span class='text'>info@sertic.nl</span>
+        <span>✉️</span>
       </div>
-      
-      <div class="document-title">Document de licence: ${escapeHtml(
+      <div class='text-icon'>
+        <span class='text'>${t.location}</span>
+        <span>📍</span>
+      </div>
+      <div>${t.city}</div>
+    </div>
+  </div>
+  <div class="content">
+    <div class="company-address">
+      <div>${escapeHtml(customer.name || customer.business_name || "")}</div>
+      <div>${escapeHtml(address.line1 || "")}</div>
+      <div>${escapeHtml(address.postal_code || "")}</div>
+      <div>${escapeHtml(address.country || "")}</div>
+    </div>
+    
+    <div class="document-header">
+      <div class="document-number">${t.documentTitle}: ${escapeHtml(
         orderNumber
       )}</div>
-      
-      <div class="items-section">
-        <div class="items-header">
-          <div>Pos N° d'article</div>
-          <div>Description</div>
-          <div class="text-right">Quantité</div>
-        </div>
-        ${(productsWithKeys || [])
-          .map(
-            (p, i) => `
-          <div class="items-row">
-            <div>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(
-              p.sku || ""
-            )}</div>
-            <div><a href="#">${escapeHtml(p.name || "")}</a></div>
-            <div class="text-right">${p.quantity || 0}</div>
-          </div>
-        `
-          )
-          .join("")}
-      </div>
-      
-      ${productsHtml}
-      
-      <div class="footer">
-        <img src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2FMSlogo.png?alt=media&token=f5524581-bc40-41c6-8c56-61906b61b4b0" alt="Microsoft Supplier Logo">
-      </div>
+      <div class="document-date">${t.date}: ${invoiceDate}</div>
     </div>
-  </body>
-  </html>
+    
+    <div class="document-title">${t.documentTitle}: ${escapeHtml(
+      orderNumber
+    )}</div>
+    
+    <div class="items-section">
+      <div class="items-header">
+        <div>${t.position} ${t.itemNo}</div>
+        <div>${t.description}</div>
+        <div class="text-right">${t.quantity}</div>
+      </div>
+      ${(productsWithKeys || [])
+        .map(
+          (p, i) => `
+        <div class="items-row">
+          <div>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(
+            p.sku || ""
+          )}</div>
+          <div><a href="#">${escapeHtml(p.name || "")}</a></div>
+          <div class="text-right">${p.quantity || 0}</div>
+        </div>
+      `
+        )
+        .join("")}
+    </div>
+    
+    ${productsHtml}
+    
+    <div class="footer">
+      <img src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2FMSlogo.png?alt=media&token=f5524581-bc40-41c6-8c56-61906b61b4b0" alt="Microsoft Supplier Logo">
+    </div>
+  </div>
+</body>
+</html>
   `;
 }
-function generateInvoiceHTML(session, invoiceNumber,orderNumber, productsWithKeys) {
+
+
+const invoiceTemplates = {
+  NL: {
+    language: 'nl-NL',
+    translations: {
+      invoiceNumber: 'Factuurnummer',
+      invoiceDate: 'Factuurdatum',
+      expiryDate: 'Vervaldatum',
+      date: 'DATUM',
+      description: 'BESCHRIJVING',
+      price: 'PRIJS',
+      amount: 'AANTAL',
+      total: 'TOTAAL',
+      subtotal: 'Subtotaal',
+      vat: 'BTW',
+      finalTotal: 'Eindtotaal',
+      paymentInfo: 'Betalingsinformatie',
+      bankName: 'Banknaam',
+      accountNumber: 'Rekeningnummer',
+      accountHolder: 'Rekeninghouder',
+      businessInfo: 'Zakelijke Informatie',
+      terms: 'Algemene voorwaarden',
+      termsText: 'Nadat wij een bevestiging van uw betaling hebben ontvangen,\nzullen wij uw aanvraag binnen 24 uur in behandeling nemen.',
+      signature: 'Handtekening',
+      location: 'Europa – Nederland - Utrecht',
+      city: 'IJsselstein - Osakastraat 9, 3404DR',
+      taxNote: null // No special tax note for NL
+    }
+  },
+  EN: {
+    language: 'en-US',
+    translations: {
+      invoiceNumber: 'Invoice Number',
+      invoiceDate: 'Invoice Date',
+      expiryDate: 'Expiry Date',
+      date: 'DATE',
+      description: 'DESCRIPTION',
+      price: 'PRICE',
+      amount: 'AMOUNT',
+      total: 'TOTAL',
+      subtotal: 'Subtotal',
+      vat: 'VAT',
+      finalTotal: 'Total',
+      paymentInfo: 'Payment Information',
+      bankName: 'Bank Name',
+      accountNumber: 'Account Number',
+      accountHolder: 'Account Holder',
+      businessInfo: 'Business Information',
+      terms: 'General Terms & Conditions',
+      termsText: 'After we receive confirmation of your payment,\nwe will process your request within 24 hours.',
+      signature: 'Signature',
+      location: 'Europe – Netherlands - Utrecht',
+      city: 'IJsselstein - Osakastraat 9, 3404DR',
+      taxNote: 'Digital goods — exempt from US sales tax (seller located outside US)'
+    }
+  },
+  FR: {
+    language: 'fr-FR',
+    translations: {
+      invoiceNumber: 'Numéro de facture',
+      invoiceDate: 'Date de facture',
+      expiryDate: 'Date d\'échéance',
+      date: 'DATE',
+      description: 'DESCRIPTION',
+      price: 'PRIX',
+      amount: 'QUANTITÉ',
+      total: 'TOTAL',
+      subtotal: 'Sous-total',
+      vat: 'TVA',
+      finalTotal: 'Total final',
+      paymentInfo: 'Informations de paiement',
+      bankName: 'Nom de la banque',
+      accountNumber: 'Numéro de compte',
+      accountHolder: 'Titulaire du compte',
+      businessInfo: 'Informations professionnelles',
+      terms: 'Conditions générales',
+      termsText: 'Dès réception de votre paiement,\nnous traiterons votre demande dans un délai de 24 heures.',
+      signature: 'Signature',
+      location: 'Europe – Pays-Bas – Utrecht',
+      city: 'IJsselstein - Osakstraat 9, 3404DR',
+      taxNote: 'livraison intracommunautaire (NL → FR, B2B)\nAutoliquidation de la TVA – Article 196 de la directive TVA de l\'UE.'
+    }
+  },
+  DE: {
+    language: 'de-DE',
+    translations: {
+      invoiceNumber: 'Rechnungsnummer',
+      invoiceDate: 'Rechnungsdatum',
+      expiryDate: 'Fälligkeitsdatum',
+      date: 'DATUM',
+      description: 'BESCHREIBUNG',
+      price: 'PREIS',
+      amount: 'MENGE',
+      total: 'GESAMT',
+      subtotal: 'Zwischensumme',
+      vat: 'MwSt',
+      finalTotal: 'Endsumme',
+      paymentInfo: 'Zahlungsinformationen',
+      bankName: 'Bankname',
+      accountNumber: 'Kontonummer',
+      accountHolder: 'Kontoinhaber',
+      businessInfo: 'Geschäftsinformationen',
+      terms: 'Allgemeine Geschäftsbedingungen',
+      termsText: 'Nach Erhalt Ihrer Zahlungsbestätigung,\nwerden wir Ihre Anfrage innerhalb von 24 Stunden bearbeiten.',
+      signature: 'Unterschrift',
+      location: 'Europa – Niederlande - Utrecht',
+      city: 'IJsselstein - Osakastraat 9, 3404DR',
+      taxNote: null
+    }
+  }
+};
+// Main function to generate invoice HTML
+function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKeys, companyCountryCode = 'EN') {
+  // Get template based on country code, fallback to EN if not found
+  const template = invoiceTemplates[companyCountryCode.toUpperCase()] || invoiceTemplates.EN;
+  const t = template.translations;
+  
   const customer = session.customer_details || {};
   const address = customer.address || {};
   const total = (session.amount_total || 0) / 100;
-  const subtotal = total; // Assuming no tax in this case
-  const tax = 0;
   const currency = (session.currency || "eur").toUpperCase();
-  const currencySymbol = currency === "EUR" ? "€" : currency;
+  
+  // Determine currency symbol
+  let currencySymbol = currency;
+  if (currency === "EUR") currencySymbol = "€";
+  else if (currency === "USD") currencySymbol = "$";
+  else if (currency === "GBP") currencySymbol = "£";
+  
+  // Calculate tax based on country and currency
+  let subtotal, tax, vatPercentage;
+  if (companyCountryCode.toUpperCase() === 'NL') {
+    // Netherlands: 21% VAT included
+    vatPercentage = 21;
+    subtotal = total / 1.21;
+    tax = total - subtotal;
+  } else if (companyCountryCode.toUpperCase() === 'EN' && currency === 'USD') {
+    // USA: No tax (export)
+    vatPercentage = 0;
+    subtotal = total;
+    tax = 0;
+  } else if (companyCountryCode.toUpperCase() === 'FR') {
+    // France: Tax autoliquidation (B2B)
+    vatPercentage = 21;
+    subtotal = total;
+    tax = 0;
+  } else {
+    // Default
+    subtotal = total;
+    tax = 0;
+    vatPercentage = 0;
+  }
 
+  // Format dates based on template language
   const invoiceDate = new Date(session.created * 1000).toLocaleDateString(
-    "fr-FR",
+    template.language,
     {
       day: "2-digit",
       month: "long",
@@ -437,7 +650,7 @@ function generateInvoiceHTML(session, invoiceNumber,orderNumber, productsWithKey
   // Due date is 30 days after invoice date
   const dueDate = new Date(session.created * 1000);
   dueDate.setDate(dueDate.getDate() + 30);
-  const dueDateFormatted = dueDate.toLocaleDateString("fr-FR", {
+  const dueDateFormatted = dueDate.toLocaleDateString(template.language, {
     day: "2-digit",
     month: "long",
     year: "numeric",
@@ -453,9 +666,7 @@ function generateInvoiceHTML(session, invoiceNumber,orderNumber, productsWithKey
       return `
       <tr>
         <td>${invoiceDate}</td>
-        <td>
-          ${escapeHtml(product.name || "")}
-        </td>
+        <td>${escapeHtml(product.name || "")}</td>
         <td class="text-right">${currencySymbol} ${unitPrice.toFixed(2)}</td>
         <td class="text-center">${quantity}</td>
         <td class="text-right">${currencySymbol} ${totalPrice.toFixed(2)}</td>
@@ -464,12 +675,24 @@ function generateInvoiceHTML(session, invoiceNumber,orderNumber, productsWithKey
     })
     .join("");
 
+  // Generate VAT label based on country
+  let vatLabel;
+  if (companyCountryCode.toUpperCase() === 'NL') {
+    vatLabel = `${vatPercentage}% ${t.vat}`;
+  } else if (companyCountryCode.toUpperCase() === 'EN' && currency === 'USD') {
+    vatLabel = `${t.vat}: 0% – Export outside EU`;
+  } else if (companyCountryCode.toUpperCase() === 'FR') {
+    vatLabel = `${t.vat} ${vatPercentage}% incl`;
+  } else {
+    vatLabel = `${t.vat}`;
+  }
+
   return `
   <!DOCTYPE html>
   <html>
   <head>
     <meta charset="UTF-8">
-    <title>Facture ${escapeHtml(orderNumber)}</title>
+    <title>${t.invoiceNumber} ${escapeHtml(orderNumber)}</title>
     <style>
       * {
         margin: 0;
@@ -648,26 +871,27 @@ function generateInvoiceHTML(session, invoiceNumber,orderNumber, productsWithKey
       .terms-section p {
         margin-bottom: 15px;
         line-height: 1.6;
+        white-space: pre-line;
       }
-.signature-section {
-  text-align: center;
-  width: 200px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.signature-image {
-  width: 80px;
-  height: 80px;
-  border-bottom: 2px solid #333;
-  margin: 0 auto 10px auto;
-  display: block;
-}
-.signature-image img{
-  width: 100%;
-  display: block;
-  margin: 0;
-}
+      .signature-section {
+        text-align: center;
+        width: 200px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .signature-image {
+        width: 80px;
+        height: 80px;
+        border-bottom: 2px solid #333;
+        margin: 0 auto 10px auto;
+        display: block;
+      }
+      .signature-image img {
+        width: 100%;
+        display: block;
+        margin: 0;
+      }
       .signature-label {
         font-weight: bold;
         font-size: 14px;
@@ -681,6 +905,18 @@ function generateInvoiceHTML(session, invoiceNumber,orderNumber, productsWithKey
         max-width: 250px;
         height: auto;
       }
+      .currency-note {
+        font-size: 12px;
+        font-style: italic;
+        color: #666;
+        margin-top: 5px;
+      }
+      .tax-note {
+        font-size: 12px;
+        color: #666;
+        margin-top: 10px;
+        font-style: italic;
+      }
     </style>
   </head>
   <body>
@@ -689,8 +925,10 @@ function generateInvoiceHTML(session, invoiceNumber,orderNumber, productsWithKey
         <h1>Sertic</h1>
       </div>
       <div class="right">
-        <div><strong>Europe – Pays-Bas – Utrecht</strong></div>
-        <div>IJsselstein - Osakstraat 9, 3404DR</div>
+        <div><strong>${t.location}</strong></div>
+        <div>${t.city}</div>
+        <div>info@sertic.nl</div>
+        <div>Sertic.nl</div>
       </div>
     </div>
 
@@ -703,18 +941,18 @@ function generateInvoiceHTML(session, invoiceNumber,orderNumber, productsWithKey
           <div>${escapeHtml(
             address.line1 || "STREET NAME & STREET NUMBER"
           )}</div>
-          <div>${escapeHtml(address.postal_code || "POSTAL CODE")}</div>
+          <div>${escapeHtml(address.postal_code || "POSTAL CODE")} ${escapeHtml(address.city || "CITY")}</div>
           <div>${escapeHtml(address.country || "COUNTRY")}</div>
-          <div>${escapeHtml(customer.tax_id || "TAX NUMBER")}</div>
+          ${customer.tax_id ? `<div>VAT – ID: ${escapeHtml(customer.tax_id)}</div>` : '<div>COMPANY TAX CODE</div>'}
         </div>
         
         <div class="invoice-info">
-          <div class="invoice-number">Numéro de facture : #${escapeHtml(
+          <div class="invoice-number">${t.invoiceNumber}: #${escapeHtml(
             orderNumber
           )}</div>
           <div class="invoice-dates">
-            <div><strong>Date de facture:</strong> ${invoiceDate}</div>
-            <div><strong>Date d'échéance:</strong> ${dueDateFormatted}</div>
+            <div><strong>${t.invoiceDate}:</strong> ${invoiceDate}</div>
+            <div><strong>${t.expiryDate}:</strong> ${dueDateFormatted}</div>
           </div>
         </div>
       </div>
@@ -722,11 +960,11 @@ function generateInvoiceHTML(session, invoiceNumber,orderNumber, productsWithKey
       <table class="invoice-table">
         <thead>
           <tr>
-            <th>DATE</th>
-            <th>DESCRIPTION</th>
-            <th class="text-right">PRIX</th>
-            <th class="text-center">QUANTITÉ</th>
-            <th class="text-right">TOTAL</th>
+            <th>${t.date}</th>
+            <th>${t.description}</th>
+            <th class="text-right">${t.price}</th>
+            <th class="text-center">${t.amount}</th>
+            <th class="text-right">${t.total}</th>
           </tr>
         </thead>
         <tbody>
@@ -737,47 +975,50 @@ function generateInvoiceHTML(session, invoiceNumber,orderNumber, productsWithKey
       <div class="totals-section">
         <table class="totals-table">
           <tr class="subtotal-row">
-            <td>Sous-total <sub>(TVA 21% incl)</sub>:</td>
+            <td>${t.subtotal}:</td>
             <td class="text-right">${currencySymbol} ${subtotal.toFixed(2)}</td>
           </tr>
+          <tr class="tax-row">
+            <td>${vatLabel}:</td>
+            <td class="text-right">${currencySymbol} ${tax.toFixed(2)}</td>
+          </tr>
           <tr class="total-row">
-            <td>Total final:</td>
+            <td>${t.finalTotal}:</td>
             <td class="text-right">${currencySymbol} ${total.toFixed(2)}</td>
           </tr>
         </table>
       </div>
+      
+      ${currency === 'USD' ? `<div class="currency-note">Currency: USD (United States Dollar)</div>` : ''}
+      ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ''}
 
       <div style="display: flex; justify-content: space-between;">
         <div class="payment-info">
-          <h3>Informations de paiement:</h3>
-          <div>Nom de la banque: KNAB</div>
+          <h3>${t.paymentInfo}:</h3>
+          <div>${t.bankName}: KNAB</div>
           <div>BIC: KNABNL2H</div>
-          <div>Numéro de compte: NL15 KNAB 0401 3837 92</div>
-          <div>Titulaire du compte: S.R. Eersel</div>
+          <div>${t.accountNumber}: NL15 KNAB 0401 3837 92</div>
+          <div>${t.accountHolder}: S.R. Eersel</div>
         </div>
         
         <div class="professional-info">
-          <h3>Informations professionnelles</h3>
+          <h3>${t.businessInfo}</h3>
           <div>KVK: 65 26 84 23</div>
-          <div>TVA: NL00 2264 923B 25</div>
+          <div>BTW: NL00 2264 923B 25</div>
         </div>
       </div>
 
       <div class="bottom-section">
         <div class="terms-section">
-          <h3>Conditions générales</h3>
-          <p>Dès réception de votre paiement,<br>
-          nous traiterons votre demande dans un délai de 24 heures.</p>
-          
-          <h3>livraison intracommunautaire (NL → FR, B2B)</h3>
-          <p>Autoliquidation de la TVA – Article 196 de la directive TVA de l'UE.</p>
+          <h3>${t.terms}</h3>
+          <p>${t.termsText}</p>
         </div>
         
         <div class="signature-section">
           <div class="signature-image">
-        <img src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2Fsergio-signature.png?alt=media&token=18a1b49b-ae58-4494-b99d-34f3c32fae73" alt="Microsoft Supplier Logo">
+            <img src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2Fsergio-signature.png?alt=media&token=18a1b49b-ae58-4494-b99d-34f3c32fae73" alt="Signature">
           </div>
-          <div class="signature-label">Signature</div>
+          <div class="signature-label">${t.signature}</div>
         </div>
       </div>
 
@@ -923,6 +1164,149 @@ app.post(
     }
   }
 );
+
+const emailTemplates = {
+  NL: {
+    subject: 'Uw bestelling bij Microsoft Supplier – Licenties en documentatie',
+    greeting: 'Beste',
+    thankYou: 'Bedankt voor uw bestelling.',
+    processed: 'De licenties zijn succesvol verwerkt en de documenten zijn nu beschikbaar.',
+    attachmentsIntro: 'In de bijlagen vindt u:',
+    attachments: {
+      invoice: 'De factuur',
+      license: 'Het licentiedocument (met alle licentiesleutels)'
+    },
+    importantInfoTitle: 'Belangrijke informatie:',
+    importantInfo: [
+      'De licenties worden direct online geactiveerd (telefonische activatie is niet nodig)',
+      'Garantie: 12 maanden',
+      'De licenties zijn afkomstig uit ons interne distributiesysteem'
+    ],
+    contactText: 'Als u vragen heeft of aanvullende licenties nodig heeft, kunt u contact met ons opnemen via:',
+    closing: 'Met vriendelijke groet',
+    founder: 'Founder @ Sertic'
+  },
+  EN: {
+    subject: 'Your order from Microsoft Supplier – Licenses and documentation',
+    greeting: 'Hello',
+    thankYou: 'Thank you for your order.',
+    processed: 'The licenses have been successfully processed and the documents are now available.',
+    attachmentsIntro: 'Please find attached:',
+    attachments: {
+      invoice: 'The invoice (VAT 0% – Export outside EU)',
+      license: 'The license document (containing all license keys)'
+    },
+    importantInfoTitle: 'Important information:',
+    importantInfo: [
+      'The licenses activate online immediately (no phone activation required)',
+      'Warranty: 12 months',
+      'The licenses are supplied through our internal distribution system',
+      'Delivery method: Digital ESD licenses via email (no physical shipment)',
+      'Not subject to U.S. sales tax'
+    ],
+    contactText: 'If you have any questions or need additional licenses, feel free to contact us at:',
+    closing: 'Kind regards',
+    founder: 'Founder @ Sertic'
+  },
+  FR: {
+    subject: 'Votre commande chez Microsoft Supplier – Licences et documentation',
+    greeting: 'Bonjour',
+    thankYou: 'Merci pour votre commande.',
+    processed: 'Les licences ont été traitées avec succès et les documents sont désormais disponibles.',
+    attachmentsIntro: 'Vous trouverez en pièces jointes :',
+    attachments: {
+      invoice: 'La facture (TVA autoliquidée – Article 196 de la directive TVA de l\'UE)',
+      license: 'Le document de licence (contenant toutes les clés de licence)'
+    },
+    importantInfoTitle: 'Informations importantes :',
+    importantInfo: [
+      'Les licences s\'activent directement en ligne (aucune activation téléphonique n\'est nécessaire)',
+      'Garantie : 12 mois',
+      'Les licences proviennent de notre système interne de distribution'
+    ],
+    contactText: 'Si vous avez des questions ou si vous avez besoin de licences supplémentaires, vous pouvez nous contacter à :',
+    closing: 'Cordialement',
+    founder: 'Founder @ Sertic'
+  },
+  DE: {
+    subject: 'Ihre Bestellung bei Microsoft Supplier – Lizenzen und Dokumentation',
+    greeting: 'Hallo',
+    thankYou: 'Vielen Dank für Ihre Bestellung.',
+    processed: 'Die Lizenzen wurden erfolgreich verarbeitet und die Dokumente sind jetzt verfügbar.',
+    attachmentsIntro: 'Im Anhang finden Sie:',
+    attachments: {
+      invoice: 'Die Rechnung',
+      license: 'Das Lizenzdokument (mit allen Lizenzschlüsseln)'
+    },
+    importantInfoTitle: 'Wichtige Informationen:',
+    importantInfo: [
+      'Die Lizenzen werden sofort online aktiviert (keine telefonische Aktivierung erforderlich)',
+      'Garantie: 12 Monate',
+      'Die Lizenzen stammen aus unserem internen Vertriebssystem'
+    ],
+    contactText: 'Wenn Sie Fragen haben oder zusätzliche Lizenzen benötigen, können Sie uns gerne kontaktieren unter:',
+    closing: 'Mit freundlichen Grüßen',
+    founder: 'Gründer @ Sertic'
+  }
+};
+
+function generateEmailContent(customerName, companyCountryCode = 'EN') {
+  // Get template based on country code, fallback to EN if not found
+  const template = emailTemplates[companyCountryCode.toUpperCase()] || emailTemplates.EN;
+  
+  const name = customerName || '';
+  
+  // Build important info list
+  const importantInfoList = template.importantInfo
+    .map(info => `<li>${info}</li>`)
+    .join('\n         ');
+  
+  const htmlContent = `<p>${template.greeting}${name ? ' ' + name : ''},</p>
+       <p>${template.thankYou}<br>
+       ${template.processed}</p>
+    
+       <p>${template.attachmentsIntro}</p>
+       <ul>
+         <li>${template.attachments.invoice}</li>
+         <li>${template.attachments.license}</li>
+       </ul>
+    
+       <p><strong>${template.importantInfoTitle}</strong></p>
+       <ul>
+         ${importantInfoList}
+       </ul>
+    
+       <p>${template.contactText}
+       <a href="mailto:info@sertic.nl">info@sertic.nl</a></p>
+    
+       <p>${template.closing},<br>
+       S.R. (Sergio) Eersel<br>
+       ${template.founder}</p>`;
+  
+  return {
+    subject: template.subject,
+    html: htmlContent
+  };
+}
+
+// Main function to send email with attachments
+async function sendOrderConfirmationEmail(
+  customerName,
+  customerEmail,
+  emailAttachments,
+  companyCountryCode = 'EN'
+) {
+  const emailContent = generateEmailContent(customerName, companyCountryCode);
+  
+  await sendEmailWithAttachment(
+    emailContent.subject,
+    emailContent.html,
+    customerEmail,
+    process.env.EMAIL_USER,
+    process.env.EMAIL_USER,
+    emailAttachments
+  );
+}
 async function processOrder(session) {
   try {
     console.log("⏳ Processing order...");
@@ -931,6 +1315,7 @@ async function processOrder(session) {
     const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
       expand: ["line_items.data.price.product"],
     });
+    const companyCountry = item?.price?.product?.metadata?.companyCountry
     const data = {
       orderNumber:orderNumber,
       internalEntryStatus: "pending",
@@ -952,6 +1337,7 @@ async function processOrder(session) {
         totalPrice: item?.amount_total / 100,
         isDigital: item?.price?.product?.metadata?.isDigital === "true", // Retrieve from metadata
         PN: item?.price?.product?.metadata?.PN,
+        companyCountry
       })),
     };
 
@@ -997,13 +1383,15 @@ async function processOrder(session) {
       fullSession,
       orderId,
       orderNumber,
-      productsWithKeys
+      productsWithKeys,
+      companyCountry
     );
     const invoicePdfBuffer = await generateInvoicePDFBuffer(
       fullSession,
       orderId,
       orderNumber,
-      allProducts
+      allProducts,
+      companyCountry
     );
 
     // Save file locally
@@ -1033,36 +1421,42 @@ async function processOrder(session) {
         contentType: pdfBuffer.contentType || "application/pdf",
       });
     }
-    await sendEmailWithAttachment(
-      `Votre commande chez Microsoft Supplier – Licences et documentation`,
-      `<p>Bonjour ${data?.name || ""},</p>
-       <p>Merci pour votre commande.<br>
-       Les licences ont ètè traitèes avec succës et les documents sont dèsormais disponibles.</p>
-    
-       <p>Vous trouverez en piëces jointes :</p>
-       <ul>
-         <li>La facture (TVA autoliquidèe ñ Article 196 de la directive TVA de líue)</li>
-         <li>Le document de licence (contenant toutes les clès de licence)</li>
-       </ul>
-    
-       <p><strong>Informations importantes :</strong></p>
-       <ul>
-         <li>Les licences síactivent directement en ligne (aucune activation tèlèphonique níest nècessaire)</li>
-         <li>Garantie : 12 mois</li>
-         <li>Les licences proviennent de notre systËme interne de distribution</li>
-       </ul>
-    
-       <p>Si vous avez des questions ou si vous avez besoin de licences supplèmentaires, vous pouvez nous contacter ‡ :
-       <a href="mailto:info@sertic.nl">info@sertic.nl</a></p>
-    
-       <p>Cordialement,<br>
-       S.R. (Sergio) Eersel<br>
-       Founder @ Sertic</p>`,
+    await sendOrderConfirmationEmail(
+      data?.name,
       data?.email,
-      process.env.EMAIL_USER,
-      process.env.EMAIL_USER,
-      emailAttachemnts
+      emailAttachemnts,
+      companyCountry  // 'NL', 'EN', 'FR', or 'DE'
     );
+    // await sendEmailWithAttachment(
+    //   `Votre commande chez Microsoft Supplier – Licences et documentation`,
+    //   `<p>Bonjour ${data?.name || ""},</p>
+    //    <p>Merci pour votre commande.<br>
+    //    Les licences ont ètè traitèes avec succës et les documents sont dèsormais disponibles.</p>
+    
+    //    <p>Vous trouverez en piëces jointes :</p>
+    //    <ul>
+    //      <li>La facture (TVA autoliquidèe ñ Article 196 de la directive TVA de líue)</li>
+    //      <li>Le document de licence (contenant toutes les clès de licence)</li>
+    //    </ul>
+    
+    //    <p><strong>Informations importantes :</strong></p>
+    //    <ul>
+    //      <li>Les licences síactivent directement en ligne (aucune activation tèlèphonique níest nècessaire)</li>
+    //      <li>Garantie : 12 mois</li>
+    //      <li>Les licences proviennent de notre systËme interne de distribution</li>
+    //    </ul>
+    
+    //    <p>Si vous avez des questions ou si vous avez besoin de licences supplèmentaires, vous pouvez nous contacter ‡ :
+    //    <a href="mailto:info@sertic.nl">info@sertic.nl</a></p>
+    
+    //    <p>Cordialement,<br>
+    //    S.R. (Sergio) Eersel<br>
+    //    Founder @ Sertic</p>`,
+    //   data?.email,
+    //   process.env.EMAIL_USER,
+    //   process.env.EMAIL_USER,
+    //   emailAttachemnts
+    // );
     // Update order as completed with both URLs
     await db.collection("orders").doc(orderId).update({
       invoiceGeneratedAt: new Date(),
@@ -1077,10 +1471,10 @@ async function processOrder(session) {
 }
 
 // New function for generating invoice PDF
-async function generateInvoicePDFBuffer(session, orderId,orderNumber, productsWithKeys) {
+async function generateInvoicePDFBuffer(session, orderId,orderNumber, productsWithKeys ,companyCountryCode) {
   let browser;
   try {
-    const htmlContent = generateInvoiceHTML(session, orderId,orderNumber, productsWithKeys);
+    const htmlContent = generateInvoiceHTML(session, orderId,orderNumber, productsWithKeys ,companyCountryCode);
 
     browser = await puppeteer.launch({
       args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"], // Use chromium's recommended args
@@ -1175,10 +1569,10 @@ const calculateOrderAmount = (price) => {
 // Add this test endpoint with detailed error handling
 // Updated test endpoint with compatible wait method
 // Updated test endpoint - completely compatible
-async function generateLicencePDFBuffer(session, orderId,orderNumber, productsWithKeys) {
+async function generateLicencePDFBuffer(session, orderId,orderNumber, productsWithKeys , companyCountryCode) {
   let browser;
   try {
-    const htmlContent = generateLicenceHTML(session, orderId,orderNumber, productsWithKeys);
+    const htmlContent = generateLicenceHTML(session, orderId,orderNumber, productsWithKeys , companyCountryCode);
 
     browser = await puppeteer.launch({
       args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"], // Use chromium's recommended args
@@ -1217,8 +1611,7 @@ app.post("/create-checkout-session", async (req, res) => {
   const cart = req.body.cart;
   const useremail = req.body.useremail;
   const cat = req.body.foundUser;
-
-  console.log("here", cart);
+  const userData = req.body.userData;
 
   const lineItems = cart?.map((product) => {
     let priceWVat = parseFloat(product?.priceWVat);
@@ -1236,6 +1629,7 @@ app.post("/create-checkout-session", async (req, res) => {
         isDigital: isDigital,
         PN: PN,
         id: product?.id,
+        companyCountry:userData.companyCountry
       };
       description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.PN}`;
     } else {
@@ -1244,6 +1638,7 @@ app.post("/create-checkout-session", async (req, res) => {
         isDigital: isDigital,
         PN: PN,
         id: product?.id,
+        companyCountry:userData.companyCountry
       };
       description = `Language: English`;
     }
