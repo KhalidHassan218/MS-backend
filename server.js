@@ -688,7 +688,6 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
   }
 
   return `
-  <!DOCTYPE html>
   <html>
   <head>
     <meta charset="UTF-8">
@@ -736,13 +735,13 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
         margin-bottom: 4px;
       }
       .content {
-        padding: 30px 40px;
+        padding: 20px 40px;
         width: 100%;
       }
       .top-section {
         display: flex;
         justify-content: space-between;
-        margin-bottom: 30px;
+        margin-bottom: 20px;
       }
       .customer-info {
         font-size: 14px;
@@ -770,7 +769,7 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
       .invoice-table {
         width: 100%;
         border-collapse: collapse;
-        margin: 30px 0;
+        margin: 20px 0;
         font-size: 14px;
       }
       .invoice-table thead {
@@ -778,14 +777,14 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
         color: white;
       }
       .invoice-table th {
-        padding: 12px 10px;
+        padding: 10px 10px;
         text-align: left;
         font-weight: bold;
         text-transform: uppercase;
         font-size: 13px;
       }
       .invoice-table td {
-        padding: 12px 10px;
+        padding: 10px 10px;
         border-bottom: 1px solid #e0e0e0;
       }
       .invoice-table tbody tr:hover {
@@ -798,7 +797,7 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
         text-align: center;
       }
       .totals-section {
-        margin: 30px 0;
+        margin: 20px 0;
         display: flex;
         justify-content: flex-end;
       }
@@ -810,7 +809,7 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
         border-bottom: 1px solid #e0e0e0;
       }
       .totals-table td {
-        padding: 10px;
+        padding: 8px;
       }
       .totals-table td:first-child {
         font-weight: bold;
@@ -826,20 +825,20 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
         color: white;
         font-weight: bold;
         font-size: 16px;
-        padding: 12px 10px;
+        padding: 10px 8px;
       }
       .payment-info {
-        margin: 30px 0;
+        margin: 20px 0;
         font-size: 13px;
       }
       .payment-info h3 {
         color: #8BC34A;
         font-size: 14px;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
         font-weight: bold;
       }
       .payment-info div {
-        margin-bottom: 3px;
+        margin-bottom: 2px;
       }
       .professional-info {
         text-align: right;
@@ -849,11 +848,11 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
       .professional-info h3 {
         color: #8BC34A;
         font-size: 14px;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
         font-weight: bold;
       }
       .bottom-section {
-        margin-top: 40px;
+        margin-top: 25px;
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
@@ -865,12 +864,12 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
       .terms-section h3 {
         color: #8BC34A;
         font-size: 14px;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
         font-weight: bold;
       }
       .terms-section p {
-        margin-bottom: 15px;
-        line-height: 1.6;
+        margin-bottom: 10px;
+        line-height: 1.5;
         white-space: pre-line;
       }
       .signature-section {
@@ -897,24 +896,24 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
         font-size: 14px;
       }
       .footer {
-        margin-top: 40px;
+        margin-top: 25px;
         text-align: center;
-        padding-bottom: 20px;
+        padding-bottom: 15px;
       }
       .footer img {
-        max-width: 250px;
+        max-width: 200px;
         height: auto;
       }
       .currency-note {
-        font-size: 12px;
+        font-size: 11px;
         font-style: italic;
         color: #666;
         margin-top: 5px;
       }
       .tax-note {
-        font-size: 12px;
+        font-size: 11px;
         color: #666;
-        margin-top: 10px;
+        margin-top: 8px;
         font-style: italic;
       }
     </style>
