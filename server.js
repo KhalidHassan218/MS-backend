@@ -421,15 +421,12 @@ return `
     <div class="right">
       <div class='text-icon'>
         <span class='text'>Sertic.nl</span>
-        <span>🌐</span>
       </div>
       <div class='text-icon'>
         <span class='text'>info@sertic.nl</span>
-        <span>✉️</span>
       </div>
       <div class='text-icon'>
         <span class='text'>${t.location}</span>
-        <span>📍</span>
       </div>
       <div>${t.city}</div>
     </div>
