@@ -1399,6 +1399,8 @@ async function processOrder(session) {
     const companyCountry =
       fullSession?.line_items?.data?.[0].price?.product?.metadata
         ?.companyCountry || "US";
+        const 
+        taxId = fullSession.metadata.taxId
     const data = {
       orderNumber: orderNumber,
       internalEntryStatus: "pending",
@@ -1412,7 +1414,6 @@ async function processOrder(session) {
       total: fullSession?.amount_total / 100,
       currency: fullSession?.currency,
       createdAt: new Date(fullSession?.created * 1000),
-      taxId: fullSession.metadata.taxId,
       products: fullSession?.line_items?.data?.map((item) => ({
         productId: item?.price?.product?.metadata?.id,
         name: item?.price?.product?.name,
