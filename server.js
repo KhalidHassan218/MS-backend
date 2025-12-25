@@ -985,9 +985,9 @@ function generateInvoiceHTML(
             <div>${escapeHtml(
               address.line1 || "STREET NAME & STREET NUMBER"
             )}</div>
-            <div>${escapeHtml(address.postal_code || "POSTAL CODE")} ${escapeHtml(
-    address.city || "CITY"
-  )}</div>
+            <div>${escapeHtml(
+              address.postal_code || "POSTAL CODE"
+            )} ${escapeHtml(address.city || "CITY")}</div>
             <div>${escapeHtml(address.country || "COUNTRY")}</div>
             ${
               customer.taxId
@@ -1026,7 +1026,9 @@ function generateInvoiceHTML(
           <table class="totals-table">
             <tr class="subtotal-row">
               <td>${t.subtotal}:</td>
-              <td class="text-right">${currencySymbol} ${subtotal.toFixed(2)}</td>
+              <td class="text-right">${currencySymbol} ${subtotal.toFixed(
+    2
+  )}</td>
             </tr>
             <tr class="tax-row">
               <td>${vatLabel}:</td>
@@ -1088,7 +1090,7 @@ function generateInvoiceHTML(
 
 // Helper function to escape HTML
 function escapeHtml(text) {
-  const div = document.createElement('div');
+  const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
 }
@@ -1410,7 +1412,7 @@ async function processOrder(session) {
       total: fullSession?.amount_total / 100,
       currency: fullSession?.currency,
       createdAt: new Date(fullSession?.created * 1000),
-      taxId: item?.price?.product?.metadata?.taxId, // Retrieve from metadata
+      taxId: fullSession.metadata.taxId,
       products: fullSession?.line_items?.data?.map((item) => ({
         productId: item?.price?.product?.metadata?.id,
         name: item?.price?.product?.name,
@@ -1729,8 +1731,8 @@ app.post("/create-checkout-session", async (req, res) => {
   const useremail = req.body.useremail;
   const cat = req.body.foundUser;
   const userData = req.body.userData;
-  console.log('userData',userData);
-  
+  console.log("userData", userData);
+
   const lineItems = cart?.map((product) => {
     let priceWVat = parseFloat(product?.priceWVat);
     let b2bpriceWVat = parseFloat(product?.b2bpriceWVat);
@@ -1739,7 +1741,7 @@ app.post("/create-checkout-session", async (req, res) => {
     const isDigital = product?.type === "digital software";
     let customFields = null;
     let description = "";
-    const PN = product?.PN; 
+    const PN = product?.PN;
     if (product?.selectedLangObj?.id) {
       customFields = {
         PN: product.selectedLangObj.PN,
@@ -1748,7 +1750,7 @@ app.post("/create-checkout-session", async (req, res) => {
         PN: PN,
         id: product?.id,
         companyCountry: userData.companyCountry,
-        taxId: userData.taxId,
+        // taxId: userData.taxId,
       };
       description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.PN}`;
     } else {
@@ -1758,7 +1760,7 @@ app.post("/create-checkout-session", async (req, res) => {
         PN: PN,
         id: product?.id,
         companyCountry: userData.companyCountry,
-        taxId: userData.taxId,
+        // taxId: userData.taxId,
       };
       description = `Language: English`;
     }
@@ -1787,6 +1789,9 @@ app.post("/create-checkout-session", async (req, res) => {
         enabled: true, // show Business Name field
         optional: false, // make it required
       },
+    },
+    metadata: {
+      taxId: userData.taxId, // Your variable from req.body.userData
     },
     expires_at: expirationTime,
     success_url: `${YOUR_DOMAIN}/success`,
@@ -2005,20 +2010,16 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
       });
 
     // Success Response
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "User accepted and created successfully",
-      });
+    res.status(200).json({
+      success: true,
+      message: "User accepted and created successfully",
+    });
   } catch (error) {
     // Catch errors from Auth update, Firestore operations, etc.
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: error.message || "An unknown error occurred",
-      });
+    res.status(500).json({
+      success: false,
+      message: error.message || "An unknown error occurred",
+    });
   }
 });
 app.post("/api/decline-pendingRegistration", async (req, res) => {
