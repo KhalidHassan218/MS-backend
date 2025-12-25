@@ -622,7 +622,8 @@ function generateInvoiceHTML(
   invoiceNumber,
   orderNumber,
   productsWithKeys,
-  companyCountryCode = "EN"
+  companyCountryCode = "EN",
+  taxId
 ) {
   // Get template based on country code, fallback to EN if not found
   const template =
@@ -728,11 +729,10 @@ function generateInvoiceHTML(
       }
       html, body {
         width: 100%;
-        min-height: 100%;
+        min-height: 100vh;
         font-family: Arial, sans-serif;
         color: #333;
         line-height: 1.5;
-        position: relative;
       }
       body {
         display: flex;
@@ -772,7 +772,8 @@ function generateInvoiceHTML(
         padding: 20px 40px;
         width: 100%;
         flex: 1;
-        padding-bottom: 280px;
+        display: flex;
+        flex-direction: column;
       }
       .top-section {
         display: flex;
@@ -892,6 +893,7 @@ function generateInvoiceHTML(
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
+        margin-bottom: 20px;
       }
       .terms-section {
         flex: 1;
@@ -932,15 +934,12 @@ function generateInvoiceHTML(
         font-size: 14px;
       }
       .footer {
-        margin-top: 25px;
         text-align: center;
-        padding-bottom: 15px;
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: white;
         padding: 20px 0;
+        background: white;
+        width: 100%;
+        border-top: 1px solid #e0e0e0;
+        margin-top: auto;
       }
       .footer img {
         max-width: 200px;
@@ -958,6 +957,9 @@ function generateInvoiceHTML(
         margin-top: 8px;
         font-style: italic;
       }
+      .invoice-content {
+        flex: 1;
+      }
     </style>
   </head>
   <body>
@@ -974,102 +976,104 @@ function generateInvoiceHTML(
     </div>
 
     <div class="content">
-      <div class="top-section">
-        <div class="customer-info">
-          <div><strong>${escapeHtml(
-            customer.name || customer.business_name || "COMPANY NAME"
-          )}</strong></div>
-          <div>${escapeHtml(
-            address.line1 || "STREET NAME & STREET NUMBER"
-          )}</div>
-          <div>${escapeHtml(address.postal_code || "POSTAL CODE")} ${escapeHtml(
+      <div class="invoice-content">
+        <div class="top-section">
+          <div class="customer-info">
+            <div><strong>${escapeHtml(
+              customer.name || customer.business_name || "COMPANY NAME"
+            )}</strong></div>
+            <div>${escapeHtml(
+              address.line1 || "STREET NAME & STREET NUMBER"
+            )}</div>
+            <div>${escapeHtml(address.postal_code || "POSTAL CODE")} ${escapeHtml(
     address.city || "CITY"
   )}</div>
-          <div>${escapeHtml(address.country || "COUNTRY")}</div>
-          ${
-            customer.taxId
-              ? `<div>Tax ID: ${escapeHtml(customer.taxId)}</div>`
-              : "<div>COMPANY TAX CODE</div>"
-          }
-        </div>
-        
-        <div class="invoice-info">
-          <div class="invoice-number">${t.invoiceNumber}: #${escapeHtml(
+            <div>${escapeHtml(address.country || "COUNTRY")}</div>
+            ${
+              customer.taxId
+                ? `<div>Tax ID: ${escapeHtml(taxId)}</div>`
+                : "<div>COMPANY TAX CODE</div>"
+            }
+          </div>
+          
+          <div class="invoice-info">
+            <div class="invoice-number">${t.invoiceNumber}: #${escapeHtml(
     orderNumber
   )}</div>
-          <div class="invoice-dates">
-            <div><strong>${t.invoiceDate}:</strong> ${invoiceDate}</div>
-            <div><strong>${t.expiryDate}:</strong> ${dueDateFormatted}</div>
+            <div class="invoice-dates">
+              <div><strong>${t.invoiceDate}:</strong> ${invoiceDate}</div>
+              <div><strong>${t.expiryDate}:</strong> ${dueDateFormatted}</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <table class="invoice-table">
-        <thead>
-          <tr>
-            <th>${t.date}</th>
-            <th>${t.description}</th>
-            <th class="text-right">${t.price}</th>
-            <th class="text-center">${t.amount}</th>
-            <th class="text-right">${t.total}</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${productsRows}
-        </tbody>
-      </table>
-
-      <div class="totals-section">
-        <table class="totals-table">
-          <tr class="subtotal-row">
-            <td>${t.subtotal}:</td>
-            <td class="text-right">${currencySymbol} ${subtotal.toFixed(2)}</td>
-          </tr>
-          <tr class="tax-row">
-            <td>${vatLabel}:</td>
-            <td class="text-right">${currencySymbol} ${tax.toFixed(2)}</td>
-          </tr>
-          <tr class="total-row">
-            <td>${t.finalTotal}:</td>
-            <td class="text-right">${currencySymbol} ${total.toFixed(2)}</td>
-          </tr>
+        <table class="invoice-table">
+          <thead>
+            <tr>
+              <th>${t.date}</th>
+              <th>${t.description}</th>
+              <th class="text-right">${t.price}</th>
+              <th class="text-center">${t.amount}</th>
+              <th class="text-right">${t.total}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${productsRows}
+          </tbody>
         </table>
-      </div>
-      
-      ${
-        currency === "USD"
-          ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
-          : ""
-      }
-      ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ""}
 
-      <div style="display: flex; justify-content: space-between;">
-        <div class="payment-info">
-          <h3>${t.paymentInfo}:</h3>
-          <div>${t.bankName}: KNAB</div>
-          <div>BIC: KNABNL2H</div>
-          <div>${t.accountNumber}: NL15 KNAB 0401 3837 92</div>
-          <div>${t.accountHolder}: S.R. Eersel</div>
+        <div class="totals-section">
+          <table class="totals-table">
+            <tr class="subtotal-row">
+              <td>${t.subtotal}:</td>
+              <td class="text-right">${currencySymbol} ${subtotal.toFixed(2)}</td>
+            </tr>
+            <tr class="tax-row">
+              <td>${vatLabel}:</td>
+              <td class="text-right">${currencySymbol} ${tax.toFixed(2)}</td>
+            </tr>
+            <tr class="total-row">
+              <td>${t.finalTotal}:</td>
+              <td class="text-right">${currencySymbol} ${total.toFixed(2)}</td>
+            </tr>
+          </table>
         </div>
         
-        <div class="professional-info">
-          <h3>${t.businessInfo}</h3>
-          <div>KVK: 65 26 84 23</div>
-          <div>BTW: NL00 2264 923B 25</div>
-        </div>
-      </div>
+        ${
+          currency === "USD"
+            ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
+            : ""
+        }
+        ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ""}
 
-      <div class="bottom-section">
-        <div class="terms-section">
-          <h3>${t.terms}</h3>
-          <p>${t.termsText}</p>
-        </div>
-        
-        <div class="signature-section">
-          <div class="signature-image">
-            <img src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2Fsergio-signature.png?alt=media&token=18a1b49b-ae58-4494-b99d-34f3c32fae73" alt="Signature">
+        <div style="display: flex; justify-content: space-between;">
+          <div class="payment-info">
+            <h3>${t.paymentInfo}:</h3>
+            <div>${t.bankName}: KNAB</div>
+            <div>BIC: KNABNL2H</div>
+            <div>${t.accountNumber}: NL15 KNAB 0401 3837 92</div>
+            <div>${t.accountHolder}: S.R. Eersel</div>
           </div>
-          <div class="signature-label">${t.signature}</div>
+          
+          <div class="professional-info">
+            <h3>${t.businessInfo}</h3>
+            <div>KVK: 65 26 84 23</div>
+            <div>BTW: NL00 2264 923B 25</div>
+          </div>
+        </div>
+
+        <div class="bottom-section">
+          <div class="terms-section">
+            <h3>${t.terms}</h3>
+            <p>${t.termsText}</p>
+          </div>
+          
+          <div class="signature-section">
+            <div class="signature-image">
+              <img src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2Fsergio-signature.png?alt=media&token=18a1b49b-ae58-4494-b99d-34f3c32fae73" alt="Signature">
+            </div>
+            <div class="signature-label">${t.signature}</div>
+          </div>
         </div>
       </div>
 
@@ -1080,6 +1084,13 @@ function generateInvoiceHTML(
   </body>
   </html>
   `;
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 // Helper function to escape HTML
@@ -1399,6 +1410,7 @@ async function processOrder(session) {
       total: fullSession?.amount_total / 100,
       currency: fullSession?.currency,
       createdAt: new Date(fullSession?.created * 1000),
+      taxId: item?.price?.product?.metadata?.taxId, // Retrieve from metadata
       products: fullSession?.line_items?.data?.map((item) => ({
         productId: item?.price?.product?.metadata?.id,
         name: item?.price?.product?.name,
@@ -1465,7 +1477,8 @@ async function processOrder(session) {
       orderId,
       orderNumber,
       allProducts,
-      companyCountry
+      companyCountry,
+      taxId
     );
 
     // Save file locally
@@ -1554,7 +1567,8 @@ async function generateInvoicePDFBuffer(
   orderId,
   orderNumber,
   productsWithKeys,
-  companyCountryCode
+  companyCountryCode,
+  taxId
 ) {
   let browser;
   try {
@@ -1563,7 +1577,8 @@ async function generateInvoicePDFBuffer(
       orderId,
       orderNumber,
       productsWithKeys,
-      companyCountryCode
+      companyCountryCode,
+      taxId
     );
 
     browser = await puppeteer.launch({
@@ -1714,7 +1729,8 @@ app.post("/create-checkout-session", async (req, res) => {
   const useremail = req.body.useremail;
   const cat = req.body.foundUser;
   const userData = req.body.userData;
-
+  console.log('userData',userData);
+  
   const lineItems = cart?.map((product) => {
     let priceWVat = parseFloat(product?.priceWVat);
     let b2bpriceWVat = parseFloat(product?.b2bpriceWVat);
@@ -1723,7 +1739,7 @@ app.post("/create-checkout-session", async (req, res) => {
     const isDigital = product?.type === "digital software";
     let customFields = null;
     let description = "";
-    const PN = product?.PN;
+    const PN = product?.PN; 
     if (product?.selectedLangObj?.id) {
       customFields = {
         PN: product.selectedLangObj.PN,
