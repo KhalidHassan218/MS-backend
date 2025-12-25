@@ -7,7 +7,7 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const sendEmail = require("./Utils/sendEmail");
 const { initializeApp, cert } = require("firebase-admin/app");
-const { getAuth } = require('firebase-admin/auth');
+const { getAuth } = require("firebase-admin/auth");
 const {
   getFirestore,
   Timestamp,
@@ -95,96 +95,102 @@ app.use(express.static("public"));
 //   }
 // }
 async function getNextOrderNumber() {
-  const counterRef = db.collection('counters').doc('orderCounter');
-  
+  const counterRef = db.collection("counters").doc("orderCounter");
+
   return await db.runTransaction(async (transaction) => {
     const counterDoc = await transaction.get(counterRef);
-    
+
     if (!counterDoc.exists) {
       // Initialize if doesn't exist
       transaction.set(counterRef, { current: 6250 });
       return 6250;
     }
-    
+
     const current = counterDoc.data().current;
     const next = current + 1;
-    
+
     transaction.update(counterRef, {
       current: next,
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
     });
-    
+
     return next;
   });
 }
 
 const templates = {
   NL: {
-    language: 'nl-NL',
+    language: "nl-NL",
     translations: {
-      documentTitle: 'Licentie document',
-      date: 'Datum',
-      position: 'Pos',
-      itemNo: 'Item-no.',
-      description: 'Beschrijving',
-      quantity: 'Aantal',
-      licenseKeys: 'Licentiesleutels',
-      installationMedia: '*Installatiemedia',
-      location: 'Europa – Nederland - Utrecht',
-      city: 'IJsselstein – Osakastraat 9, 3404DR'
+      documentTitle: "Licentie document",
+      date: "Datum",
+      position: "Pos",
+      itemNo: "Item-no.",
+      description: "Beschrijving",
+      quantity: "Aantal",
+      licenseKeys: "Licentiesleutels",
+      installationMedia: "*Installatiemedia",
+      location: "Europa – Nederland - Utrecht",
+      city: "IJsselstein – Osakastraat 9, 3404DR",
     },
-    downloadUrl: 'https://www.microsoft.com/nl-nl/software-download/windows11'
+    downloadUrl: "https://www.microsoft.com/nl-nl/software-download/windows11",
   },
   FR: {
-    language: 'fr-FR',
+    language: "fr-FR",
     translations: {
-      documentTitle: 'Document de licence',
-      date: 'Date',
-      position: 'Pos',
-      itemNo: 'N° d\'article',
-      description: 'Description',
-      quantity: 'Quantité',
-      licenseKeys: 'Clés de licence',
-      installationMedia: '*Support d\'installation',
-      location: 'Europe – Pays-Bas – Utrecht',
-      city: 'IJsselstein – Osakastaat 9, 3404DR'
+      documentTitle: "Document de licence",
+      date: "Date",
+      position: "Pos",
+      itemNo: "N° d'article",
+      description: "Description",
+      quantity: "Quantité",
+      licenseKeys: "Clés de licence",
+      installationMedia: "*Support d'installation",
+      location: "Europe – Pays-Bas – Utrecht",
+      city: "IJsselstein – Osakastaat 9, 3404DR",
     },
-    downloadUrl: 'https://www.microsoft.com/fr-fr/software-download/windows11'
+    downloadUrl: "https://www.microsoft.com/fr-fr/software-download/windows11",
   },
   EN: {
-    language: 'en-US',
+    language: "en-US",
     translations: {
-      documentTitle: 'License document',
-      date: 'Date',
-      position: 'Pos',
-      itemNo: 'Item-no.',
-      description: 'Description',
-      quantity: 'Amount',
-      licenseKeys: 'Licensecodes',
-      installationMedia: '*Installation Media',
-      location: 'Europe – Netherlands - Utrecht',
-      city: 'IJsselstein - Osakastraat 9, 3404DR'
+      documentTitle: "License document",
+      date: "Date",
+      position: "Pos",
+      itemNo: "Item-no.",
+      description: "Description",
+      quantity: "Amount",
+      licenseKeys: "Licensecodes",
+      installationMedia: "*Installation Media",
+      location: "Europe – Netherlands - Utrecht",
+      city: "IJsselstein - Osakastraat 9, 3404DR",
     },
-    downloadUrl: 'https://www.microsoft.com/en-en/software-download/windows11'
+    downloadUrl: "https://www.microsoft.com/en-en/software-download/windows11",
   },
   DE: {
-    language: 'de-DE',
+    language: "de-DE",
     translations: {
-      documentTitle: 'Lizenzdokument',
-      date: 'Datum',
-      position: 'Pos',
-      itemNo: 'Artikel-Nr.',
-      description: 'Beschreibung',
-      quantity: 'Menge',
-      licenseKeys: 'Lizenzschlüssel',
-      installationMedia: '*Installationsmedien',
-      location: 'Europa – Niederlande – Utrecht',
-      city: 'IJsselstein – Osakastraat 9, 3404DR'
+      documentTitle: "Lizenzdokument",
+      date: "Datum",
+      position: "Pos",
+      itemNo: "Artikel-Nr.",
+      description: "Beschreibung",
+      quantity: "Menge",
+      licenseKeys: "Lizenzschlüssel",
+      installationMedia: "*Installationsmedien",
+      location: "Europa – Niederlande – Utrecht",
+      city: "IJsselstein – Osakastraat 9, 3404DR",
     },
-    downloadUrl: 'https://www.microsoft.com/de-de/software-download/windows11'
-  }
+    downloadUrl: "https://www.microsoft.com/de-de/software-download/windows11",
+  },
 };
-function generateLicenceHTML(session, orderId,orderNumber, productsWithKeys,companyCountryCode = 'EN') {
+function generateLicenceHTML(
+  session,
+  orderId,
+  orderNumber,
+  productsWithKeys,
+  companyCountryCode = "EN"
+) {
   const template = templates[companyCountryCode.toUpperCase()] || templates.EN;
   const t = template.translations;
   const customer = session.customer_details || {};
@@ -202,15 +208,15 @@ function generateLicenceHTML(session, orderId,orderNumber, productsWithKeys,comp
 
   // Map productsWithKeys to HTML blocks
   const productsHtml = (productsWithKeys || [])
-  .map((product, idx) => {
-    const keysHtml = (product.licenseKeys || [])
-      .map((k) => `<div class="license-key">${k}</div>`)
-      .join("");
-    return `
+    .map((product, idx) => {
+      const keysHtml = (product.licenseKeys || [])
+        .map((k) => `<div class="license-key">${k}</div>`)
+        .join("");
+      return `
     <div class="product-section">
       <div class="product-title">${escapeHtml(product.name || "")} (x${
-      product.quantity || 0
-    })</div>
+        product.quantity || 0
+      })</div>
       <div class="license-keys-title">${t.licenseKeys}:</div>
       <div class="license-keys-grid">
         ${keysHtml}
@@ -224,10 +230,10 @@ function generateLicenceHTML(session, orderId,orderNumber, productsWithKeys,comp
       </div>
     </div>
   `;
-  })
-  .join("");
+    })
+    .join("");
 
-return `
+  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -245,6 +251,12 @@ return `
       font-family: Arial, sans-serif;
       color: #333;
       line-height: 1.4;
+      position: relative;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
     }
     .banner {
       width: 100%;
@@ -298,6 +310,8 @@ return `
       padding: 15mm;
       width: 100%;
       height: auto;
+      flex: 1;
+      padding-bottom: 100px;
     }
     .company-address {
       margin-bottom: 15px;
@@ -406,6 +420,12 @@ return `
     .footer {
       margin-top: 20px;
       text-align: center;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      padding: 20px 0;
     }
     .footer img {
       max-width: 200px;
@@ -441,14 +461,14 @@ return `
     
     <div class="document-header">
       <div class="document-number">${t.documentTitle}: ${escapeHtml(
-        orderNumber
-      )}</div>
+    orderNumber
+  )}</div>
       <div class="document-date">${t.date}: ${invoiceDate}</div>
     </div>
     
     <div class="document-title">${t.documentTitle}: ${escapeHtml(
-      orderNumber
-    )}</div>
+    orderNumber
+  )}</div>
     
     <div class="items-section">
       <div class="items-header">
@@ -460,9 +480,7 @@ return `
         .map(
           (p, i) => `
         <div class="items-row">
-          <div>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(
-            p.sku || ""
-          )}</div>
+          <div>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(p.sku || "")}</div>
           <div><a href="#">${escapeHtml(p.name || "")}</a></div>
           <div class="text-right">${p.quantity || 0}</div>
         </div>
@@ -482,147 +500,160 @@ return `
   `;
 }
 
-
 const invoiceTemplates = {
   NL: {
-    language: 'nl-NL',
+    language: "nl-NL",
     translations: {
-      invoiceNumber: 'Factuurnummer',
-      invoiceDate: 'Factuurdatum',
-      expiryDate: 'Vervaldatum',
-      date: 'DATUM',
-      description: 'BESCHRIJVING',
-      price: 'PRIJS',
-      amount: 'AANTAL',
-      total: 'TOTAAL',
-      subtotal: 'Subtotaal',
-      vat: 'BTW',
-      finalTotal: 'Eindtotaal',
-      paymentInfo: 'Betalingsinformatie',
-      bankName: 'Banknaam',
-      accountNumber: 'Rekeningnummer',
-      accountHolder: 'Rekeninghouder',
-      businessInfo: 'Zakelijke Informatie',
-      terms: 'Algemene voorwaarden',
-      termsText: 'Nadat wij een bevestiging van uw betaling hebben ontvangen,\nzullen wij uw aanvraag binnen 24 uur in behandeling nemen.',
-      signature: 'Handtekening',
-      location: 'Europa – Nederland - Utrecht',
-      city: 'IJsselstein - Osakastraat 9, 3404DR',
-      taxNote: null // No special tax note for NL
-    }
+      invoiceNumber: "Factuurnummer",
+      invoiceDate: "Factuurdatum",
+      expiryDate: "Vervaldatum",
+      date: "DATUM",
+      description: "BESCHRIJVING",
+      price: "PRIJS",
+      amount: "AANTAL",
+      total: "TOTAAL",
+      subtotal: "Subtotaal",
+      vat: "BTW",
+      finalTotal: "Eindtotaal",
+      paymentInfo: "Betalingsinformatie",
+      bankName: "Banknaam",
+      accountNumber: "Rekeningnummer",
+      accountHolder: "Rekeninghouder",
+      businessInfo: "Zakelijke Informatie",
+      terms: "Algemene voorwaarden",
+      termsText:
+        "Nadat wij een bevestiging van uw betaling hebben ontvangen,\nzullen wij uw aanvraag binnen 24 uur in behandeling nemen.",
+      signature: "Handtekening",
+      location: "Europa – Nederland - Utrecht",
+      city: "IJsselstein - Osakastraat 9, 3404DR",
+      taxNote: null, // No special tax note for NL
+    },
   },
   EN: {
-    language: 'en-US',
+    language: "en-US",
     translations: {
-      invoiceNumber: 'Invoice Number',
-      invoiceDate: 'Invoice Date',
-      expiryDate: 'Expiry Date',
-      date: 'DATE',
-      description: 'DESCRIPTION',
-      price: 'PRICE',
-      amount: 'AMOUNT',
-      total: 'TOTAL',
-      subtotal: 'Subtotal',
-      vat: 'VAT',
-      finalTotal: 'Total',
-      paymentInfo: 'Payment Information',
-      bankName: 'Bank Name',
-      accountNumber: 'Account Number',
-      accountHolder: 'Account Holder',
-      businessInfo: 'Business Information',
-      terms: 'General Terms & Conditions',
-      termsText: 'After we receive confirmation of your payment,\nwe will process your request within 24 hours.',
-      signature: 'Signature',
-      location: 'Europe – Netherlands - Utrecht',
-      city: 'IJsselstein - Osakastraat 9, 3404DR',
-      taxNote: 'Digital goods — exempt from US sales tax (seller located outside US)'
-    }
+      invoiceNumber: "Invoice Number",
+      invoiceDate: "Invoice Date",
+      expiryDate: "Expiry Date",
+      date: "DATE",
+      description: "DESCRIPTION",
+      price: "PRICE",
+      amount: "AMOUNT",
+      total: "TOTAL",
+      subtotal: "Subtotal",
+      vat: "VAT",
+      finalTotal: "Total",
+      paymentInfo: "Payment Information",
+      bankName: "Bank Name",
+      accountNumber: "Account Number",
+      accountHolder: "Account Holder",
+      businessInfo: "Business Information",
+      terms: "General Terms & Conditions",
+      termsText:
+        "After we receive confirmation of your payment,\nwe will process your request within 24 hours.",
+      signature: "Signature",
+      location: "Europe – Netherlands - Utrecht",
+      city: "IJsselstein - Osakastraat 9, 3404DR",
+      taxNote:
+        "Digital goods — exempt from US sales tax (seller located outside US)",
+    },
   },
   FR: {
-    language: 'fr-FR',
+    language: "fr-FR",
     translations: {
-      invoiceNumber: 'Numéro de facture',
-      invoiceDate: 'Date de facture',
-      expiryDate: 'Date d\'échéance',
-      date: 'DATE',
-      description: 'DESCRIPTION',
-      price: 'PRIX',
-      amount: 'QUANTITÉ',
-      total: 'TOTAL',
-      subtotal: 'Sous-total',
-      vat: 'TVA',
-      finalTotal: 'Total final',
-      paymentInfo: 'Informations de paiement',
-      bankName: 'Nom de la banque',
-      accountNumber: 'Numéro de compte',
-      accountHolder: 'Titulaire du compte',
-      businessInfo: 'Informations professionnelles',
-      terms: 'Conditions générales',
-      termsText: 'Dès réception de votre paiement,\nnous traiterons votre demande dans un délai de 24 heures.',
-      signature: 'Signature',
-      location: 'Europe – Pays-Bas – Utrecht',
-      city: 'IJsselstein - Osakstraat 9, 3404DR',
-      taxNote: 'livraison intracommunautaire (NL → FR, B2B)\nAutoliquidation de la TVA – Article 196 de la directive TVA de l\'UE.'
-    }
+      invoiceNumber: "Numéro de facture",
+      invoiceDate: "Date de facture",
+      expiryDate: "Date d'échéance",
+      date: "DATE",
+      description: "DESCRIPTION",
+      price: "PRIX",
+      amount: "QUANTITÉ",
+      total: "TOTAL",
+      subtotal: "Sous-total",
+      vat: "TVA",
+      finalTotal: "Total final",
+      paymentInfo: "Informations de paiement",
+      bankName: "Nom de la banque",
+      accountNumber: "Numéro de compte",
+      accountHolder: "Titulaire du compte",
+      businessInfo: "Informations professionnelles",
+      terms: "Conditions générales",
+      termsText:
+        "Dès réception de votre paiement,\nnous traiterons votre demande dans un délai de 24 heures.",
+      signature: "Signature",
+      location: "Europe – Pays-Bas – Utrecht",
+      city: "IJsselstein - Osakstraat 9, 3404DR",
+      taxNote:
+        "livraison intracommunautaire (NL → FR, B2B)\nAutoliquidation de la TVA – Article 196 de la directive TVA de l'UE.",
+    },
   },
   DE: {
-    language: 'de-DE',
+    language: "de-DE",
     translations: {
-      invoiceNumber: 'Rechnungsnummer',
-      invoiceDate: 'Rechnungsdatum',
-      expiryDate: 'Fälligkeitsdatum',
-      date: 'DATUM',
-      description: 'BESCHREIBUNG',
-      price: 'PREIS',
-      amount: 'MENGE',
-      total: 'GESAMT',
-      subtotal: 'Zwischensumme',
-      vat: 'MwSt',
-      finalTotal: 'Endsumme',
-      paymentInfo: 'Zahlungsinformationen',
-      bankName: 'Bankname',
-      accountNumber: 'Kontonummer',
-      accountHolder: 'Kontoinhaber',
-      businessInfo: 'Geschäftsinformationen',
-      terms: 'Allgemeine Geschäftsbedingungen',
-      termsText: 'Nach Erhalt Ihrer Zahlungsbestätigung,\nwerden wir Ihre Anfrage innerhalb von 24 Stunden bearbeiten.',
-      signature: 'Unterschrift',
-      location: 'Europa – Niederlande - Utrecht',
-      city: 'IJsselstein - Osakastraat 9, 3404DR',
-      taxNote: null
-    }
-  }
+      invoiceNumber: "Rechnungsnummer",
+      invoiceDate: "Rechnungsdatum",
+      expiryDate: "Fälligkeitsdatum",
+      date: "DATUM",
+      description: "BESCHREIBUNG",
+      price: "PREIS",
+      amount: "MENGE",
+      total: "GESAMT",
+      subtotal: "Zwischensumme",
+      vat: "MwSt",
+      finalTotal: "Endsumme",
+      paymentInfo: "Zahlungsinformationen",
+      bankName: "Bankname",
+      accountNumber: "Kontonummer",
+      accountHolder: "Kontoinhaber",
+      businessInfo: "Geschäftsinformationen",
+      terms: "Allgemeine Geschäftsbedingungen",
+      termsText:
+        "Nach Erhalt Ihrer Zahlungsbestätigung,\nwerden wir Ihre Anfrage innerhalb von 24 Stunden bearbeiten.",
+      signature: "Unterschrift",
+      location: "Europa – Niederlande - Utrecht",
+      city: "IJsselstein - Osakastraat 9, 3404DR",
+      taxNote: null,
+    },
+  },
 };
 // Main function to generate invoice HTML
-function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKeys, companyCountryCode = 'EN') {
+function generateInvoiceHTML(
+  session,
+  invoiceNumber,
+  orderNumber,
+  productsWithKeys,
+  companyCountryCode = "EN"
+) {
   // Get template based on country code, fallback to EN if not found
-  const template = invoiceTemplates[companyCountryCode.toUpperCase()] || invoiceTemplates.EN;
+  const template =
+    invoiceTemplates[companyCountryCode.toUpperCase()] || invoiceTemplates.EN;
   const t = template.translations;
-  
+
   const customer = session.customer_details || {};
+  console.log("customer", customer);
   const address = customer.address || {};
   const total = (session.amount_total || 0) / 100;
   const currency = (session.currency || "eur").toUpperCase();
-  
+
   // Determine currency symbol
   let currencySymbol = currency;
   if (currency === "EUR") currencySymbol = "€";
   else if (currency === "USD") currencySymbol = "$";
   else if (currency === "GBP") currencySymbol = "£";
-  
+
   // Calculate tax based on country and currency
   let subtotal, tax, vatPercentage;
-  if (companyCountryCode.toUpperCase() === 'NL') {
+  if (companyCountryCode.toUpperCase() === "NL") {
     // Netherlands: 21% VAT included
     vatPercentage = 21;
     subtotal = total / 1.21;
     tax = total - subtotal;
-  } else if (companyCountryCode.toUpperCase() === 'EN' && currency === 'USD') {
+  } else if (companyCountryCode.toUpperCase() === "EN" && currency === "USD") {
     // USA: No tax (export)
     vatPercentage = 0;
     subtotal = total;
     tax = 0;
-  } else if (companyCountryCode.toUpperCase() === 'FR') {
+  } else if (companyCountryCode.toUpperCase() === "FR") {
     // France: Tax autoliquidation (B2B)
     vatPercentage = 21;
     subtotal = total;
@@ -674,11 +705,11 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
 
   // Generate VAT label based on country
   let vatLabel;
-  if (companyCountryCode.toUpperCase() === 'NL') {
+  if (companyCountryCode.toUpperCase() === "NL") {
     vatLabel = `${vatPercentage}% ${t.vat}`;
-  } else if (companyCountryCode.toUpperCase() === 'EN' && currency === 'USD') {
+  } else if (companyCountryCode.toUpperCase() === "EN" && currency === "USD") {
     vatLabel = `${t.vat}: 0% – Export outside EU`;
-  } else if (companyCountryCode.toUpperCase() === 'FR') {
+  } else if (companyCountryCode.toUpperCase() === "FR") {
     vatLabel = `${t.vat} ${vatPercentage}% incl`;
   } else {
     vatLabel = `${t.vat}`;
@@ -701,6 +732,12 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
         font-family: Arial, sans-serif;
         color: #333;
         line-height: 1.5;
+        position: relative;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
       }
       .banner {
         width: 100%;
@@ -734,6 +771,8 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
       .content {
         padding: 20px 40px;
         width: 100%;
+        flex: 1;
+        padding-bottom: 280px;
       }
       .top-section {
         display: flex;
@@ -896,6 +935,12 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
         margin-top: 25px;
         text-align: center;
         padding-bottom: 15px;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        padding: 20px 0;
       }
       .footer img {
         max-width: 200px;
@@ -937,15 +982,21 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
           <div>${escapeHtml(
             address.line1 || "STREET NAME & STREET NUMBER"
           )}</div>
-          <div>${escapeHtml(address.postal_code || "POSTAL CODE")} ${escapeHtml(address.city || "CITY")}</div>
+          <div>${escapeHtml(address.postal_code || "POSTAL CODE")} ${escapeHtml(
+    address.city || "CITY"
+  )}</div>
           <div>${escapeHtml(address.country || "COUNTRY")}</div>
-          ${customer.tax_id ? `<div>VAT – ID: ${escapeHtml(customer.tax_id)}</div>` : '<div>COMPANY TAX CODE</div>'}
+          ${
+            customer.taxId
+              ? `<div>Tax ID: ${escapeHtml(customer.taxId)}</div>`
+              : "<div>COMPANY TAX CODE</div>"
+          }
         </div>
         
         <div class="invoice-info">
           <div class="invoice-number">${t.invoiceNumber}: #${escapeHtml(
-            orderNumber
-          )}</div>
+    orderNumber
+  )}</div>
           <div class="invoice-dates">
             <div><strong>${t.invoiceDate}:</strong> ${invoiceDate}</div>
             <div><strong>${t.expiryDate}:</strong> ${dueDateFormatted}</div>
@@ -985,8 +1036,12 @@ function generateInvoiceHTML(session, invoiceNumber, orderNumber, productsWithKe
         </table>
       </div>
       
-      ${currency === 'USD' ? `<div class="currency-note">Currency: USD (United States Dollar)</div>` : ''}
-      ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ''}
+      ${
+        currency === "USD"
+          ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
+          : ""
+      }
+      ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ""}
 
       <div style="display: flex; justify-content: space-between;">
         <div class="payment-info">
@@ -1053,7 +1108,7 @@ function escapeHtml(str) {
  * products: [{ productId, name, quantity, unitPrice, totalPrice }, ...]
  * returns productsWithKeys: same objects + licenseKeys: [...]
  */
-async function assignKeysToProducts(orderId,orderNumber, products) {
+async function assignKeysToProducts(orderId, orderNumber, products) {
   const results = [];
   console.log("digitalProducts", products);
 
@@ -1062,7 +1117,12 @@ async function assignKeysToProducts(orderId,orderNumber, products) {
     const productId = product?.productId; // or product.productId (whichever your data uses)
 
     // Reserve keys for this specific product
-    const assignedKeys = await reserveLicenseKeys(orderId,orderNumber, productId, needed);
+    const assignedKeys = await reserveLicenseKeys(
+      orderId,
+      orderNumber,
+      productId,
+      needed
+    );
 
     results.push({
       ...product,
@@ -1078,7 +1138,7 @@ async function assignKeysToProducts(orderId,orderNumber, products) {
  * Returns array of key strings (e.g. ["11111-11111-..."])
  * Throws if not enough keys.
  */
-async function reserveLicenseKeys(orderId,orderNumber, productId, neededQty) {
+async function reserveLicenseKeys(orderId, orderNumber, productId, neededQty) {
   if (neededQty <= 0) return [];
 
   const licenseKeysRef = db.collection("licenseKeys");
@@ -1163,101 +1223,113 @@ app.post(
 
 const emailTemplates = {
   NL: {
-    subject: 'Uw bestelling bij Microsoft Supplier – Licenties en documentatie',
-    greeting: 'Beste',
-    thankYou: 'Bedankt voor uw bestelling.',
-    processed: 'De licenties zijn succesvol verwerkt en de documenten zijn nu beschikbaar.',
-    attachmentsIntro: 'In de bijlagen vindt u:',
+    subject: "Uw bestelling bij Microsoft Supplier – Licenties en documentatie",
+    greeting: "Beste",
+    thankYou: "Bedankt voor uw bestelling.",
+    processed:
+      "De licenties zijn succesvol verwerkt en de documenten zijn nu beschikbaar.",
+    attachmentsIntro: "In de bijlagen vindt u:",
     attachments: {
-      invoice: 'De factuur',
-      license: 'Het licentiedocument (met alle licentiesleutels)'
+      invoice: "De factuur",
+      license: "Het licentiedocument (met alle licentiesleutels)",
     },
-    importantInfoTitle: 'Belangrijke informatie:',
+    importantInfoTitle: "Belangrijke informatie:",
     importantInfo: [
-      'De licenties worden direct online geactiveerd (telefonische activatie is niet nodig)',
-      'Garantie: 12 maanden',
-      'De licenties zijn afkomstig uit ons interne distributiesysteem'
+      "De licenties worden direct online geactiveerd (telefonische activatie is niet nodig)",
+      "Garantie: 12 maanden",
+      "De licenties zijn afkomstig uit ons interne distributiesysteem",
     ],
-    contactText: 'Als u vragen heeft of aanvullende licenties nodig heeft, kunt u contact met ons opnemen via:',
-    closing: 'Met vriendelijke groet',
-    founder: 'Founder @ Sertic'
+    contactText:
+      "Als u vragen heeft of aanvullende licenties nodig heeft, kunt u contact met ons opnemen via:",
+    closing: "Met vriendelijke groet",
+    founder: "Founder @ Sertic",
   },
   EN: {
-    subject: 'Your order from Microsoft Supplier – Licenses and documentation',
-    greeting: 'Hello',
-    thankYou: 'Thank you for your order.',
-    processed: 'The licenses have been successfully processed and the documents are now available.',
-    attachmentsIntro: 'Please find attached:',
+    subject: "Your order from Microsoft Supplier – Licenses and documentation",
+    greeting: "Hello",
+    thankYou: "Thank you for your order.",
+    processed:
+      "The licenses have been successfully processed and the documents are now available.",
+    attachmentsIntro: "Please find attached:",
     attachments: {
-      invoice: 'The invoice (VAT 0% – Export outside EU)',
-      license: 'The license document (containing all license keys)'
+      invoice: "The invoice (VAT 0% – Export outside EU)",
+      license: "The license document (containing all license keys)",
     },
-    importantInfoTitle: 'Important information:',
+    importantInfoTitle: "Important information:",
     importantInfo: [
-      'The licenses activate online immediately (no phone activation required)',
-      'Warranty: 12 months',
-      'The licenses are supplied through our internal distribution system',
-      'Delivery method: Digital ESD licenses via email (no physical shipment)',
-      'Not subject to U.S. sales tax'
+      "The licenses activate online immediately (no phone activation required)",
+      "Warranty: 12 months",
+      "The licenses are supplied through our internal distribution system",
+      "Delivery method: Digital ESD licenses via email (no physical shipment)",
+      "Not subject to U.S. sales tax",
     ],
-    contactText: 'If you have any questions or need additional licenses, feel free to contact us at:',
-    closing: 'Kind regards',
-    founder: 'Founder @ Sertic'
+    contactText:
+      "If you have any questions or need additional licenses, feel free to contact us at:",
+    closing: "Kind regards",
+    founder: "Founder @ Sertic",
   },
   FR: {
-    subject: 'Votre commande chez Microsoft Supplier – Licences et documentation',
-    greeting: 'Bonjour',
-    thankYou: 'Merci pour votre commande.',
-    processed: 'Les licences ont été traitées avec succès et les documents sont désormais disponibles.',
-    attachmentsIntro: 'Vous trouverez en pièces jointes :',
+    subject:
+      "Votre commande chez Microsoft Supplier – Licences et documentation",
+    greeting: "Bonjour",
+    thankYou: "Merci pour votre commande.",
+    processed:
+      "Les licences ont été traitées avec succès et les documents sont désormais disponibles.",
+    attachmentsIntro: "Vous trouverez en pièces jointes :",
     attachments: {
-      invoice: 'La facture (TVA autoliquidée – Article 196 de la directive TVA de l\'UE)',
-      license: 'Le document de licence (contenant toutes les clés de licence)'
+      invoice:
+        "La facture (TVA autoliquidée – Article 196 de la directive TVA de l'UE)",
+      license: "Le document de licence (contenant toutes les clés de licence)",
     },
-    importantInfoTitle: 'Informations importantes :',
+    importantInfoTitle: "Informations importantes :",
     importantInfo: [
-      'Les licences s\'activent directement en ligne (aucune activation téléphonique n\'est nécessaire)',
-      'Garantie : 12 mois',
-      'Les licences proviennent de notre système interne de distribution'
+      "Les licences s'activent directement en ligne (aucune activation téléphonique n'est nécessaire)",
+      "Garantie : 12 mois",
+      "Les licences proviennent de notre système interne de distribution",
     ],
-    contactText: 'Si vous avez des questions ou si vous avez besoin de licences supplémentaires, vous pouvez nous contacter à :',
-    closing: 'Cordialement',
-    founder: 'Founder @ Sertic'
+    contactText:
+      "Si vous avez des questions ou si vous avez besoin de licences supplémentaires, vous pouvez nous contacter à :",
+    closing: "Cordialement",
+    founder: "Founder @ Sertic",
   },
   DE: {
-    subject: 'Ihre Bestellung bei Microsoft Supplier – Lizenzen und Dokumentation',
-    greeting: 'Hallo',
-    thankYou: 'Vielen Dank für Ihre Bestellung.',
-    processed: 'Die Lizenzen wurden erfolgreich verarbeitet und die Dokumente sind jetzt verfügbar.',
-    attachmentsIntro: 'Im Anhang finden Sie:',
+    subject:
+      "Ihre Bestellung bei Microsoft Supplier – Lizenzen und Dokumentation",
+    greeting: "Hallo",
+    thankYou: "Vielen Dank für Ihre Bestellung.",
+    processed:
+      "Die Lizenzen wurden erfolgreich verarbeitet und die Dokumente sind jetzt verfügbar.",
+    attachmentsIntro: "Im Anhang finden Sie:",
     attachments: {
-      invoice: 'Die Rechnung',
-      license: 'Das Lizenzdokument (mit allen Lizenzschlüsseln)'
+      invoice: "Die Rechnung",
+      license: "Das Lizenzdokument (mit allen Lizenzschlüsseln)",
     },
-    importantInfoTitle: 'Wichtige Informationen:',
+    importantInfoTitle: "Wichtige Informationen:",
     importantInfo: [
-      'Die Lizenzen werden sofort online aktiviert (keine telefonische Aktivierung erforderlich)',
-      'Garantie: 12 Monate',
-      'Die Lizenzen stammen aus unserem internen Vertriebssystem'
+      "Die Lizenzen werden sofort online aktiviert (keine telefonische Aktivierung erforderlich)",
+      "Garantie: 12 Monate",
+      "Die Lizenzen stammen aus unserem internen Vertriebssystem",
     ],
-    contactText: 'Wenn Sie Fragen haben oder zusätzliche Lizenzen benötigen, können Sie uns gerne kontaktieren unter:',
-    closing: 'Mit freundlichen Grüßen',
-    founder: 'Gründer @ Sertic'
-  }
+    contactText:
+      "Wenn Sie Fragen haben oder zusätzliche Lizenzen benötigen, können Sie uns gerne kontaktieren unter:",
+    closing: "Mit freundlichen Grüßen",
+    founder: "Gründer @ Sertic",
+  },
 };
 
-function generateEmailContent(customerName, companyCountryCode = 'EN') {
+function generateEmailContent(customerName, companyCountryCode = "EN") {
   // Get template based on country code, fallback to EN if not found
-  const template = emailTemplates[companyCountryCode.toUpperCase()] || emailTemplates.EN;
-  
-  const name = customerName || '';
-  
+  const template =
+    emailTemplates[companyCountryCode.toUpperCase()] || emailTemplates.EN;
+
+  const name = customerName || "";
+
   // Build important info list
   const importantInfoList = template.importantInfo
-    .map(info => `<li>${info}</li>`)
-    .join('\n         ');
-  
-  const htmlContent = `<p>${template.greeting}${name ? ' ' + name : ''},</p>
+    .map((info) => `<li>${info}</li>`)
+    .join("\n         ");
+
+  const htmlContent = `<p>${template.greeting}${name ? " " + name : ""},</p>
        <p>${template.thankYou}<br>
        ${template.processed}</p>
     
@@ -1278,10 +1350,10 @@ function generateEmailContent(customerName, companyCountryCode = 'EN') {
        <p>${template.closing},<br>
        S.R. (Sergio) Eersel<br>
        ${template.founder}</p>`;
-  
+
   return {
     subject: template.subject,
-    html: htmlContent
+    html: htmlContent,
   };
 }
 
@@ -1290,10 +1362,10 @@ async function sendOrderConfirmationEmail(
   customerName,
   customerEmail,
   emailAttachments,
-  companyCountryCode = 'EN'
+  companyCountryCode = "EN"
 ) {
   const emailContent = generateEmailContent(customerName, companyCountryCode);
-  
+
   await sendEmailWithAttachment(
     emailContent.subject,
     emailContent.html,
@@ -1311,9 +1383,11 @@ async function processOrder(session) {
     const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
       expand: ["line_items.data.price.product"],
     });
-    const companyCountry = fullSession?.line_items?.data?.[0].price?.product?.metadata?.companyCountry || "US"
+    const companyCountry =
+      fullSession?.line_items?.data?.[0].price?.product?.metadata
+        ?.companyCountry || "US";
     const data = {
-      orderNumber:orderNumber,
+      orderNumber: orderNumber,
       internalEntryStatus: "pending",
       email: fullSession?.customer_details?.email,
       country: fullSession?.customer_details?.address?.country,
@@ -1333,7 +1407,7 @@ async function processOrder(session) {
         totalPrice: item?.amount_total / 100,
         isDigital: item?.price?.product?.metadata?.isDigital === "true", // Retrieve from metadata
         PN: item?.price?.product?.metadata?.PN,
-        companyCountry
+        companyCountry,
       })),
     };
 
@@ -1348,7 +1422,11 @@ async function processOrder(session) {
       data.products?.filter((product) => !product.isDigital) ?? [];
     let productsWithKeys;
     try {
-      productsWithKeys = await assignKeysToProducts(orderId, orderNumber, digitalProducts);
+      productsWithKeys = await assignKeysToProducts(
+        orderId,
+        orderNumber,
+        digitalProducts
+      );
     } catch (err) {
       console.error(
         "❌ Not enough license keys or error reserving keys:",
@@ -1392,7 +1470,11 @@ async function processOrder(session) {
 
     // Save file locally
     // await savePDFToFile(pdfBuffer, orderId);
-    const licensePdfUrl = await uploadPDFToFirebaseStorage(orderId,orderNumber, pdfBuffer);
+    const licensePdfUrl = await uploadPDFToFirebaseStorage(
+      orderId,
+      orderNumber,
+      pdfBuffer
+    );
     const invoicePdfUrl = await uploadPDFToFirebaseStorage(
       `${orderNumber}-invoice`,
       orderNumber,
@@ -1421,30 +1503,30 @@ async function processOrder(session) {
       data?.name,
       data?.email,
       emailAttachemnts,
-      companyCountry  // 'NL', 'EN', 'FR', or 'DE'
+      companyCountry // 'NL', 'EN', 'FR', or 'DE'
     );
     // await sendEmailWithAttachment(
     //   `Votre commande chez Microsoft Supplier – Licences et documentation`,
     //   `<p>Bonjour ${data?.name || ""},</p>
     //    <p>Merci pour votre commande.<br>
     //    Les licences ont ètè traitèes avec succës et les documents sont dèsormais disponibles.</p>
-    
+
     //    <p>Vous trouverez en piëces jointes :</p>
     //    <ul>
     //      <li>La facture (TVA autoliquidèe ñ Article 196 de la directive TVA de líue)</li>
     //      <li>Le document de licence (contenant toutes les clès de licence)</li>
     //    </ul>
-    
+
     //    <p><strong>Informations importantes :</strong></p>
     //    <ul>
     //      <li>Les licences síactivent directement en ligne (aucune activation tèlèphonique níest nècessaire)</li>
     //      <li>Garantie : 12 mois</li>
     //      <li>Les licences proviennent de notre systËme interne de distribution</li>
     //    </ul>
-    
+
     //    <p>Si vous avez des questions ou si vous avez besoin de licences supplèmentaires, vous pouvez nous contacter ‡ :
     //    <a href="mailto:info@sertic.nl">info@sertic.nl</a></p>
-    
+
     //    <p>Cordialement,<br>
     //    S.R. (Sergio) Eersel<br>
     //    Founder @ Sertic</p>`,
@@ -1467,10 +1549,22 @@ async function processOrder(session) {
 }
 
 // New function for generating invoice PDF
-async function generateInvoicePDFBuffer(session, orderId,orderNumber, productsWithKeys ,companyCountryCode) {
+async function generateInvoicePDFBuffer(
+  session,
+  orderId,
+  orderNumber,
+  productsWithKeys,
+  companyCountryCode
+) {
   let browser;
   try {
-    const htmlContent = generateInvoiceHTML(session, orderId,orderNumber, productsWithKeys ,companyCountryCode);
+    const htmlContent = generateInvoiceHTML(
+      session,
+      orderId,
+      orderNumber,
+      productsWithKeys,
+      companyCountryCode
+    );
 
     browser = await puppeteer.launch({
       args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"], // Use chromium's recommended args
@@ -1503,7 +1597,7 @@ async function generateInvoicePDFBuffer(session, orderId,orderNumber, productsWi
     }
   }
 }
-async function uploadPDFToFirebaseStorage(orderId,orderNumber, pdfBuffer) {
+async function uploadPDFToFirebaseStorage(orderId, orderNumber, pdfBuffer) {
   const bucket = getStorage().bucket("supplier-34b95.appspot.com"); // requires admin.initializeApp()
   const file = bucket.file(`licence/Invoice-${orderId}.pdf`);
 
@@ -1565,10 +1659,22 @@ const calculateOrderAmount = (price) => {
 // Add this test endpoint with detailed error handling
 // Updated test endpoint with compatible wait method
 // Updated test endpoint - completely compatible
-async function generateLicencePDFBuffer(session, orderId,orderNumber, productsWithKeys , companyCountryCode) {
+async function generateLicencePDFBuffer(
+  session,
+  orderId,
+  orderNumber,
+  productsWithKeys,
+  companyCountryCode
+) {
   let browser;
   try {
-    const htmlContent = generateLicenceHTML(session, orderId,orderNumber, productsWithKeys , companyCountryCode);
+    const htmlContent = generateLicenceHTML(
+      session,
+      orderId,
+      orderNumber,
+      productsWithKeys,
+      companyCountryCode
+    );
 
     browser = await puppeteer.launch({
       args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"], // Use chromium's recommended args
@@ -1625,7 +1731,8 @@ app.post("/create-checkout-session", async (req, res) => {
         isDigital: isDigital,
         PN: PN,
         id: product?.id,
-        companyCountry:userData.companyCountry
+        companyCountry: userData.companyCountry,
+        taxId: userData.taxId,
       };
       description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.PN}`;
     } else {
@@ -1634,7 +1741,8 @@ app.post("/create-checkout-session", async (req, res) => {
         isDigital: isDigital,
         PN: PN,
         id: product?.id,
-        companyCountry:userData.companyCountry
+        companyCountry: userData.companyCountry,
+        taxId: userData.taxId,
       };
       description = `Language: English`;
     }
@@ -1703,8 +1811,7 @@ app.post("/api/sendemail", async (req, res) => {
 });
 app.post("/api/registerNewPendingUser", async (req, res) => {
   const { email, companyName, taxId, companyCountry, password } = req.body;
-  console.log('email23',email);
-  let userFound
+  let userFound;
   try {
     // await getAuth()
     // .getUserByEmail(email)
@@ -1722,27 +1829,29 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
     //   }
     // });
     await getAuth()
-    .createUser({
-      email: email,
-      emailVerified: false,
-      disabled: true,
-      password:password
-    }).then((createdUser) => {
-      console.log('createdUser',createdUser);
-      
-     db.collection("pending_registrations").add({
-      uid:createdUser?.uid,
-      email: email,
-      taxId: taxId,
-      companyName: companyName,
-      companyCountry: companyCountry,
-      createdAt: Date.now(),
-    });
-    }).catch((error) => {
-      console.log('error creating a new registered user' , error);
-      return null
-    })
-    res.status(200).json({ success: true, userFound: userFound});
+      .createUser({
+        email: email,
+        emailVerified: false,
+        disabled: true,
+        password: password,
+      })
+      .then((createdUser) => {
+        console.log("createdUser", createdUser);
+
+        db.collection("pending_registrations").add({
+          uid: createdUser?.uid,
+          email: email,
+          taxId: taxId,
+          companyName: companyName,
+          companyCountry: companyCountry,
+          createdAt: Date.now(),
+        });
+      })
+      .catch((error) => {
+        console.log("error creating a new registered user", error);
+        return null;
+      });
+    res.status(200).json({ success: true, userFound: userFound });
   } catch (error) {
     res.status(500).json(error.message);
   }
@@ -1750,7 +1859,7 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
 app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
   const { email, companyName, taxId, companyCountry } = req.body;
 
-  let userFound
+  let userFound;
   try {
     await sendEmailToAdmin(
       `pending Registration`,
@@ -1760,162 +1869,166 @@ app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
         country: companyCountry,
         type: taxId,
       }),
-      'info@microsoftsupplier.com',
+      "info@microsoftsupplier.com",
       process.env.EMAIL_USER,
-      process.env.EMAIL_USER,
+      process.env.EMAIL_USER
     );
-    res.status(200).json({ success: true, message: 'email to admin sent successfully'});
+    res
+      .status(200)
+      .json({ success: true, message: "email to admin sent successfully" });
   } catch (error) {
     res.status(500).json(error.message);
   }
 });
 
 async function getPendingDetails(docId) {
-  const docRef = db.collection('pending_registrations').doc(docId);
-  
+  const docRef = db.collection("pending_registrations").doc(docId);
+
   // Await the promise to get the DocumentSnapshot
-  const pendingRegistrationSnapshot = await docRef.get(); 
+  const pendingRegistrationSnapshot = await docRef.get();
 
   if (pendingRegistrationSnapshot.exists) {
     // Access the data using .data()
-    const pendingRegistrationDetails = pendingRegistrationSnapshot.data(); 
+    const pendingRegistrationDetails = pendingRegistrationSnapshot.data();
     return pendingRegistrationDetails;
   } else {
     return null;
   }
 }
 
-
 // Function to safely generate the next sequential B2B Account ID
 const getNextB2BAccountId = async () => {
-  const counterRef = db.collection('settings').doc('b2b_account_id_counter');
+  const counterRef = db.collection("settings").doc("b2b_account_id_counter");
 
   // Use a transaction to ensure atomic increment and prevent race conditions
   const newId = await db.runTransaction(async (t) => {
     const doc = await t.get(counterRef);
-    
+
     // Check if the counter exists (initial setup check)
     if (!doc.exists) {
       throw new Error("B2B ID counter not set up!");
     }
 
     const currentId = doc.data().last_id;
-    const prefix = doc.data().prefix || '';
-    
+    const prefix = doc.data().prefix || "";
+
     // 1. Increment the ID number
     const nextIdNumber = currentId + 1;
-    
+
     // 2. Update the counter in the transaction
     t.update(counterRef, { last_id: nextIdNumber });
 
     // 3. Return the fully formatted ID
     // Example: 'B2B-10001'
-    return `${prefix}${nextIdNumber}`; 
+    return `${prefix}${nextIdNumber}`;
   });
-  
+
   return newId;
 };
 
 app.post("/api/accept-pendingRegistration", async (req, res) => {
-  const {uid, email, docId} = req.body;
+  const { uid, email, docId } = req.body;
 
   try {
     const b2bSupplierId = await getNextB2BAccountId();
     // 1. Enable the user account in Firebase Auth
     await getAuth()
-    .updateUser(uid, {
-      disabled: false,
-    })
-    .then( async (userRecord) => {
-      console.log(userRecord , "UserRecord");
-      
-      // 2. Send Acceptance Email
-      sendEmailToClient(
-        `pending Registration response`,
-        generateClientStatusEmailHTML(email, 'accepted'),
-        email,
-        process.env.EMAIL_USER,
-        process.env.EMAIL_USER,
-      );
-      
-      // 3. Get Pending Registration Details
-      const pendingRegistrationSnapshot = await getPendingDetails(docId)
+      .updateUser(uid, {
+        disabled: false,
+      })
+      .then(async (userRecord) => {
+        console.log(userRecord, "UserRecord");
 
-      // 4. *** CONSOLIDATE AND CREATE USER DOCUMENT ***
-      const newUserData = {
-        uid: uid,
-        email: email,
-        isB2B:true,
-        b2bSupplierId: b2bSupplierId,
-        companyName: pendingRegistrationSnapshot.companyName,
-        companyCountry: pendingRegistrationSnapshot.companyCountry,
-        taxId: pendingRegistrationSnapshot.taxId,
-        status: 'active', // Set the initial status
-        creationTime: userRecord.metadata.creationTime, // From Auth metadata
-        acceptedAt: Date.now(), // Timestamp for acceptance
-      };
-      
-      await db
-        .collection('users')
-        .doc(uid) // Use UID as the document ID
-        .set(newUserData);
-      // **********************************************
+        // 2. Send Acceptance Email
+        sendEmailToClient(
+          `pending Registration response`,
+          generateClientStatusEmailHTML(email, "accepted"),
+          email,
+          process.env.EMAIL_USER,
+          process.env.EMAIL_USER
+        );
 
-      // 5. Delete the pending registration document
-      await db
-        .collection('pending_registrations')
-        .doc(docId)
-        .delete();
+        // 3. Get Pending Registration Details
+        const pendingRegistrationSnapshot = await getPendingDetails(docId);
 
-      // 6. Record the history
-      await db.collection("registrations_history").add({
-        uid: uid,
-        email: email,
-        status: 'Accepted',
-        createdAt: Date.now(),
+        // 4. *** CONSOLIDATE AND CREATE USER DOCUMENT ***
+        const newUserData = {
+          uid: uid,
+          email: email,
+          isB2B: true,
+          b2bSupplierId: b2bSupplierId,
+          companyName: pendingRegistrationSnapshot.companyName,
+          companyCountry: pendingRegistrationSnapshot.companyCountry,
+          taxId: pendingRegistrationSnapshot.taxId,
+          status: "active", // Set the initial status
+          creationTime: userRecord.metadata.creationTime, // From Auth metadata
+          acceptedAt: Date.now(), // Timestamp for acceptance
+        };
+
+        await db
+          .collection("users")
+          .doc(uid) // Use UID as the document ID
+          .set(newUserData);
+        // **********************************************
+
+        // 5. Delete the pending registration document
+        await db.collection("pending_registrations").doc(docId).delete();
+
+        // 6. Record the history
+        await db.collection("registrations_history").add({
+          uid: uid,
+          email: email,
+          status: "Accepted",
+          createdAt: Date.now(),
+        });
+      }) // End of .then(async (userRecord) => { ...
+      .catch((error) => {
+        console.log("Error updating user:", error);
+        // Re-throw the error to be caught by the outer try/catch
+        throw new Error(`Auth Update Error: ${error.message}`);
       });
 
-    }) // End of .then(async (userRecord) => { ...
-    .catch((error) => {
-      console.log('Error updating user:', error);
-      // Re-throw the error to be caught by the outer try/catch
-      throw new Error(`Auth Update Error: ${error.message}`); 
-    });
-    
     // Success Response
-    res.status(200).json({ success: true, message: 'User accepted and created successfully'});
-    
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "User accepted and created successfully",
+      });
   } catch (error) {
     // Catch errors from Auth update, Firestore operations, etc.
-    res.status(500).json({ success: false, message: error.message || "An unknown error occurred" });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: error.message || "An unknown error occurred",
+      });
   }
 });
 app.post("/api/decline-pendingRegistration", async (req, res) => {
-  const {uid, email, docId} = req.body;
+  const { uid, email, docId } = req.body;
 
-  let userFound
+  let userFound;
   try {
+    // See the UserRecord reference doc for the contents of userRecord.
+    await sendEmailToClient(
+      `pending Registration response`,
+      generateClientStatusEmailHTML(email, "declined"),
+      email,
+      process.env.EMAIL_USER,
+      process.env.EMAIL_USER
+    );
+    await db.collection("pending_registrations").doc(docId).delete();
 
-      // See the UserRecord reference doc for the contents of userRecord.
-      await sendEmailToClient(
-        `pending Registration response`,
-        generateClientStatusEmailHTML(email, 'declined'),
-        email,
-        process.env.EMAIL_USER,
-        process.env.EMAIL_USER,
-      );
-      await db
-      .collection('pending_registrations')
-      .doc(docId)
-      .delete();
-      
-      await db.collection("registrations_history").add({
-        uid:uid,
-        email: email,
-        status: 'Declined',
-        createdAt: Date.now(),
-      });
-    res.status(200).json({ success: true, message: 'email to admin sent successfully'});
+    await db.collection("registrations_history").add({
+      uid: uid,
+      email: email,
+      status: "Declined",
+      createdAt: Date.now(),
+    });
+    res
+      .status(200)
+      .json({ success: true, message: "email to admin sent successfully" });
   } catch (error) {
     res.status(500).json(error.message);
   }
