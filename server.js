@@ -938,7 +938,6 @@ function generateInvoiceHTML(
         padding: 20px 0;
         background: white;
         width: 100%;
-        border-top: 1px solid #e0e0e0;
         margin-top: auto;
       }
       .footer img {
@@ -990,9 +989,9 @@ function generateInvoiceHTML(
             )} ${escapeHtml(address.city || "CITY")}</div>
             <div>${escapeHtml(address.country || "COUNTRY")}</div>
             ${
-              customer.taxId
+              taxId
                 ? `<div>Tax ID: ${escapeHtml(taxId)}</div>`
-                : "<div>COMPANY TAX CODE</div>"
+                : "<div>Company Tax ID</div>"
             }
           </div>
           
@@ -1123,8 +1122,6 @@ function escapeHtml(str) {
  */
 async function assignKeysToProducts(orderId, orderNumber, products) {
   const results = [];
-  console.log("digitalProducts", products);
-
   for (const product of products) {
     const needed = product.quantity || 0;
     const productId = product?.productId; // or product.productId (whichever your data uses)
@@ -1402,8 +1399,7 @@ async function processOrder(session) {
     const companyCountry =
       fullSession?.line_items?.data?.[0].price?.product?.metadata
         ?.companyCountry || "US";
-        const 
-        taxId = fullSession.metadata.taxId
+        const taxId = fullSession?.metadata?.taxId
     const data = {
       orderNumber: orderNumber,
       internalEntryStatus: "pending",
