@@ -1396,6 +1396,9 @@ async function processOrder(session) {
     const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
       expand: ["line_items.data.price.product"],
     });
+    console.log('fullSession',fullSession);
+    console.log('fullSession.metadata',fullSession?.metadata);
+    
     const companyCountry =
       fullSession?.line_items?.data?.[0].price?.product?.metadata
         ?.companyCountry || "US";
