@@ -480,7 +480,7 @@ function generateLicenceHTML(
         .map(
           (p, i) => `
         <div class="items-row">
-          <div>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(p.sku || "")}</div>
+          <div>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(p.PN || "")}</div>
           <div><a href="#">${escapeHtml(p.name || "")}</a></div>
           <div class="text-right">${p.quantity || 0}</div>
         </div>
@@ -990,7 +990,7 @@ function generateInvoiceHTML(
             <div>${escapeHtml(address.country || "COUNTRY")}</div>
             ${
               taxId
-                ? `<div>Tax ID: ${escapeHtml(taxId)}</div>`
+                ? `<div>${escapeHtml(taxId)}</div>`
                 : "<div>Company Tax ID</div>"
             }
           </div>
