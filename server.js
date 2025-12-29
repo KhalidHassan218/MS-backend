@@ -480,7 +480,7 @@ function generateLicenceHTML(
         .map(
           (p, i) => `
         <div class="items-row">
-          <div>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(p.PN || "")}</div>
+          <div>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(p.PN || "")}</div>
           <div><a href="#">${escapeHtml(p.name || "")}</a></div>
           <div class="text-right">${p.quantity || 0}</div>
         </div>
