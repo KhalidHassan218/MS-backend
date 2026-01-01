@@ -638,9 +638,9 @@ function generateInvoiceHTML(
 
   // Determine currency symbol
   let currencySymbol = currency;
-  if (currency === "EUR") currencySymbol = "€";
-  else if (currency === "USD") currencySymbol = "$";
-  else if (currency === "GBP") currencySymbol = "£";
+  if (currency.toLowerCase() === "eur") currencySymbol = "€";
+  else if (currency.toLowerCase() === "usd") currencySymbol = "$";
+  else if (currency.toLowerCase() === "gbp") currencySymbol = "£";
 
   // Calculate tax based on country and currency
   let subtotal, tax, vatPercentage;
@@ -649,7 +649,7 @@ function generateInvoiceHTML(
     vatPercentage = 21;
     subtotal = total / 1.21;
     tax = total - subtotal;
-  } else if (companyCountryCode.toUpperCase() === "EN" && currency === "USD") {
+  } else if (companyCountryCode.toUpperCase() === "EN" && currency.toLowerCase() === "usd") {
     // USA: No tax (export)
     vatPercentage = 0;
     subtotal = total;
@@ -708,7 +708,7 @@ function generateInvoiceHTML(
   let vatLabel;
   if (companyCountryCode.toUpperCase() === "NL") {
     vatLabel = `${vatPercentage}% ${t.vat}`;
-  } else if (companyCountryCode.toUpperCase() === "EN" && currency === "USD") {
+  } else if (companyCountryCode.toUpperCase() === "EN" && currency.toLowerCase() === "usd") {
     vatLabel = `${t.vat}: 0% – Export outside EU`;
   } else if (companyCountryCode.toUpperCase() === "FR") {
     vatLabel = `${t.vat} ${vatPercentage}% incl`;
@@ -1041,7 +1041,7 @@ function generateInvoiceHTML(
         </div>
         
         ${
-          currency === "USD"
+          currency.toLowerCase() === "usd"
             ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
             : ""
         }
@@ -1728,16 +1728,17 @@ app.get("/", (req, res) => {
 
 app.post("/create-checkout-session", async (req, res) => {
   const cart = req.body.cart;
+  console.log("cart", cart);
   const useremail = req.body.useremail;
   const cat = req.body.foundUser;
   const userData = req.body.userData;
   console.log("userData", userData);
-
+  const isUSCompany = userData?.companyCountry === "US"
+  console.log("isUSCompany", isUSCompany);
+  const currency =  isUSCompany ? "usd" : "euro"
   const lineItems = cart?.map((product) => {
-    let priceWVat = parseFloat(product?.priceWVat);
-    let b2bpriceWVat = parseFloat(product?.b2bpriceWVat);
-    const priceCopy =
-      cat === "B2B" ? b2bpriceWVat.toFixed(2) : priceWVat.toFixed(2);
+    let b2bpriceWVat = parseFloat(isUSCompany ? product?.["price(B2B_USD)"] : product?.b2bpriceWVat);
+    const priceCopy = b2bpriceWVat.toFixed(2) 
     const isDigital = product?.type === "digital software";
     let customFields = null;
     let description = "";
@@ -1759,7 +1760,7 @@ app.post("/create-checkout-session", async (req, res) => {
         isDigital: isDigital,
         PN: PN,
         id: product?.id,
-        companyCountry: userData.companyCountry,
+        companyCountry: userData?.companyCountry,
         // taxId: userData.taxId,
       };
       description = `Language: English`;
@@ -1767,7 +1768,7 @@ app.post("/create-checkout-session", async (req, res) => {
 
     return {
       price_data: {
-        currency: "eur",
+        currency: currency,
         product_data: {
           name: product.name,
           images: [product.imageUrl],
