@@ -160,7 +160,7 @@ const templates = {
       itemNo: "Item-no.",
       description: "Description",
       quantity: "Amount",
-      licenseKeys: "Licensecodes",
+      licenseKeys: "License keys",
       installationMedia: "*Installation Media",
       location: "Europe – Netherlands - Utrecht",
       city: "IJsselstein - Osakastraat 9, 3404DR",
