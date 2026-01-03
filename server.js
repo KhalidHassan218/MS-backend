@@ -1735,7 +1735,7 @@ app.post("/create-checkout-session", async (req, res) => {
   console.log("userData", userData);
   const isUSCompany = userData?.companyCountry === "US"
   console.log("isUSCompany", isUSCompany);
-  const currency =  isUSCompany ? "usd" : "euro"
+  const currency =  isUSCompany ? "usd" : "eur"
   const lineItems = cart?.map((product) => {
     let b2bpriceWVat = parseFloat(isUSCompany ? product?.["price(B2B_USD)"] : product?.b2bpriceWVat);
     const priceCopy = b2bpriceWVat.toFixed(2) 
