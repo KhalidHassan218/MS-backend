@@ -480,7 +480,9 @@ function generateLicenceHTML(
         .map(
           (p, i) => `
         <div class="items-row">
-          <div>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(p.PN || "")}</div>
+          <div>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(
+            p.PN || ""
+          )}</div>
           <div><a href="#">${escapeHtml(p.name || "")}</a></div>
           <div class="text-right">${p.quantity || 0}</div>
         </div>
@@ -649,7 +651,10 @@ function generateInvoiceHTML(
     vatPercentage = 21;
     subtotal = total / 1.21;
     tax = total - subtotal;
-  } else if (companyCountryCode.toUpperCase() === "EN" && currency.toLowerCase() === "usd") {
+  } else if (
+    companyCountryCode.toUpperCase() === "EN" &&
+    currency.toLowerCase() === "usd"
+  ) {
     // USA: No tax (export)
     vatPercentage = 0;
     subtotal = total;
@@ -708,7 +713,10 @@ function generateInvoiceHTML(
   let vatLabel;
   if (companyCountryCode.toUpperCase() === "NL") {
     vatLabel = `${vatPercentage}% ${t.vat}`;
-  } else if (companyCountryCode.toUpperCase() === "EN" && currency.toLowerCase() === "usd") {
+  } else if (
+    companyCountryCode.toUpperCase() === "EN" &&
+    currency.toLowerCase() === "usd"
+  ) {
     vatLabel = `${t.vat}: 0% – Export outside EU`;
   } else if (companyCountryCode.toUpperCase() === "FR") {
     vatLabel = `${t.vat} ${vatPercentage}% incl`;
@@ -1116,11 +1124,13 @@ function escapeHtml(str) {
     .replace(/'/g, "&#39;");
 }
 
-/**
- * products: [{ productId, name, quantity, unitPrice, totalPrice }, ...]
- * returns productsWithKeys: same objects + licenseKeys: [...]
- */
-async function assignKeysToProducts(orderId, orderNumber, products) {
+async function assignKeysToProducts(
+  orderId,
+  orderNumber,
+  products,
+  b2bSupplierId,
+  uid
+) {
   const results = [];
   for (const product of products) {
     const needed = product.quantity || 0;
@@ -1131,7 +1141,9 @@ async function assignKeysToProducts(orderId, orderNumber, products) {
       orderId,
       orderNumber,
       productId,
-      needed
+      needed,
+      b2bSupplierId,
+      uid
     );
 
     results.push({
@@ -1143,12 +1155,14 @@ async function assignKeysToProducts(orderId, orderNumber, products) {
   return results;
 }
 
-/**
- * Reserve `neededQty` keys from licenseKeys collection and mark them used with orderId.
- * Returns array of key strings (e.g. ["11111-11111-..."])
- * Throws if not enough keys.
- */
-async function reserveLicenseKeys(orderId, orderNumber, productId, neededQty) {
+async function reserveLicenseKeys(
+  orderId,
+  orderNumber,
+  productId,
+  neededQty,
+  b2bSupplierId,
+  uid
+) {
   if (neededQty <= 0) return [];
 
   const licenseKeysRef = db.collection("licenseKeys");
@@ -1189,6 +1203,8 @@ async function reserveLicenseKeys(orderId, orderNumber, productId, neededQty) {
         orderId,
         orderNumber,
         usedAt: FieldValue.serverTimestamp(),
+        b2bSupplierId: b2bSupplierId,
+        uid:uid
       });
     });
 
@@ -1393,14 +1409,17 @@ async function processOrder(session) {
     const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
       expand: ["line_items.data.price.product"],
     });
-    console.log('fullSession',fullSession);
-    console.log('fullSession.metadata',fullSession?.metadata);
-    
+    console.log("fullSession", fullSession);
+    console.log("fullSession.metadata", fullSession?.metadata);
+
     const companyCountry =
       fullSession?.line_items?.data?.[0].price?.product?.metadata
         ?.companyCountry || "US";
-        const taxId = fullSession?.metadata?.taxId
+    const taxId = fullSession?.metadata?.taxId;
+    const b2bSupplierId = fullSession?.metadata?.b2bSupplierId;
+    const uid = fullSession?.metadata?.uid;
     const data = {
+      uid:uid,
       orderNumber: orderNumber,
       internalEntryStatus: "pending",
       email: fullSession?.customer_details?.email,
@@ -1439,7 +1458,9 @@ async function processOrder(session) {
       productsWithKeys = await assignKeysToProducts(
         orderId,
         orderNumber,
-        digitalProducts
+        digitalProducts,
+        b2bSupplierId,
+        uid
       );
     } catch (err) {
       console.error(
@@ -1733,12 +1754,14 @@ app.post("/create-checkout-session", async (req, res) => {
   const cat = req.body.foundUser;
   const userData = req.body.userData;
   console.log("userData", userData);
-  const isUSCompany = userData?.companyCountry === "US"
+  const isUSCompany = userData?.companyCountry === "US";
   console.log("isUSCompany", isUSCompany);
-  const currency =  isUSCompany ? "usd" : "eur"
+  const currency = isUSCompany ? "usd" : "eur";
   const lineItems = cart?.map((product) => {
-    let b2bpriceWVat = parseFloat(isUSCompany ? product?.["price(B2B_USD)"] : product?.b2bpriceWVat);
-    const priceCopy = b2bpriceWVat.toFixed(2) 
+    let b2bpriceWVat = parseFloat(
+      isUSCompany ? product?.["price(B2B_USD)"] : product?.b2bpriceWVat
+    );
+    const priceCopy = b2bpriceWVat.toFixed(2);
     const isDigital = product?.type === "digital software";
     let customFields = null;
     let description = "";
@@ -1751,6 +1774,7 @@ app.post("/create-checkout-session", async (req, res) => {
         PN: PN,
         id: product?.id,
         companyCountry: userData.companyCountry,
+        b2bSupplierId: userData.b2bSupplierId,
         // taxId: userData.taxId,
       };
       description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.PN}`;
@@ -1761,6 +1785,7 @@ app.post("/create-checkout-session", async (req, res) => {
         PN: PN,
         id: product?.id,
         companyCountry: userData?.companyCountry,
+        b2bSupplierId: userData.b2bSupplierId,
         // taxId: userData.taxId,
       };
       description = `Language: English`;
@@ -1792,7 +1817,9 @@ app.post("/create-checkout-session", async (req, res) => {
       },
     },
     metadata: {
-      taxId: userData.taxId, // Your variable from req.body.userData
+      taxId: userData?.taxId,
+      b2bSupplierId: userData?.b2bSupplierId,
+      uid: userData?.uid,
     },
     expires_at: expirationTime,
     success_url: `${YOUR_DOMAIN}/success`,
@@ -1985,28 +2012,23 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
           status: "active", // Set the initial status
           creationTime: userRecord.metadata.creationTime, // From Auth metadata
           acceptedAt: Date.now(), // Timestamp for acceptance
+          langCode: "en",
         };
 
         await db
           .collection("users")
           .doc(uid) // Use UID as the document ID
           .set(newUserData);
-        // **********************************************
-
-        // 5. Delete the pending registration document
         await db.collection("pending_registrations").doc(docId).delete();
-
-        // 6. Record the history
         await db.collection("registrations_history").add({
           uid: uid,
           email: email,
           status: "Accepted",
           createdAt: Date.now(),
         });
-      }) // End of .then(async (userRecord) => { ...
+      })
       .catch((error) => {
         console.log("Error updating user:", error);
-        // Re-throw the error to be caught by the outer try/catch
         throw new Error(`Auth Update Error: ${error.message}`);
       });
 
@@ -2016,7 +2038,6 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
       message: "User accepted and created successfully",
     });
   } catch (error) {
-    // Catch errors from Auth update, Firestore operations, etc.
     res.status(500).json({
       success: false,
       message: error.message || "An unknown error occurred",
@@ -2028,7 +2049,6 @@ app.post("/api/decline-pendingRegistration", async (req, res) => {
 
   let userFound;
   try {
-    // See the UserRecord reference doc for the contents of userRecord.
     await sendEmailToClient(
       `pending Registration response`,
       generateClientStatusEmailHTML(email, "declined"),
