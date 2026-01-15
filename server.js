@@ -792,7 +792,7 @@ async function reserveLicenseKeys(
         key: data.key,
         status: "active",
         isReplacement: false,
-        addedAt: FieldValue.serverTimestamp(),
+        addedAt: Date.now(),
         replacedAt: null,
         replacementReason: null,
         licenseDocId: doc.id  // Optional: keep reference to license doc
