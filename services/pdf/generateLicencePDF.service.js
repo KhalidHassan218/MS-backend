@@ -3,6 +3,7 @@ import generateReplacmentLicenseHTML from "../../templates/licence/generateRepla
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import chromium from "@sparticuz/chromium";
+
 puppeteer.use(StealthPlugin());
 
 async function generateLicencePDFBuffer(
@@ -23,9 +24,12 @@ async function generateLicencePDFBuffer(
       htmlContent = generateLicenceHTML(licenseData, companyCountryCode);
     }
 
+    // Use @sparticuz/chromium for serverless environments
     browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
     });
 
     const page = await browser.newPage();
