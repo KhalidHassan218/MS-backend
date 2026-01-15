@@ -786,7 +786,17 @@ async function reserveLicenseKeys(
     snapshot.docs.forEach((doc) => {
       const data = doc.data();
 
-      reservedKeys.push(data.key);
+      // reservedKeys.push(data.key);
+
+      reservedKeys.push({
+        key: data.key,
+        status: "active",
+        isReplacement: false,
+        addedAt: FieldValue.serverTimestamp(),
+        replacedAt: null,
+        replacementReason: null,
+        licenseDocId: doc.id  // Optional: keep reference to license doc
+      });
 
       tx.update(doc.ref, {
         status: "used",

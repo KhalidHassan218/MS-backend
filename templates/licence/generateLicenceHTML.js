@@ -28,7 +28,7 @@ function generateLicenceHTML(
     const productsHtml = (products || [])
       .map((product, idx) => {
         const keysHtml = (product.licenseKeys || [])
-          .map((k) => `<div class="license-key">${k}</div>`)
+          .map((k) => `<div class="license-key">${k.key}</div>`)
           .join("");
         return `
       <div class="product-section">
