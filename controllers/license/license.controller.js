@@ -79,7 +79,32 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
         uid,
         adminNote: "Key replacement",
       });
+      // 4️⃣ B. Update old license key to 'replaced' in licenseKeys collection
+      const oldKeySnapshot = await tx.get(
+        licenseKeysRef
+          .where("key", "==", oldKey)
+          .where("productId", "==", productId)
+          .limit(1)
+      );
 
+      if (!oldKeySnapshot.empty) {
+        const oldKeyDoc = oldKeySnapshot.docs[0];
+        tx.update(oldKeyDoc.ref, {
+          status: "replaced",
+          replacedAt: FieldValue.serverTimestamp(),
+          replacementReason: requestData.reason,
+          replacedBy: uid,
+          newKey: newKey, // Reference to the new key
+          requestId: requestId,
+        });
+        console.log(
+          `🔄 Old key marked as replaced in licenseKeys collection: ${oldKey}`
+        );
+      } else {
+        console.warn(
+          `⚠️ Old key not found in licenseKeys collection: ${oldKey}`
+        );
+      }
       // 5️⃣ Find the product and update its licenseKeys array
       const productIndex = orderData.products.findIndex(
         (p) => p.productId === productId
@@ -190,7 +215,8 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
       fullOrderDataForPDF = {
         customer: orderData.customer || {
           name: requestData.customerName || orderData.bussinessName || "",
-          businessName: requestData.customerBusinessName || orderData.bussinessName || "",
+          businessName:
+            requestData.customerBusinessName || orderData.bussinessName || "",
           address: requestData.customerAddress || {
             line1: orderData.address1 || "",
             postalCode: orderData.postal_code || "",
@@ -220,7 +246,7 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
       orderNumber,
       pdfBuffer
     );
-    
+
     await savePDFRecord(`${orderNumber}-license`, licensePdfUrl);
 
     // 9️⃣ Send email with PDF
