@@ -37,17 +37,15 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
     const licenseKeysRef = db.collection("licenseKeys");
 
     let newKey; // to hold the replaced key
-
-    // 3️⃣ Run transaction
-    // 3️⃣ Run transaction
     let fullOrderDataForPDF;
 
+    // 3️⃣ Run transaction
     await db.runTransaction(async (tx) => {
       console.log(
         `🔄 Transaction started - order=${orderId}, product=${productId}`
       );
 
-      // A. Fetch the existing order document to get all products
+      // A. Fetch the existing order document
       const orderSnap = await tx.get(ordersRef);
       if (!orderSnap.exists) {
         throw new Error(`Order ${orderId} not found`);
@@ -67,7 +65,8 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
       }
 
       const keyDoc = snapshot.docs[0];
-      newKey = keyDoc.data().key;
+      const newKeyData = keyDoc.data();
+      newKey = newKeyData.key;
       const oldKey = requestData.licenseKey;
 
       // 4️⃣ Update new license key to 'used'
@@ -81,11 +80,74 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
         adminNote: "Key replacement",
       });
 
-      // 5️⃣ Update orders collection with replacement history
+      // 5️⃣ Find the product and update its licenseKeys array
+      const productIndex = orderData.products.findIndex(
+        (p) => p.productId === productId
+      );
+
+      if (productIndex === -1) {
+        throw new Error(`Product ${productId} not found in order`);
+      }
+
+      const product = orderData.products[productIndex];
+
+      // Find the old key object and mark it as replaced
+      const oldKeyIndex = product.licenseKeys.findIndex(
+        (k) => k.key === oldKey && k.status === "active"
+      );
+
+      if (oldKeyIndex === -1) {
+        throw new Error("Old key not found or already replaced");
+      }
+
+      // Update old key object
+      product.licenseKeys[oldKeyIndex] = {
+        ...product.licenseKeys[oldKeyIndex],
+        status: "replaced",
+        replacedAt: Date.now(),
+        replacementReason: requestData.reason,
+      };
+
+      // Create new key object
+      const newKeyObject = {
+        key: newKey,
+        status: "active",
+        isReplacement: true, // 🎨 For PDF highlighting
+        addedAt: Date.now(),
+        replacedAt: null,
+        replacementReason: null,
+        licenseDocId: keyDoc.id,
+        replacedOldKey: oldKey,
+      };
+
+      // Add new key to array
+      product.licenseKeys.push(newKeyObject);
+
+      // Add to replacement history
+      if (!product.replacementHistory) {
+        product.replacementHistory = [];
+      }
+
+      product.replacementHistory.push({
+        replacementId: `repl_${Date.now()}`,
+        oldKey: oldKey,
+        newKey: newKey,
+        reason: requestData.reason,
+        replacedAt: Date.now(),
+        replacedBy: uid,
+        requestId: requestId,
+      });
+
+      // Update the products array
+      orderData.products[productIndex] = product;
+
+      // 6️⃣ Update orders document
       tx.update(ordersRef, {
+        products: orderData.products,
         feedback,
         feedbackUpdatedAt: FieldValue.serverTimestamp(),
         keyReplaced: true,
+        // Optional: Keep global keyReplacements array for quick reference
         keyReplacements: FieldValue.arrayUnion({
           productId,
           productName: requestData.productName,
@@ -98,7 +160,7 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
         }),
       });
 
-      // 6️⃣ Update replacement request status
+      // 7️⃣ Update replacement request status
       tx.update(requestRef, {
         status: "resolved",
         newLicenseKey: newKey,
@@ -106,39 +168,38 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
         processedBy: uid,
       });
 
-      // C. Prepare full licenseData for PDF generation while inside/based on transaction data
-      // We map over ALL products from the original order
-      const updatedProducts = (orderData.products || []).map((p) => {
-        // If this is the product where the key was replaced
-        if (p.id === productId) {
-          return {
-            ...p,
-            // Replace the old key string with the new key string in the array
-            licenseKeys: (p.licenseKeys || []).map((k) =>
-              k === oldKey ? newKey : k
-            ),
-            // Add this property so the HTML template applies the blue style/icon
-            newLicenseKeys: [newKey],
-          };
-        }
-        // Return other products (like Windows or Office) unchanged
-        return p;
+      // C. Prepare full order data for PDF generation
+      const updatedProducts = orderData.products.map((p) => {
+        // Get only ACTIVE keys for PDF
+        const activeKeys = p.licenseKeys
+          .filter((k) => k.status === "active")
+          .map((k) => k.key);
+
+        // Get newly replaced keys (for highlighting in PDF)
+        const newlyReplacedKeys = p.licenseKeys
+          .filter((k) => k.status === "active" && k.isReplacement === true)
+          .map((k) => k.key);
+
+        return {
+          ...p,
+          licenseKeys: activeKeys, // Only active keys
+          newLicenseKeys: newlyReplacedKeys, // Keys to highlight
+        };
       });
 
       fullOrderDataForPDF = {
         customer: orderData.customer || {
-          name: requestData.customerName || "",
-          businessName: requestData.customerBusinessName || "",
+          name: requestData.customerName || orderData.bussinessName || "",
+          businessName: requestData.customerBusinessName || orderData.bussinessName || "",
           address: requestData.customerAddress || {
-            line1: "",
-            postalCode: "",
-            country: "",
+            line1: orderData.address1 || "",
+            postalCode: orderData.postal_code || "",
+            country: orderData.country || "",
           },
         },
         order: {
           id: orderId,
           number: orderNumber,
-          // Use original order date if available, otherwise current
           date: orderData.createdAt?.seconds || new Date().getTime() / 1000,
         },
         products: updatedProducts,
@@ -148,24 +209,26 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
     });
 
     // 8️⃣ Generate PDF with the full order data
-    // The 'true' flag activates keyReplacement logic in your HTML generator
     const pdfBuffer = await generateLicencePDFBuffer(
       fullOrderDataForPDF,
       companyCountry,
-      true
+      true // keyReplacement flag
     );
+
     const licensePdfUrl = await uploadPDFToFirebaseStorage(
       orderId,
       orderNumber,
       pdfBuffer
     );
+    
     await savePDFRecord(`${orderNumber}-license`, licensePdfUrl);
 
-    let emailAttachemnts = [
+    // 9️⃣ Send email with PDF
+    let emailAttachments = [
       {
         filename: `License-${orderNumber}.pdf`,
-        content: pdfBuffer, // Buffer or string
-        contentType: pdfBuffer.contentType || "application/pdf",
+        content: pdfBuffer,
+        contentType: "application/pdf",
       },
     ];
 
@@ -177,12 +240,16 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
       email,
       process.env.EMAIL_USER,
       process.env.EMAIL_USER,
-      emailAttachemnts
+      emailAttachments
     );
-    // 9️⃣ Send PDF as response
-    res
-      .status(200)
-      .json({ success: true, message: "email with PDF sent successfully" });
+
+    // 🔟 Send response
+    res.status(200).json({
+      success: true,
+      message: "Email with PDF sent successfully",
+      oldKey: requestData.licenseKey,
+      newKey: newKey,
+    });
   } catch (error) {
     console.error("❌ Error replacing key and generating PDF:", error);
     res.status(500).json({ success: false, message: error.message });

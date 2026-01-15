@@ -739,6 +739,7 @@ async function assignKeysToProducts(
     results.push({
       ...product,
       licenseKeys: assignedKeys,
+      replacementHistory: []
     });
   }
 

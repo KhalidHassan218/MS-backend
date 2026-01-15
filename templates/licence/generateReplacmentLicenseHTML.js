@@ -37,12 +37,15 @@ function generateReplacmentLicenseHTML(
           const isNewKey = keyReplacement && product.newLicenseKeys?.includes(k);
           
           if (isNewKey) {
-            // Highlight new key with special styling
-            return `<div class="license-key license-key-new">${k}</div>`;
+            // Highlight new key with yellow-orange bg and dark text
+            return `<div class="license-key license-key-new">
+              ${escapeHtml(k)}
+              <span class="new-badge">NEW</span>
+            </div>`;
           }
           
           // Normal key display
-          return `<div class="license-key">${k}</div>`;
+          return `<div class="license-key">${escapeHtml(k)}</div>`;
         })
         .join("");
 
@@ -227,41 +230,44 @@ function generateReplacmentLicenseHTML(
       .license-keys-grid {
         display: grid;
         grid-template-columns: repeat(2, max-content);
-        gap: 5px;
+        gap: 10px;
+        margin-bottom: 15px;
       }
       .license-key {
         background: #000;
         color: white;
-        padding: 2px 5px;
+        padding: 4px 8px;
         font-family: 'Courier New', monospace;
         font-size: 12px;
         letter-spacing: 1px;
         font-weight: bold;
-        border-radius: 3px;
+        border-radius: 4px;
         width: fit-content;
-      }
-      
-      /* Special styling for NEW/REPLACED keys */
-      .license-key-new {
-        background: #27ae60;
-        color: white;
-        border: 2px solid #f39c12;
-        box-shadow: 0 0 8px rgba(243, 156, 18, 0.5);
         position: relative;
       }
       
-      .license-key-new::after {
-        content: "NEW";
+      /* 🎨 Yellow-Orange styling for NEW/REPLACED keys */
+      .license-key-new {
+        background: #FFA500 !important; /* Orange background */
+        color: #1a1a1a !important; /* Dark text for contrast */
+        border: 2px solid #FF8C00; /* Darker orange border */
+        box-shadow: 0 2px 8px rgba(255, 165, 0, 0.4);
+        padding: 6px 10px;
+        font-weight: 900;
+      }
+      
+      .new-badge {
         position: absolute;
-        top: -10px;
+        top: -8px;
         right: -8px;
-        background: #f39c12;
+        background: #FF4500; /* Red-orange for badge */
         color: white;
-        font-size: 8px;
-        padding: 2px 4px;
+        font-size: 9px;
+        padding: 2px 5px;
         border-radius: 3px;
         font-weight: bold;
         letter-spacing: 0.5px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
       }
       
       .installation-support {
@@ -317,9 +323,9 @@ function generateReplacmentLicenseHTML(
     </div>
     <div class="content">
       <div class="company-address">
-        <div>${escapeHtml(customer.name || customer.business_name || "")}</div>
+        <div>${escapeHtml(customer.name || customer.businessName || "")}</div>
         <div>${escapeHtml(address.line1 || "")}</div>
-        <div>${escapeHtml(address.postal_code || "")}</div>
+        <div>${escapeHtml(address.postalCode || address.postal_code || "")}</div>
         <div>${escapeHtml(address.country || "")}</div>
       </div>
       
