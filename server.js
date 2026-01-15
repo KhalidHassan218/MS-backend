@@ -1,48 +1,41 @@
-require("dotenv").config();
-const express = require("express");
+import "dotenv/config";
+import licenseRoutes from "./routes/license/license.routes.js";
+import express from "express";
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY; //sergio test
 // "sk_test_51LbU1MHfTVIOkODVDGnp8QhsHfVIMExL6SS0UajaTfhs8ytFXrFw7X2raMn26h2QJWFTjHU4fClQUelQ4PAxmXg700PZ4tyKYv" omar test
-const stripe = require("stripe")(stripeSecretKey);
-const cors = require("cors");
-const bodyParser = require("body-parser");
-const sendEmail = require("./Utils/sendEmail");
-const { initializeApp, cert } = require("firebase-admin/app");
-const { getAuth } = require("firebase-admin/auth");
-const {
-  getFirestore,
-  Timestamp,
-  FieldValue,
-  Filter,
-} = require("firebase-admin/firestore");
-const fs = require("fs"); // Use synchronous version for initial setup
-const puppeteer = require("puppeteer-extra");
-const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+import Stripe from "stripe";
+import cors from "cors";
+import bodyParser from "body-parser";
+import sendEmail from "./Utils/sendEmail.js";
+import { initializeApp, cert } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+
+const stripe = new Stripe(stripeSecretKey);
+
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
+
+import puppeteer from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import chromium from "@sparticuz/chromium";
+import sendEmailWithAttachment from "./Utils/sendEmailWithAttachment.js";
+import generateRegistrationEmailHTML from "./templates/Emails/newRegisteredCompaniesrequest.js";
+import sendEmailToClient from "./Utils/sendEmailToClient.js";
+import sendEmailToAdmin from "./Utils/sendAdminEmail.js";
+import generateClientStatusEmailHTML from "./templates/Emails/ClientNewRegisterationResponse.js";
+import { uploadPDFToFirebaseStorage } from "./services/firebaseStorage.service.js";
+import generateLicencePDFBuffer from "./services/pdf/generateLicencePDF.service.js";
+import savePDFRecord from "./services/pdf/savePdfRecord.service.js";
 puppeteer.use(StealthPlugin());
-const { getStorage } = require("firebase-admin/storage");
 
-// --- Corrected Import ---
-const chromium = require("@sparticuz/chromium");
-
-const path = require("path");
 // const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
-// 1. Check if the environment variable is set
 if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
   throw new Error(
     "FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set."
   );
 }
 
-// 2. Parse the single-line string back into a JavaScript object
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-// const serviceAccount = require('./firebase/service-account.json');
 
-const { v4: uuidv4 } = require("uuid");
-// const puppeteer = require('puppeteer');
-const sendEmailWithAttachment = require("./Utils/sendEmailWithAttachment");
-const generateRegistrationEmailHTML = require("./templates/newRegisteredCompaniesrequest");
-const sendEmailToClient = require("./Utils/sendEmailToClient");
-const sendEmailToAdmin = require("./Utils/sendAdminEmail");
-const generateClientStatusEmailHTML = require("./templates/ClientNewRegisterationResponse");
 initializeApp({
   credential: cert(serviceAccount),
   storageBucket: "supplier-34b95.appspot.com", // ← ADD THIS LINE
@@ -51,49 +44,12 @@ initializeApp({
 const db = getFirestore();
 // YOUR_DOMAIN = "https://microsoftsupplier.com";
 // YOUR_DOMAIN = "http://localhost:3000";
-YOUR_DOMAIN = "https://ms-test-ser.vercel.app";
+const YOUR_DOMAIN = "https://ms-test-ser.vercel.app";
 const app = express();
 
 app.use(cors());
 app.use(express.static("public"));
 
-// async function generateLicencePDFBuffer(session, orderId) {
-//   let browser;
-
-//   try {
-//     const htmlContent = generateLicenceHTML(session, orderId);
-
-//     browser = await puppeteer.launch({
-//       headless: true,
-//       args: ['--no-sandbox', '--disable-setuid-sandbox']
-//     });
-
-//     const page = await browser.newPage();
-//     await page.setContent(htmlContent);
-
-//     const pdfBuffer = await page.pdf({
-//       format: 'A4',
-//       printBackground: true,
-//       margin: {
-//         top: '0',
-//         right: '0',
-//         bottom: '0',
-//         left: '0'
-//       }
-//     });
-
-//     console.log('✅ PDF buffer generated, ready for download');
-//     return pdfBuffer;
-
-//   } catch (error) {
-//     console.error('❌ Error generating PDF buffer:', error);
-//     throw error;
-//   } finally {
-//     if (browser) {
-//       await browser.close();
-//     }
-//   }
-// }
 async function getNextOrderNumber() {
   const counterRef = db.collection("counters").doc("orderCounter");
 
@@ -117,390 +73,26 @@ async function getNextOrderNumber() {
     return next;
   });
 }
-
-const templates = {
-  NL: {
-    language: "nl-NL",
-    translations: {
-      documentTitle: "Licentie document",
-      date: "Datum",
-      position: "Pos",
-      itemNo: "Item-no.",
-      description: "Beschrijving",
-      quantity: "Aantal",
-      licenseKeys: "Licentiesleutels",
-      installationMedia: "*Installatiemedia",
-      location: "Europa – Nederland - Utrecht",
-      city: "IJsselstein – Osakastraat 9, 3404DR",
+const extractLicenseDataFromSession = (session, orderId, orderNumber, productsWithKeys) => {
+  return {
+    customer: {
+      name: session.customer_details?.name || session.customer_details?.business_name || "",
+      businessName: session.customer_details?.business_name,
+      address: {
+        line1: session.customer_details?.address?.line1 || "",
+        postalCode: session.customer_details?.address?.postal_code || "",
+        country: session.customer_details?.address?.country || "",
+      },
     },
-    downloadUrl: "https://www.microsoft.com/nl-nl/software-download/windows11",
-  },
-  FR: {
-    language: "fr-FR",
-    translations: {
-      documentTitle: "Document de licence",
-      date: "Date",
-      position: "Pos",
-      itemNo: "N° d'article",
-      description: "Description",
-      quantity: "Quantité",
-      licenseKeys: "Clés de licence",
-      installationMedia: "*Support d'installation",
-      location: "Europe – Pays-Bas – Utrecht",
-      city: "IJsselstein – Osakastaat 9, 3404DR",
+    order: {
+      id: orderId,
+      number: orderNumber,
+      date: new Date(session.created * 1000),
     },
-    downloadUrl: "https://www.microsoft.com/fr-fr/software-download/windows11",
-  },
-  EN: {
-    language: "en-US",
-    translations: {
-      documentTitle: "License document",
-      date: "Date",
-      position: "Pos",
-      itemNo: "Item-no.",
-      description: "Description",
-      quantity: "Amount",
-      licenseKeys: "License keys",
-      installationMedia: "*Installation Media",
-      location: "Europe – Netherlands - Utrecht",
-      city: "IJsselstein - Osakastraat 9, 3404DR",
-    },
-    downloadUrl: "https://www.microsoft.com/en-en/software-download/windows11",
-  },
-  DE: {
-    language: "de-DE",
-    translations: {
-      documentTitle: "Lizenzdokument",
-      date: "Datum",
-      position: "Pos",
-      itemNo: "Artikel-Nr.",
-      description: "Beschreibung",
-      quantity: "Menge",
-      licenseKeys: "Lizenzschlüssel",
-      installationMedia: "*Installationsmedien",
-      location: "Europa – Niederlande – Utrecht",
-      city: "IJsselstein – Osakastraat 9, 3404DR",
-    },
-    downloadUrl: "https://www.microsoft.com/de-de/software-download/windows11",
-  },
-};
-function generateLicenceHTML(
-  session,
-  orderId,
-  orderNumber,
-  productsWithKeys,
-  companyCountryCode = "EN"
-) {
-  const template = templates[companyCountryCode.toUpperCase()] || templates.EN;
-  const t = template.translations;
-  const customer = session.customer_details || {};
-  const address = customer.address || {};
-  const total = (session.amount_total || 0) / 100;
-  const currency = (session.currency || "").toUpperCase();
-  const invoiceDate = new Date(session.created * 1000).toLocaleDateString(
-    template.language,
-    {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    }
-  );
-
-  // Map productsWithKeys to HTML blocks
-  const productsHtml = (productsWithKeys || [])
-    .map((product, idx) => {
-      const keysHtml = (product.licenseKeys || [])
-        .map((k) => `<div class="license-key">${k}</div>`)
-        .join("");
-      return `
-    <div class="product-section">
-      <div class="product-title">${escapeHtml(product.name || "")} (x${
-        product.quantity || 0
-      })</div>
-      <div class="license-keys-title">${t.licenseKeys}:</div>
-      <div class="license-keys-grid">
-        ${keysHtml}
-      </div>
-      <div class="installation-support">
-        <strong>${t.installationMedia}</strong><br>
-        <strong>${escapeHtml(product.name || "")}</strong><br>
-        <a href="${template.downloadUrl}">
-          ${template.downloadUrl}
-        </a>
-      </div>
-    </div>
-  `;
-    })
-    .join("");
-
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>${t.documentTitle}</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    html, body {
-      width: 100%;
-      min-height: 100%;
-      font-family: Arial, sans-serif;
-      color: #333;
-      line-height: 1.4;
-      position: relative;
-    }
-    body {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-    .banner {
-      width: 100%;
-      aspect-ratio: 4 / 1;
-      background-image: url("https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2Fimage.png?alt=media&token=104e6658-bbf5-482e-8f0a-314a9d3875e0");
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0 40px;
-      color: white;
-    }
-    .left h1 {
-      font-size: 32px;
-      margin: 0;
-      font-family: "Helvetica", "Arial", sans-serif;
-      font-weight: 800;
-    }
-    .right {
-      text-align: right;
-      font-size: 16px;
-      line-height: 1.4;
-      font-family: "Helvetica", "Arial", sans-serif;
-      font-weight: 400;
-    }
-    .text-icon {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 8px;
-    }
-    .text-icon .text {
-      text-align: right;
-    }
-    .icon-block {
-      margin-top: 20px;
-      font-size: 30px;
-    }
-    .icon-block span {
-      display: block;
-      margin-bottom: 10px;
-    }
-    .header-image {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
-    .content {
-      padding: 15mm;
-      width: 100%;
-      height: auto;
-      flex: 1;
-      padding-bottom: 100px;
-    }
-    .company-address {
-      margin-bottom: 15px;
-      font-size: 14px;
-    }
-    .company-address div:first-child {
-      font-weight: bold;
-      font-size: 16px;
-    }
-    .document-header {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-      align-items: flex-end;
-      font-size: 14px;
-      margin-bottom: 15px;
-    }
-    .document-number {
-      background: #2c5aa0;
-      color: white;
-      font-weight: bold;
-      padding: 4px 8px;
-      font-size: 14px;
-    }
-    .document-title {
-      font-size: 18px;
-      font-weight: bold;
-      margin: 10px 0 15px 0;
-    }
-    .items-section {
-      margin-bottom: 30px;
-      font-size: 14px;
-    }
-    .items-header, .items-row {
-      display: grid;
-      grid-template-columns: 200px 1fr 100px;
-      gap: 10px;
-      padding: 8px 0;
-    }
-    .items-header {
-      font-weight: bold;
-      border-top: 2px solid #ddd;
-      border-bottom: 1px solid #ddd;
-      background: #f8f9fa;
-    }
-    .items-row {
-      border-bottom: 1px solid #eee;
-    }
-    .items-row a {
-      color: #2c5aa0;
-      text-decoration: none;
-      font-weight: bold;
-    }
-    .text-right {
-      text-align: right;
-    }
-    .product-section {
-      margin: 10px 0;
-      font-size: 14px;
-    }
-    .product-title {
-      color: #2c5aa0;
-      font-weight: bold;
-      margin-bottom: 10px;
-      font-size: 16px;
-    }
-    .license-keys-title {
-      font-weight: bold;
-      margin-bottom: 10px;
-      font-size: 14px;
-    }
-    .license-keys-grid {
-      display: grid;
-      grid-template-columns: repeat(2, max-content);
-      gap: 5px;
-    }
-    .license-key {
-      background: #000;
-      color: white;
-      padding: 2px 5px;
-      font-family: 'Courier New', monospace;
-      font-size: 12px;
-      letter-spacing: 1px;
-      font-weight: bold;
-      border-radius: 3px;
-      width: fit-content;
-    }
-    .installation-support {
-      border: 2px solid #2c5aa0;
-      padding: 10px;
-      margin: 15px 0 0;
-      font-size: 13px;
-      background: #f8f9fa;
-      width: 70%;
-    }
-    .installation-support strong {
-      color: #2c5aa0;
-      font-size: 14px;
-    }
-    .installation-support a {
-      color: #2c5aa0;
-      word-break: break-all;
-      font-weight: bold;
-    }
-    .footer {
-      margin-top: 20px;
-      text-align: center;
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: white;
-      padding: 20px 0;
-    }
-    .footer img {
-      max-width: 200px;
-      height: auto;
-    }
-  </style>
-</head>
-<body>
-  <div class="banner">
-    <div class="left">
-      <h1>Sertic</h1>
-    </div>
-    <div class="right">
-      <div class='text-icon'>
-        <span class='text'>Sertic.nl</span>
-      </div>
-      <div class='text-icon'>
-        <span class='text'>info@sertic.nl</span>
-      </div>
-      <div class='text-icon'>
-        <span class='text'>${t.location}</span>
-      </div>
-      <div>${t.city}</div>
-    </div>
-  </div>
-  <div class="content">
-    <div class="company-address">
-      <div>${escapeHtml(customer.name || customer.business_name || "")}</div>
-      <div>${escapeHtml(address.line1 || "")}</div>
-      <div>${escapeHtml(address.postal_code || "")}</div>
-      <div>${escapeHtml(address.country || "")}</div>
-    </div>
-    
-    <div class="document-header">
-      <div class="document-number">${t.documentTitle}: ${escapeHtml(
-    orderNumber
-  )}</div>
-      <div class="document-date">${t.date}: ${invoiceDate}</div>
-    </div>
-    
-    <div class="document-title">${t.documentTitle}: ${escapeHtml(
-    orderNumber
-  )}</div>
-    
-    <div class="items-section">
-      <div class="items-header">
-        <div>${t.position} ${t.itemNo}</div>
-        <div>${t.description}</div>
-        <div class="text-right">${t.quantity}</div>
-      </div>
-      ${(productsWithKeys || [])
-        .map(
-          (p, i) => `
-        <div class="items-row">
-          <div>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(
-            p.PN || ""
-          )}</div>
-          <div><a href="#">${escapeHtml(p.name || "")}</a></div>
-          <div class="text-right">${p.quantity || 0}</div>
-        </div>
-      `
-        )
-        .join("")}
-    </div>
-    
-    ${productsHtml}
-    
-    <div class="footer">
-      <img src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2FMSlogo.png?alt=media&token=f5524581-bc40-41c6-8c56-61906b61b4b0" alt="Microsoft Supplier Logo">
-    </div>
-  </div>
-</body>
-</html>
-  `;
+    products: productsWithKeys,
+  };
 }
+
 
 const invoiceTemplates = {
   NL: {
@@ -987,26 +579,25 @@ function generateInvoiceHTML(
         <div class="top-section">
           <div class="customer-info">
             <div><strong>${escapeHtml(
-              customer.name || customer.business_name || "COMPANY NAME"
-            )}</strong></div>
+    customer.name || customer.business_name || "COMPANY NAME"
+  )}</strong></div>
             <div>${escapeHtml(
-              address.line1 || "STREET NAME & STREET NUMBER"
-            )}</div>
+    address.line1 || "STREET NAME & STREET NUMBER"
+  )}</div>
             <div>${escapeHtml(
-              address.postal_code || "POSTAL CODE"
-            )} ${escapeHtml(address.city || "CITY")}</div>
+    address.postal_code || "POSTAL CODE"
+  )} ${escapeHtml(address.city || "CITY")}</div>
             <div>${escapeHtml(address.country || "COUNTRY")}</div>
-            ${
-              taxId
-                ? `<div>${escapeHtml(taxId)}</div>`
-                : "<div>Company Tax ID</div>"
-            }
+            ${taxId
+      ? `<div>${escapeHtml(taxId)}</div>`
+      : "<div>Company Tax ID</div>"
+    }
           </div>
           
           <div class="invoice-info">
             <div class="invoice-number">${t.invoiceNumber}: #${escapeHtml(
-    orderNumber
-  )}</div>
+      orderNumber
+    )}</div>
             <div class="invoice-dates">
               <div><strong>${t.invoiceDate}:</strong> ${invoiceDate}</div>
               <div><strong>${t.expiryDate}:</strong> ${dueDateFormatted}</div>
@@ -1034,8 +625,8 @@ function generateInvoiceHTML(
             <tr class="subtotal-row">
               <td>${t.subtotal}:</td>
               <td class="text-right">${currencySymbol} ${subtotal.toFixed(
-    2
-  )}</td>
+      2
+    )}</td>
             </tr>
             <tr class="tax-row">
               <td>${vatLabel}:</td>
@@ -1048,11 +639,10 @@ function generateInvoiceHTML(
           </table>
         </div>
         
-        ${
-          currency.toLowerCase() === "usd"
-            ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
-            : ""
-        }
+        ${currency.toLowerCase() === "usd"
+      ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
+      : ""
+    }
         ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ""}
 
         <div style="display: flex; justify-content: space-between;">
@@ -1096,23 +686,23 @@ function generateInvoiceHTML(
 }
 
 // Helper function to escape HTML
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
-}
+// function escapeHtml(text) {
+//   const div = document.createElement("div");
+//   div.textContent = text;
+//   return div.innerHTML;
+// }
 
-// Helper function to escape HTML
-function escapeHtml(text) {
-  const map = {
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;",
-  };
-  return String(text).replace(/[&<>"']/g, (m) => map[m]);
-}
+// // Helper function to escape HTML
+// function escapeHtml(text) {
+//   const map = {
+//     "&": "&amp;",
+//     "<": "&lt;",
+//     ">": "&gt;",
+//     '"': "&quot;",
+//     "'": "&#039;",
+//   };
+//   return String(text).replace(/[&<>"']/g, (m) => map[m]);
+// }
 
 // Simple HTML-escape to avoid injection in generated HTML
 function escapeHtml(str) {
@@ -1204,7 +794,7 @@ async function reserveLicenseKeys(
         orderNumber,
         usedAt: FieldValue.serverTimestamp(),
         b2bSupplierId: b2bSupplierId,
-        uid:uid
+        uid: uid,
       });
     });
 
@@ -1269,6 +859,7 @@ const emailTemplates = {
       "Als u vragen heeft of aanvullende licenties nodig heeft, kunt u contact met ons opnemen via:",
     closing: "Met vriendelijke groet",
     founder: "Founder @ Sertic",
+    keyReplacementRequest: "Sleutelvervangingsverzoek", // ✅ New key
   },
   EN: {
     subject: "Your order from Microsoft Supplier – Licenses and documentation",
@@ -1293,6 +884,7 @@ const emailTemplates = {
       "If you have any questions or need additional licenses, feel free to contact us at:",
     closing: "Kind regards",
     founder: "Founder @ Sertic",
+    keyReplacementRequest: "Key replacement request", // ✅ New key
   },
   FR: {
     subject:
@@ -1317,6 +909,7 @@ const emailTemplates = {
       "Si vous avez des questions ou si vous avez besoin de licences supplémentaires, vous pouvez nous contacter à :",
     closing: "Cordialement",
     founder: "Founder @ Sertic",
+    keyReplacementRequest: "Demande de remplacement de clé", // ✅ New key
   },
   DE: {
     subject:
@@ -1340,6 +933,7 @@ const emailTemplates = {
       "Wenn Sie Fragen haben oder zusätzliche Lizenzen benötigen, können Sie uns gerne kontaktieren unter:",
     closing: "Mit freundlichen Grüßen",
     founder: "Gründer @ Sertic",
+    keyReplacementRequest: "Schlüsselersatzanfrage", // ✅ New key
   },
 };
 
@@ -1419,7 +1013,7 @@ async function processOrder(session) {
     const b2bSupplierId = fullSession?.metadata?.b2bSupplierId;
     const uid = fullSession?.metadata?.uid;
     const data = {
-      uid:uid,
+      uid: uid,
       orderNumber: orderNumber,
       internalEntryStatus: "pending",
       email: fullSession?.customer_details?.email,
@@ -1486,13 +1080,11 @@ async function processOrder(session) {
       products: allProducts,
       internalEntryStatus: "keys_assigned",
     });
+    const licenseData = extractLicenseDataFromSession(session, orderId, orderNumber, productsWithKeys);
 
     // Generate PDF with the assigned keys embedded
     const pdfBuffer = await generateLicencePDFBuffer(
-      fullSession,
-      orderId,
-      orderNumber,
-      productsWithKeys,
+      licenseData,
       companyCountry
     );
     const invoicePdfBuffer = await generateInvoicePDFBuffer(
@@ -1504,8 +1096,6 @@ async function processOrder(session) {
       taxId
     );
 
-    // Save file locally
-    // await savePDFToFile(pdfBuffer, orderId);
     const licensePdfUrl = await uploadPDFToFirebaseStorage(
       orderId,
       orderNumber,
@@ -1518,7 +1108,6 @@ async function processOrder(session) {
     );
 
     // Save Firestore PDF record
-    // await savePDFRecord(orderId, pdfUrl);
     await savePDFRecord(`${orderNumber}-license`, licensePdfUrl);
     await savePDFRecord(`${orderNumber}-invoice`, invoicePdfUrl);
     let emailAttachemnts = [
@@ -1541,36 +1130,7 @@ async function processOrder(session) {
       emailAttachemnts,
       companyCountry // 'NL', 'EN', 'FR', or 'DE'
     );
-    // await sendEmailWithAttachment(
-    //   `Votre commande chez Microsoft Supplier – Licences et documentation`,
-    //   `<p>Bonjour ${data?.name || ""},</p>
-    //    <p>Merci pour votre commande.<br>
-    //    Les licences ont ètè traitèes avec succës et les documents sont dèsormais disponibles.</p>
 
-    //    <p>Vous trouverez en piëces jointes :</p>
-    //    <ul>
-    //      <li>La facture (TVA autoliquidèe ñ Article 196 de la directive TVA de líue)</li>
-    //      <li>Le document de licence (contenant toutes les clès de licence)</li>
-    //    </ul>
-
-    //    <p><strong>Informations importantes :</strong></p>
-    //    <ul>
-    //      <li>Les licences síactivent directement en ligne (aucune activation tèlèphonique níest nècessaire)</li>
-    //      <li>Garantie : 12 mois</li>
-    //      <li>Les licences proviennent de notre systËme interne de distribution</li>
-    //    </ul>
-
-    //    <p>Si vous avez des questions ou si vous avez besoin de licences supplèmentaires, vous pouvez nous contacter ‡ :
-    //    <a href="mailto:info@sertic.nl">info@sertic.nl</a></p>
-
-    //    <p>Cordialement,<br>
-    //    S.R. (Sergio) Eersel<br>
-    //    Founder @ Sertic</p>`,
-    //   data?.email,
-    //   process.env.EMAIL_USER,
-    //   process.env.EMAIL_USER,
-    //   emailAttachemnts
-    // );
     // Update order as completed with both URLs
     await db.collection("orders").doc(orderId).update({
       invoiceGeneratedAt: new Date(),
@@ -1635,57 +1195,12 @@ async function generateInvoicePDFBuffer(
     }
   }
 }
-async function uploadPDFToFirebaseStorage(orderId, orderNumber, pdfBuffer) {
-  const bucket = getStorage().bucket("supplier-34b95.appspot.com"); // requires admin.initializeApp()
-  const file = bucket.file(`licence/Invoice-${orderId}.pdf`);
 
-  await file.save(pdfBuffer, {
-    metadata: { contentType: "application/pdf" },
-  });
 
-  // Make file public OR use signed URL
-  await file.makePublic();
 
-  return `https://storage.googleapis.com/${bucket.name}/licence/Invoice-${orderId}.pdf`;
-}
-async function savePDFRecord(orderId, pdfUrl) {
-  await db.collection("pdfDocuments").add({
-    orderId,
-    pdfUrl,
-    createdAt: new Date(),
-  });
-}
-
-// Add this function to save PDF to file
-// async function savePDFToFile(pdfBuffer, orderId) {
-//   try {
-//     const pdfsDir = path.join(__dirname, 'pdfs');
-
-//     // Create PDFs directory if it doesn't exist
-//     try {
-//       await fs.access(pdfsDir);
-//     } catch {
-//       await fs.mkdir(pdfsDir, { recursive: true });
-//     }
-
-//     const filename = `invoice-${orderId}.pdf`;
-//     const filePath = path.join(pdfsDir, filename);
-//     await fs.writeFile(filePath, pdfBuffer);
-
-//     console.log('📁 PDF saved to:', filePath);
-
-//     return filePath;
-
-//   } catch (error) {
-//     console.log('⚠️ Could not save PDF to file:', error.message);
-//   }
-// }
-
-// ✅ NOW add JSON middleware for other routes
 app.use(express.json());
 app.use(bodyParser.json());
 
-// ✅ NOW add JSON middleware for other routes
 app.use(express.json());
 app.use(bodyParser.json());
 
@@ -1693,55 +1208,8 @@ const calculateOrderAmount = (price) => {
   console.log(price);
   return price * 100;
 };
-// Add this test endpoint to generate and download a PDF
-// Add this test endpoint with detailed error handling
-// Updated test endpoint with compatible wait method
-// Updated test endpoint - completely compatible
-async function generateLicencePDFBuffer(
-  session,
-  orderId,
-  orderNumber,
-  productsWithKeys,
-  companyCountryCode
-) {
-  let browser;
-  try {
-    const htmlContent = generateLicenceHTML(
-      session,
-      orderId,
-      orderNumber,
-      productsWithKeys,
-      companyCountryCode
-    );
 
-    browser = await puppeteer.launch({
-      args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"], // Use chromium's recommended args
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(), // <-- THIS is the key line
-      headless: chromium.headless,
-      ignoreHTTPSErrors: true,
-    });
 
-    const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: "networkidle0" });
-
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: { top: "0", right: "0", bottom: "0", left: "0" },
-    });
-
-    console.log("✅ PDF buffer generated, ready for download");
-    return pdfBuffer;
-  } catch (error) {
-    console.error("❌ Error generating PDF buffer:", error);
-    throw error;
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
-  }
-}
 
 app.get("/", (req, res) => {
   res.send("welcome to microsoftsupplier website");
@@ -1929,7 +1397,7 @@ app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
     res.status(500).json(error.message);
   }
 });
-
+app.use("/api/licenses", licenseRoutes);
 async function getPendingDetails(docId) {
   const docRef = db.collection("pending_registrations").doc(docId);
 

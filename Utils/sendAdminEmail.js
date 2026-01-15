@@ -1,5 +1,4 @@
-const nodemailer = require("nodemailer");
-
+import nodemailer from "nodemailer"
 const sendEmailToAdmin = async (
   subject,
   message,
@@ -54,4 +53,4 @@ const sendEmailToAdmin = async (
   throw new Error("❌ Email failed after maximum retries.");
 };
 
-module.exports = sendEmailToAdmin;
+export default sendEmailToAdmin;

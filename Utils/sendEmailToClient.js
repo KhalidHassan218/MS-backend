@@ -1,4 +1,4 @@
-const nodemailer = require("nodemailer");
+import nodemailer from "nodemailer";
 
 const sendEmailToClient = async (
   subject,
@@ -56,4 +56,4 @@ const sendEmailToClient = async (
   throw new Error("❌ Email failed after maximum retries.");
 };
 
-module.exports = sendEmailToClient;
+export default sendEmailToClient;

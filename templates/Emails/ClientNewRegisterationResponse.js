@@ -94,5 +94,5 @@ function generateClientStatusEmailHTML(email, status) {
     `;
   }
   
-  module.exports = generateClientStatusEmailHTML;
+  export default generateClientStatusEmailHTML;
   

@@ -153,5 +153,5 @@ function generateRegistrationEmailHTML(user) {
     `;
   }
   
-  module.exports = generateRegistrationEmailHTML;
+export default  generateRegistrationEmailHTML;
   
