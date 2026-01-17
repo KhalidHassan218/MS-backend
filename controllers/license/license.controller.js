@@ -151,10 +151,10 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
 
       tx.update(ordersRef, {
         products: orderData.products,
-        feedback,
-        feedbackUpdatedAt: FieldValue.serverTimestamp(),
-        keyReplaced: true,
         keyReplacements: FieldValue.arrayUnion({
+          feedback,
+          feedbackUpdatedAt: FieldValue.serverTimestamp(),
+          keyReplaced: true,
           productId,
           productName: requestData.productName,
           oldKey,
