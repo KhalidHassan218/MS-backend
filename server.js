@@ -443,6 +443,7 @@ function generateInvoiceHTML(
         display: flex;
         flex-direction: column;
         justify-content: flex-end;
+        align-items: flex-end;
       }
       .totals-table {
         width: 350px;
