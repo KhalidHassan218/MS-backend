@@ -46,7 +46,7 @@ const templates = {
         installationMedia: "*Installation Media",
         location: "Europe – Netherlands - Utrecht",
         city: "IJsselstein - Osakastraat 9, 3404DR",
-        new:"new",
+        new:"New",
       },
       downloadUrl: "https://www.microsoft.com/en-en/software-download/windows11",
     },
