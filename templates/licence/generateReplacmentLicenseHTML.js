@@ -40,7 +40,7 @@ function generateReplacmentLicenseHTML(
             // Highlight new key with yellow-orange bg and dark text
             return `<div class="license-key license-key-new">
               ${escapeHtml(k)}
-              <span class="new-badge">NEW</span>
+              <span class="new-badge">${template.new}</span>
             </div>`;
           }
           

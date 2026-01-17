@@ -107,6 +107,7 @@ const invoiceTemplates = {
       amount: "AANTAL",
       total: "TOTAAL",
       subtotal: "Subtotaal",
+      paid: "Betaald",
       vat: "BTW",
       finalTotal: "Eindtotaal",
       paymentInfo: "Betalingsinformatie",
@@ -135,6 +136,7 @@ const invoiceTemplates = {
       amount: "AMOUNT",
       total: "TOTAL",
       subtotal: "Subtotal",
+      paid: "Paid",
       vat: "VAT",
       finalTotal: "Total",
       paymentInfo: "Payment Information",
@@ -164,6 +166,7 @@ const invoiceTemplates = {
       amount: "QUANTITÉ",
       total: "TOTAL",
       subtotal: "Sous-total",
+      paid: "Payé",
       vat: "TVA",
       finalTotal: "Total final",
       paymentInfo: "Informations de paiement",
@@ -193,6 +196,7 @@ const invoiceTemplates = {
       amount: "MENGE",
       total: "GESAMT",
       subtotal: "Zwischensumme",
+      paid: "Bezahlt",
       vat: "MwSt",
       finalTotal: "Endsumme",
       paymentInfo: "Zahlungsinformationen",
@@ -637,6 +641,9 @@ function generateInvoiceHTML(
               <td class="text-right">${currencySymbol} ${total.toFixed(2)}</td>
             </tr>
           </table>
+          <div class="invoice-status">
+            <strong>${t.paid}</strong>
+          </div>
         </div>
         
         ${currency.toLowerCase() === "usd"
