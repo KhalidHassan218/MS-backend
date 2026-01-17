@@ -9,6 +9,7 @@ import bodyParser from "body-parser";
 import sendEmail from "./Utils/sendEmail.js";
 import { initializeApp, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import fetch from "node-fetch";
 
 const stripe = new Stripe(stripeSecretKey);
 
@@ -440,6 +441,7 @@ function generateInvoiceHTML(
       .totals-section {
         margin: 20px 0;
         display: flex;
+        flex-direction: column;
         justify-content: flex-end;
       }
       .totals-table {
@@ -1557,5 +1559,44 @@ app.post("/api/decline-pendingRegistration", async (req, res) => {
     res.status(500).json(error.message);
   }
 });
+
+
+
+app.post("/api/download", async (req, res) => {
+  const { type, url, id } = req.body;
+
+  if (!id || !url || !type) {
+    return res.status(400).send("Missing parameters");
+  }
+
+  const allowedHosts = ["storage.googleapis.com"];
+  const parsed = new URL(url);
+
+  if (!allowedHosts.includes(parsed.host)) {
+    return res.status(400).send("Invalid file source");
+  }
+
+  // Download the file from the URL
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    return res.status(500).send("Failed to fetch file");
+  }
+
+  const buffer = await response.arrayBuffer();
+
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="invoice-${id}.pdf"`
+  );
+  res.setHeader("Content-Type", "application/pdf");
+
+  res.send(Buffer.from(buffer));
+});
+
+
+
+
+
 const PORT = process.env.PORT || 4242;
 app.listen(PORT, () => console.log(`Node server listening on port ${PORT}`));
