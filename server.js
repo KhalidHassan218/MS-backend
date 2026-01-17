@@ -1248,7 +1248,7 @@ app.post("/create-checkout-session", async (req, res) => {
   const currency = isUSCompany ? "usd" : "eur";
   const lineItems = cart?.map((product) => {
     let b2bpriceWVat = parseFloat(
-      isUSCompany ? product?.["price(B2B_USD)"] : product?.b2bpriceWVat
+      isUSCompany ? product?.["b2bpriceWVat_USD"] : product?.b2bpriceWVat
     );
     const priceCopy = b2bpriceWVat.toFixed(2);
     const isDigital = product?.type === "digital software";
