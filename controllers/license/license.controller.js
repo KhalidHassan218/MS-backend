@@ -153,7 +153,7 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
         products: orderData.products,
         keyReplacements: FieldValue.arrayUnion({
           feedback,
-          feedbackUpdatedAt: FieldValue.serverTimestamp(),
+          feedbackUpdatedAt: new Date(),
           keyReplaced: true,
           productId,
           productName: requestData.productName,
