@@ -1156,6 +1156,7 @@ async function processOrder(session) {
     await db.collection("orders").doc(orderId).update({
       invoiceGeneratedAt: new Date(),
       internalEntryStatus: "completed",
+      paymentStatus: "paid",
       invoiceUrl: invoicePdfUrl,
       licenseUrl: licensePdfUrl,
     });
