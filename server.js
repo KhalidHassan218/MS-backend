@@ -1503,6 +1503,7 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
           creationTime: userRecord.metadata.creationTime, // From Auth metadata
           acceptedAt: Date.now(), // Timestamp for acceptance
           langCode: "en",
+          invoiceSettings: { enabled: false, overDueDay: null }
         };
 
         await db
