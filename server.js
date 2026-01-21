@@ -95,6 +95,197 @@ const extractLicenseDataFromSession = (session, orderId, orderNumber, productsWi
 }
 
 
+
+
+
+
+async function processPayByInvoiceOrder(session, totalAmountMainCurrency, paymentLinkUrl) {
+  try {
+    console.log("⏳ session order...", session?.line_items);
+    const orderNumber = await getNextOrderNumber();
+
+    const companyCountry =
+      session?.metadata
+        ?.companyCountry || "US";
+    const taxId = session?.metadata?.taxId;
+    const b2bSupplierId = session?.metadata?.b2bSupplierId;
+    const uid = session?.metadata?.uid;
+    const data = {
+      uid: uid,
+      orderNumber: orderNumber,
+      internalEntryStatus: "pending",
+      paymentStatus: "Payment due",
+      payment_url: paymentLinkUrl,
+      email: session?.metadata?.email,
+      country: companyCountry,
+      poNumber: session?.metadata?.poNumber,
+      // city: fullSession?.customer_details?.address?.city,
+      // address1: fullSession?.customer_details?.address?.line1,
+      // address2: fullSession?.customer_details?.address?.line2,
+      // postal_code: fullSession?.customer_details?.address?.postal_code,
+      // bussinessName: fullSession?.customer_details?.business_name,
+      total: totalAmountMainCurrency,
+      currency: session?.currency,
+      createdAt: new Date(),
+      products: session?.line_items.map((item) => ({
+        productId: item?.price_data?.product_data?.metadata?.id,
+        name: item?.price_data?.product_data?.name,
+        quantity: item?.quantity,
+        unitPrice: item?.price_data?.unit_amount / 100,
+        totalPrice: item?.amount_total / 100,
+        isDigital: item?.price_data?.product_data?.metadata?.isDigital === "true", // Retrieve from metadata
+        PN: item?.price_data?.product_data?.metadata?.PN,
+        companyCountry,
+      })),
+    };
+    console.log("data", data);
+
+
+    // Store order as pending
+    const orderDocRef = await db.collection("orders").add(data);
+    const orderId = orderDocRef.id;
+
+    // Assign keys to products (this will update licenseKeys docs in firestore)
+    let digitalProducts =
+      data.products?.filter((product) => product.isDigital) ?? [];
+    let phisycalProducts =
+      data.products?.filter((product) => !product.isDigital) ?? [];
+    let productsWithKeys;
+    try {
+      productsWithKeys = await assignKeysToProducts(
+        orderId,
+        orderNumber,
+        digitalProducts,
+        b2bSupplierId,
+        uid
+      );
+    } catch (err) {
+      console.error(
+        "❌ Not enough license keys or error reserving keys:",
+        err.message
+      );
+
+      // Update order as failed or out-of-stock
+      await db.collection("orders").doc(orderId).update({
+        internalEntryStatus: "failed",
+        failureReason: err.message,
+        invoiceGeneratedAt: null,
+      });
+
+      // optional: notify admin or send email to customer here
+      return;
+    }
+    const allProducts = [...productsWithKeys, ...phisycalProducts];
+    // Update stored order to include the assigned keys per product (so DB has complete record)
+    console.log("allProducts", allProducts);
+
+    await db.collection("orders").doc(orderId).update({
+      products: allProducts,
+      internalEntryStatus: "keys_assigned",
+    });
+    const adaptedSession = {
+      created: Math.floor(data.createdAt.getTime() / 1000), // match Stripe session timestamp
+      currency: data.currency,
+      metadata: {
+        email: data.email,
+        poNumber: data.poNumber,
+      },
+      customer_details: {
+        name: data.customer?.name || "",
+        business_name: data.customer?.businessName || "",
+        address: {
+          line1: data.customer?.address?.line1 || "",
+          postal_code: data.customer?.address?.postalCode || "",
+          country: data.country || "",
+        },
+      },
+    };
+
+    const licenseData = extractLicenseDataFromSession(adaptedSession, orderId, orderNumber, productsWithKeys);
+
+    // Generate PDF with the assigned keys embedded
+    const pdfBuffer = await generateLicencePDFBuffer(
+      licenseData,
+      companyCountry,
+      false
+    );
+    // const invoicePdfBuffer = await generateInvoicePDFBuffer(
+    //   fullSession,
+    //   orderId,
+    //   orderNumber,
+    //   allProducts,
+    //   companyCountry,
+    //   taxId
+    // );
+
+    const licensePdfUrl = await uploadPDFToFirebaseStorage(
+      orderId,
+      orderNumber,
+      pdfBuffer
+    );
+    // const invoicePdfUrl = await uploadPDFToFirebaseStorage(
+    //   `${orderNumber}-invoice`,
+    //   orderNumber,
+    //   invoicePdfBuffer
+    // );
+
+    // Save Firestore PDF record
+    await savePDFRecord(`${orderNumber}-license`, licensePdfUrl);
+    // await savePDFRecord(`${orderNumber}-invoice`, invoicePdfUrl);
+    let emailAttachemnts = [
+      // {
+      //   filename: `Invoice-${orderNumber}.pdf`,
+      //   content: invoicePdfBuffer, // Buffer or string
+      //   contentType: invoicePdfBuffer.contentType || "application/pdf",
+      // },
+    ];
+    if (productsWithKeys?.length > 0) {
+      emailAttachemnts.push({
+        filename: `License-${orderNumber}.pdf`,
+        content: pdfBuffer, // Buffer or string
+        contentType: pdfBuffer.contentType || "application/pdf",
+      });
+    }
+    await sendOrderConfirmationEmail(
+      data?.name,
+      data?.email,
+      emailAttachemnts,
+      companyCountry // 'NL', 'EN', 'FR', or 'DE'
+    );
+
+    // Update order as completed with both URLs
+    await db.collection("orders").doc(orderId).update({
+      invoiceGeneratedAt: new Date(),
+      internalEntryStatus: "completed",
+      // invoiceUrl: invoicePdfUrl,
+      licenseUrl: licensePdfUrl,
+    });
+    console.log("✅ Order completed:", orderId);
+  } catch (err) {
+    console.error("❌ Error processing order:", err);
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const invoiceTemplates = {
   NL: {
     language: "nl-NL",
@@ -695,24 +886,7 @@ function generateInvoiceHTML(
   `;
 }
 
-// Helper function to escape HTML
-// function escapeHtml(text) {
-//   const div = document.createElement("div");
-//   div.textContent = text;
-//   return div.innerHTML;
-// }
 
-// // Helper function to escape HTML
-// function escapeHtml(text) {
-//   const map = {
-//     "&": "&amp;",
-//     "<": "&lt;",
-//     ">": "&gt;",
-//     '"': "&quot;",
-//     "'": "&#039;",
-//   };
-//   return String(text).replace(/[&<>"']/g, (m) => map[m]);
-// }
 
 // Simple HTML-escape to avoid injection in generated HTML
 function escapeHtml(str) {
@@ -849,7 +1023,7 @@ app.post(
       if (event.type === "checkout.session.completed") {
         const session = event.data.object;
 
-        processOrder(session); // Fire and forget
+        processPaidOrder(session); // Fire and forget
       }
     } catch (err) {
       console.log("❌ Webhook verification failed:", err.message);
@@ -1016,7 +1190,7 @@ async function sendOrderConfirmationEmail(
     emailAttachments
   );
 }
-async function processOrder(session) {
+async function processPaidOrder(session) {
   try {
     console.log("⏳ Processing order...");
     const orderNumber = await getNextOrderNumber();
@@ -1254,7 +1428,8 @@ app.post("/create-checkout-session", async (req, res) => {
   console.log("poNumber", poNumber);
   const isUSCompany = userData?.companyCountry === "US";
   console.log("isUSCompany", isUSCompany);
-  const currency = isUSCompany ? "usd" : "eur";
+  let currency
+  currency = isUSCompany ? "usd" : "eur";
   const lineItems = cart?.map((product) => {
     let b2bpriceWVat = parseFloat(
       isUSCompany ? product?.["b2bpriceWVat_USD"] : product?.b2bpriceWVat
@@ -1305,27 +1480,80 @@ app.post("/create-checkout-session", async (req, res) => {
   });
 
   if (isUserPayByInvoiceEnabled) {
-    // Calculate Expiry: Current Time + (overDueDay * 24 hours)
-    const daysToAdd = userData?.userInvoiceSettings?.overDueDay || 1; // Default to 1 if missing
-    const expirationTime = Math.floor(Date.now() / 1000) + (daysToAdd * 24 * 60 * 60);
-    let customer;
-    const existingCustomers = await stripe.customers.list({ email: useremail, limit: 1 });
-    if (existingCustomers.data.length > 0) {
-      customer = existingCustomers.data[0];
-    } else {
-      customer = await stripe.customers.create({
-        email: useremail,
-        name: userData?.name || useremail,
+    try {
+      // 1. Prepare line items using your exact existing logic for metadata and pricing
+      const paymentLinkLineItems = cart.map((product) => {
+        const b2bpriceWVat = parseFloat(
+          isUSCompany ? product?.["b2bpriceWVat_USD"] : product?.b2bpriceWVat
+        );
+        const isDigital = product?.type === "digital software";
+        const description = product?.selectedLangObj?.id
+          ? `Language: ${product.selectedLangObj.lang} PN: ${product.selectedLangObj.PN}`
+          : `Language: English`;
+
+        return {
+          price_data: {
+            currency: currency,
+            unit_amount: Math.round(b2bpriceWVat * 100),
+            product_data: {
+              name: product.name,
+              description: description,
+              images: [product.imageUrl],
+              metadata: {
+                PN: product?.selectedLangObj?.PN || product.PN,
+                id: product?.id,
+                isDigital: String(isDigital),
+                language: product?.selectedLangObj?.lang || "English",
+              },
+            },
+          },
+          quantity: product.calculatequantity || 1,
+        };
+      });
+
+      // 2. Create the Payment Link
+      // This creates a permanent URL (no 24h limit) that you can store in Firebase
+      const payByLinkSessionData = {
+        line_items: paymentLinkLineItems,
+        currency: currency,
         metadata: {
+          poNumber: poNumber || "N/A",
+          orderType: "pay_by_invoice",
           uid: userData?.uid,
           b2bSupplierId: userData?.b2bSupplierId,
-        }
-      });
+          taxId: userData?.taxId,
+          companyCountry: userData?.companyCountry,
+          email: userData?.email
+        },
+        // You can disable manual tax or promotion codes to keep the UI minimal
+        billing_address_collection: "required",
+        after_completion: {
+          type: "redirect",
+          redirect: {
+            url: `${YOUR_DOMAIN}/success?status=pending&po=${poNumber}`,
+          },
+        },
+      }
+      const paymentLink = await stripe.paymentLinks.create(payByLinkSessionData);
+      const totalAmountCents = paymentLinkLineItems.reduce((acc, item) => {
+        console.log("item.price_data.unit_amount", item.price_data.unit_amount);
+
+        return acc + (parseFloat(item.price_data.unit_amount) * item.quantity);
+      }, 0);
+      const totalAmountMainCurrency = totalAmountCents / 100;
+      // 3. Log for your Firebase tracking
+      console.log("Payment Link Created:", paymentLink.url);
+      console.log("totalAmountCents", totalAmountCents);
+      console.log("totalAmountMainCurrency", totalAmountMainCurrency);
+      const paymentLinkUrl = paymentLink.url
+      processPayByInvoiceOrder(payByLinkSessionData, totalAmountMainCurrency, paymentLinkUrl);
+      // 4. Return the link to be attached to your Firebase orders doc
+      res.status(200).send();
+
+    } catch (error) {
+      console.error("Payment Link Error:", error);
+      res.status(500).json({ error: error.message });
     }
-    console.log("here", customer);
-
-    res.status(200).send();
-
   } else {
 
     const expirationTime = Math.floor(Date.now() / 1000) + 30 * 60; // 30 minutes in seconds

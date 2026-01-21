@@ -8,32 +8,33 @@ function escapeHtml(str) {
     .replace(/'/g, "&#39;");
 }
 function generateLicenceHTML(
-    licenseData,
-    companyCountryCode = "EN",
-  ) {
-    const {customer, order, products} = licenseData;
-    const template = templates[companyCountryCode.toUpperCase()] || templates.EN;
-    const t = template.translations;
-    const address = customer.address || {};
-    const invoiceDate = new Date(order.date * 1000).toLocaleDateString(
-      template.language,
-      {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      }
-    );
-  
-    // Map products to HTML blocks
-    const productsHtml = (products || [])
-      .map((product, idx) => {
-        const keysHtml = (product.licenseKeys || [])
-          .map((k) => `<div class="license-key">${k.key}</div>`)
-          .join("");
-        return `
+  licenseData,
+  companyCountryCode = "EN",
+) {
+  console.log("licenseData", licenseData);
+
+  const { customer, order, products } = licenseData;
+  const template = templates[companyCountryCode.toUpperCase()] || templates.EN;
+  const t = template.translations;
+  const address = customer.address || {};
+  const invoiceDate = new Date(order.date * 1000).toLocaleDateString(
+    template.language,
+    {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    }
+  );
+
+  // Map products to HTML blocks
+  const productsHtml = (products || [])
+    .map((product, idx) => {
+      const keysHtml = (product.licenseKeys || [])
+        .map((k) => `<div class="license-key">${k.key}</div>`)
+        .join("");
+      return `
       <div class="product-section">
-        <div class="product-title">${escapeHtml(product.name || "")} (x${
-          product.quantity || 0
+        <div class="product-title">${escapeHtml(product.name || "")} (x${product.quantity || 0
         })</div>
         <div class="license-keys-title">${t.licenseKeys}:</div>
         <div class="license-keys-grid">
@@ -48,10 +49,10 @@ function generateLicenceHTML(
         </div>
       </div>
     `;
-      })
-      .join("");
-  
-    return `
+    })
+    .join("");
+
+  return `
   <!DOCTYPE html>
   <html>
   <head>
@@ -279,14 +280,14 @@ function generateLicenceHTML(
       
       <div class="document-header">
         <div class="document-number">${t.documentTitle}: ${escapeHtml(
-            order.number
-    )}</div>
+    order.number
+  )}</div>
         <div class="document-date">${t.date}: ${invoiceDate}</div>
       </div>
       
       <div class="document-title">${t.documentTitle}: ${escapeHtml(
-        order.number
-    )}</div>
+    order.number
+  )}</div>
       
       <div class="items-section">
         <div class="items-header">
@@ -295,18 +296,18 @@ function generateLicenceHTML(
           <div class="text-right">${t.quantity}</div>
         </div>
         ${(products || [])
-          .map(
-            (p, i) => `
+      .map(
+        (p, i) => `
           <div class="items-row">
             <div>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(
-              p.PN || ""
-            )}</div>
+          p.PN || ""
+        )}</div>
             <div><a href="#">${escapeHtml(p.name || "")}</a></div>
             <div class="text-right">${p.quantity || 0}</div>
           </div>
         `
-          )
-          .join("")}
+      )
+      .join("")}
       </div>
       
       ${productsHtml}
@@ -318,7 +319,7 @@ function generateLicenceHTML(
   </body>
   </html>
     `;
-  }
+}
 
 
-  export default generateLicenceHTML
+export default generateLicenceHTML

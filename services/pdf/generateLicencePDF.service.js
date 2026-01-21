@@ -6,36 +6,42 @@ import chromium from "@sparticuz/chromium";
 
 puppeteer.use(StealthPlugin());
 
+const isLocalMac =
+  process.platform === "darwin" && process.arch === "arm64";
+
 async function generateLicencePDFBuffer(
   licenseData,
   companyCountryCode,
   keyReplacement = false
 ) {
   let browser;
-  try {
-    let htmlContent;
-    if (keyReplacement) {
-      htmlContent = generateReplacmentLicenseHTML(
-        licenseData,
-        companyCountryCode,
-        true
-      );
-    } else {
-      htmlContent = generateLicenceHTML(licenseData, companyCountryCode);
-    }
 
-    // Use @sparticuz/chromium for serverless environments
-    browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-    });
+  try {
+    const htmlContent = keyReplacement
+      ? generateReplacmentLicenseHTML(licenseData, companyCountryCode, true)
+      : generateLicenceHTML(licenseData, companyCountryCode);
+
+    browser = await puppeteer.launch(
+      isLocalMac
+        ? {
+            // ✅ macOS (M1–M4) → system Chrome
+            executablePath:
+              "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            headless: "new",
+          }
+        : {
+            // ✅ AWS / serverless → sparticuz chromium
+            args: chromium.args,
+            defaultViewport: chromium.defaultViewport,
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless,
+          }
+    );
 
     const page = await browser.newPage();
-    await page.setContent(htmlContent);
+    await page.setContent(htmlContent, { waitUntil: "networkidle0" });
 
-    const pdfBuffer = await page.pdf({
+    return await page.pdf({
       format: "A4",
       printBackground: true,
       margin: {
@@ -45,16 +51,11 @@ async function generateLicencePDFBuffer(
         left: "0",
       },
     });
-
-    console.log("✅ PDF buffer generated, ready for download");
-    return pdfBuffer;
   } catch (error) {
     console.error("❌ Error generating PDF buffer:", error);
     throw error;
   } finally {
-    if (browser) {
-      await browser.close();
-    }
+    if (browser) await browser.close();
   }
 }
 
