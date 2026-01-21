@@ -1243,7 +1243,15 @@ app.post("/create-checkout-session", async (req, res) => {
   const useremail = req.body.useremail;
   const cat = req.body.foundUser;
   const userData = req.body.userData;
+
+  const poNumber = req.body?.poNumber || null;
+  const isUserPayByInvoiceEnabled = req.body?.isUserPayByInvoiceEnabled;
+  const userInvoiceSettings = isUserPayByInvoiceEnabled && req.body?.userInvoiceSettings;
+
   console.log("userData", userData);
+  console.log("userInvoiceSettings", userInvoiceSettings);
+  console.log("isUserPayByInvoiceEnabled", isUserPayByInvoiceEnabled);
+  console.log("poNumber", poNumber);
   const isUSCompany = userData?.companyCountry === "US";
   console.log("isUSCompany", isUSCompany);
   const currency = isUSCompany ? "usd" : "eur";
@@ -1295,33 +1303,59 @@ app.post("/create-checkout-session", async (req, res) => {
       quantity: product.calculatequantity || 1,
     };
   });
-  const expirationTime = Math.floor(Date.now() / 1000) + 30 * 60; // 30 minutes in seconds
-  const sessionData = {
-    line_items: lineItems,
-    mode: "payment",
-    billing_address_collection: "required",
-    name_collection: {
-      business: {
-        enabled: true, // show Business Name field
-        optional: false, // make it required
+
+  if (isUserPayByInvoiceEnabled) {
+    // Calculate Expiry: Current Time + (overDueDay * 24 hours)
+    const daysToAdd = userData?.userInvoiceSettings?.overDueDay || 1; // Default to 1 if missing
+    const expirationTime = Math.floor(Date.now() / 1000) + (daysToAdd * 24 * 60 * 60);
+    let customer;
+    const existingCustomers = await stripe.customers.list({ email: useremail, limit: 1 });
+    if (existingCustomers.data.length > 0) {
+      customer = existingCustomers.data[0];
+    } else {
+      customer = await stripe.customers.create({
+        email: useremail,
+        name: userData?.name || useremail,
+        metadata: {
+          uid: userData?.uid,
+          b2bSupplierId: userData?.b2bSupplierId,
+        }
+      });
+    }
+    console.log("here", customer);
+
+    res.status(200).send();
+
+  } else {
+
+    const expirationTime = Math.floor(Date.now() / 1000) + 30 * 60; // 30 minutes in seconds
+    const sessionData = {
+      line_items: lineItems,
+      mode: "payment",
+      billing_address_collection: "required",
+      name_collection: {
+        business: {
+          enabled: true, // show Business Name field
+          optional: false, // make it required
+        },
       },
-    },
-    metadata: {
-      taxId: userData?.taxId,
-      b2bSupplierId: userData?.b2bSupplierId,
-      uid: userData?.uid,
-    },
-    expires_at: expirationTime,
-    success_url: `${YOUR_DOMAIN}/success`,
-    cancel_url: `${YOUR_DOMAIN}?canceled=true`,
-  };
+      metadata: {
+        taxId: userData?.taxId,
+        b2bSupplierId: userData?.b2bSupplierId,
+        uid: userData?.uid,
+      },
+      expires_at: expirationTime,
+      success_url: `${YOUR_DOMAIN}/success`,
+      cancel_url: `${YOUR_DOMAIN}?canceled=true`,
+    };
 
-  if (useremail) {
-    sessionData.customer_email = useremail;
+    if (useremail) {
+      sessionData.customer_email = useremail;
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionData);
+    res.status(200).send(session.url);
   }
-
-  const session = await stripe.checkout.sessions.create(sessionData);
-  res.status(200).send(session.url);
 });
 
 app.post("/api/sendemail", async (req, res) => {
