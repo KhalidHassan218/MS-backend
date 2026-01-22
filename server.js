@@ -99,82 +99,13 @@ const extractLicenseDataFromSession = (session, orderId, orderNumber, productsWi
 
 
 
-async function processPayByInvoiceOrder(session, totalAmountMainCurrency, paymentLinkUrl) {
+async function processPayByInvoiceOrder(data, orderNumber, companyCountry, productsWithKeys, phisycalProducts, orderId) {
   try {
-    console.log("⏳ session order...", session?.line_items);
-    const orderNumber = await getNextOrderNumber();
-
-    const companyCountry =
-      session?.metadata
-        ?.companyCountry || "US";
-    const taxId = session?.metadata?.taxId;
-    const b2bSupplierId = session?.metadata?.b2bSupplierId;
-    const uid = session?.metadata?.uid;
-    const data = {
-      uid: uid,
-      orderNumber: orderNumber,
-      internalEntryStatus: "pending",
-      paymentStatus: "Payment due",
-      payment_url: paymentLinkUrl,
-      email: session?.metadata?.email,
-      country: companyCountry,
-      poNumber: session?.metadata?.poNumber,
-      // city: fullSession?.customer_details?.address?.city,
-      // address1: fullSession?.customer_details?.address?.line1,
-      // address2: fullSession?.customer_details?.address?.line2,
-      // postal_code: fullSession?.customer_details?.address?.postal_code,
-      // bussinessName: fullSession?.customer_details?.business_name,
-      total: totalAmountMainCurrency,
-      currency: session?.currency,
-      createdAt: new Date(),
-      products: session?.line_items.map((item) => ({
-        productId: item?.price_data?.product_data?.metadata?.id,
-        name: item?.price_data?.product_data?.name,
-        quantity: item?.quantity,
-        unitPrice: item?.price_data?.unit_amount / 100,
-        totalPrice: item?.amount_total / 100,
-        isDigital: item?.price_data?.product_data?.metadata?.isDigital === "true", // Retrieve from metadata
-        PN: item?.price_data?.product_data?.metadata?.PN,
-        companyCountry,
-      })),
-    };
-    console.log("data", data);
-
-
-    // Store order as pending
-    const orderDocRef = await db.collection("orders").add(data);
-    const orderId = orderDocRef.id;
+    // const taxId = session?.metadata?.taxId;
 
     // Assign keys to products (this will update licenseKeys docs in firestore)
-    let digitalProducts =
-      data.products?.filter((product) => product.isDigital) ?? [];
-    let phisycalProducts =
-      data.products?.filter((product) => !product.isDigital) ?? [];
-    let productsWithKeys;
-    try {
-      productsWithKeys = await assignKeysToProducts(
-        orderId,
-        orderNumber,
-        digitalProducts,
-        b2bSupplierId,
-        uid
-      );
-    } catch (err) {
-      console.error(
-        "❌ Not enough license keys or error reserving keys:",
-        err.message
-      );
 
-      // Update order as failed or out-of-stock
-      await db.collection("orders").doc(orderId).update({
-        internalEntryStatus: "failed",
-        failureReason: err.message,
-        invoiceGeneratedAt: null,
-      });
 
-      // optional: notify admin or send email to customer here
-      return;
-    }
     const allProducts = [...productsWithKeys, ...phisycalProducts];
     // Update stored order to include the assigned keys per product (so DB has complete record)
     console.log("allProducts", allProducts);
@@ -1417,7 +1348,8 @@ app.post("/create-checkout-session", async (req, res) => {
   const useremail = req.body.useremail;
   const cat = req.body.foundUser;
   const userData = req.body.userData;
-
+  const b2bSupplierId = userData?.b2bSupplierId
+  const companyCountry = userData?.companyCountry
   const poNumber = req.body?.poNumber || null;
   const isUserPayByInvoiceEnabled = req.body?.isUserPayByInvoiceEnabled;
   const userInvoiceSettings = isUserPayByInvoiceEnabled && req.body?.userInvoiceSettings;
@@ -1490,16 +1422,17 @@ app.post("/create-checkout-session", async (req, res) => {
         const description = product?.selectedLangObj?.id
           ? `Language: ${product.selectedLangObj.lang} PN: ${product.selectedLangObj.PN}`
           : `Language: English`;
-
+        const unit_amount = parseFloat(b2bpriceWVat * 100)
         return {
           price_data: {
             currency: currency,
-            unit_amount: Math.round(b2bpriceWVat * 100),
+            unit_amount: unit_amount,
             product_data: {
               name: product.name,
               description: description,
               images: [product.imageUrl],
               metadata: {
+                amount_total: product?.quantity * unit_amount,
                 PN: product?.selectedLangObj?.PN || product.PN,
                 id: product?.id,
                 isDigital: String(isDigital),
@@ -1530,7 +1463,12 @@ app.post("/create-checkout-session", async (req, res) => {
         after_completion: {
           type: "redirect",
           redirect: {
-            url: `${YOUR_DOMAIN}/success?status=pending&po=${poNumber}`,
+            url: `${YOUR_DOMAIN}/success?status`,
+          },
+        },
+        restrictions: {
+          completed_sessions: {
+            limit: 1,
           },
         },
       }
@@ -1546,7 +1484,79 @@ app.post("/create-checkout-session", async (req, res) => {
       console.log("totalAmountCents", totalAmountCents);
       console.log("totalAmountMainCurrency", totalAmountMainCurrency);
       const paymentLinkUrl = paymentLink.url
-      processPayByInvoiceOrder(payByLinkSessionData, totalAmountMainCurrency, paymentLinkUrl);
+
+
+
+
+
+
+      const uid = userData?.uid;
+      const orderNumber = await getNextOrderNumber();
+
+      const data = {
+        uid: uid,
+        orderNumber: orderNumber,
+        internalEntryStatus: "pending",
+        paymentStatus: "Payment due",
+        payment_url: paymentLinkUrl,
+        email: userData?.email,
+        country: userData?.companyCountry,
+        poNumber: poNumber,
+        // city: fullSession?.customer_details?.address?.city,
+        // address1: fullSession?.customer_details?.address?.line1,
+        // address2: fullSession?.customer_details?.address?.line2,
+        // postal_code: fullSession?.customer_details?.address?.postal_code,
+        // bussinessName: fullSession?.customer_details?.business_name,
+        total: totalAmountMainCurrency,
+        currency: currency,
+        createdAt: new Date(),
+        products: paymentLinkLineItems.map((item) => ({
+          productId: item?.price_data?.product_data?.metadata?.id,
+          name: item?.price_data?.product_data?.name,
+          quantity: item?.quantity,
+          unitPrice: item?.price_data?.unit_amount / 100,
+          totalPrice: item?.price_data?.product_data?.metadata?.amount_total / 100,
+          isDigital: item?.price_data?.product_data?.metadata?.isDigital === "true", // Retrieve from metadata
+          PN: item?.price_data?.product_data?.metadata?.PN,
+          companyCountry,
+        })),
+      };
+      console.log("data", data);
+
+
+      // Store order as pending
+      const orderDocRef = await db.collection("orders").add(data);
+      const orderId = orderDocRef.id;
+      let digitalProducts =
+        data.products?.filter((product) => product.isDigital) ?? [];
+      let phisycalProducts =
+        data.products?.filter((product) => !product.isDigital) ?? [];
+      let productsWithKeys;
+      try {
+        productsWithKeys = await assignKeysToProducts(
+          orderId,
+          orderNumber,
+          digitalProducts,
+          b2bSupplierId,
+          uid
+        );
+      } catch (err) {
+        console.error(
+          "❌ Not enough license keys or error reserving keys:",
+          err.message
+        );
+
+        // Update order as failed or out-of-stock
+        await db.collection("orders").doc(orderId).update({
+          internalEntryStatus: "failed",
+          failureReason: err.message,
+          invoiceGeneratedAt: null,
+        });
+
+        // optional: notify admin or send email to customer here
+        return;
+      }
+      processPayByInvoiceOrder(data, orderNumber, companyCountry, productsWithKeys, phisycalProducts, orderId);
       // 4. Return the link to be attached to your Firebase orders doc
       res.status(200).send();
 
