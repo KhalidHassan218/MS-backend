@@ -1498,7 +1498,7 @@ app.post("/create-checkout-session", async (req, res) => {
         orderNumber: orderNumber,
         internalEntryStatus: "pending",
         paymentStatus: "Payment due",
-        payment_url: paymentLinkUrl,
+        paymentUrl: paymentLinkUrl,
         email: userData?.email,
         country: userData?.companyCountry,
         poNumber: poNumber,
