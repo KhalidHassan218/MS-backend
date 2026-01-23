@@ -567,6 +567,9 @@ function generateInvoiceHTML(
         justify-content: flex-end;
         align-items: flex-end;
       }
+      invoice-status{
+      align-self: flex-start;
+      }
       .totals-table {
         width: 350px;
         font-size: 14px;
