@@ -31,7 +31,7 @@ puppeteer.use(StealthPlugin());
 // const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
 if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
   throw new Error(
-    "FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set."
+    "FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set.",
   );
 }
 
@@ -74,10 +74,18 @@ async function getNextOrderNumber() {
     return next;
   });
 }
-const extractLicenseDataFromSession = (session, orderId, orderNumber, productsWithKeys) => {
+const extractLicenseDataFromSession = (
+  session,
+  orderId,
+  orderNumber,
+  productsWithKeys,
+) => {
   return {
     customer: {
-      name: session.customer_details?.name || session.customer_details?.business_name || "",
+      name:
+        session.customer_details?.name ||
+        session.customer_details?.business_name ||
+        "",
       businessName: session.customer_details?.business_name,
       address: {
         line1: session.customer_details?.address?.line1 || "",
@@ -92,19 +100,20 @@ const extractLicenseDataFromSession = (session, orderId, orderNumber, productsWi
     },
     products: productsWithKeys,
   };
-}
+};
 
-
-
-
-
-
-async function processPayByInvoiceOrder(data, orderNumber, companyCountry, productsWithKeys, phisycalProducts, orderId) {
+async function processPayByInvoiceOrder(
+  data,
+  orderNumber,
+  companyCountry,
+  productsWithKeys,
+  phisycalProducts,
+  orderId,
+) {
   try {
     // const taxId = session?.metadata?.taxId;
 
     // Assign keys to products (this will update licenseKeys docs in firestore)
-
 
     const allProducts = [...productsWithKeys, ...phisycalProducts];
     // Update stored order to include the assigned keys per product (so DB has complete record)
@@ -132,13 +141,18 @@ async function processPayByInvoiceOrder(data, orderNumber, companyCountry, produ
       },
     };
 
-    const licenseData = extractLicenseDataFromSession(adaptedSession, orderId, orderNumber, productsWithKeys);
+    const licenseData = extractLicenseDataFromSession(
+      adaptedSession,
+      orderId,
+      orderNumber,
+      productsWithKeys,
+    );
 
     // Generate PDF with the assigned keys embedded
     const pdfBuffer = await generateLicencePDFBuffer(
       licenseData,
       companyCountry,
-      false
+      false,
     );
     // const invoicePdfBuffer = await generateInvoicePDFBuffer(
     //   fullSession,
@@ -152,7 +166,7 @@ async function processPayByInvoiceOrder(data, orderNumber, companyCountry, produ
     const licensePdfUrl = await uploadPDFToFirebaseStorage(
       orderId,
       orderNumber,
-      pdfBuffer
+      pdfBuffer,
     );
     // const invoicePdfUrl = await uploadPDFToFirebaseStorage(
     //   `${orderNumber}-invoice`,
@@ -181,7 +195,7 @@ async function processPayByInvoiceOrder(data, orderNumber, companyCountry, produ
       data?.name,
       data?.email,
       emailAttachemnts,
-      companyCountry // 'NL', 'EN', 'FR', or 'DE'
+      companyCountry, // 'NL', 'EN', 'FR', or 'DE'
     );
 
     // Update order as completed with both URLs
@@ -196,26 +210,6 @@ async function processPayByInvoiceOrder(data, orderNumber, companyCountry, produ
     console.error("❌ Error processing order:", err);
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const invoiceTemplates = {
   NL: {
@@ -344,7 +338,7 @@ function generateInvoiceHTML(
   orderNumber,
   productsWithKeys,
   companyCountryCode = "EN",
-  taxId
+  taxId,
 ) {
   // Get template based on country code, fallback to EN if not found
   const template =
@@ -397,7 +391,7 @@ function generateInvoiceHTML(
       day: "2-digit",
       month: "long",
       year: "numeric",
-    }
+    },
   );
 
   // Due date is 30 days after invoice date
@@ -567,12 +561,15 @@ function generateInvoiceHTML(
         justify-content: flex-end;
         align-items: flex-end;
       }
-      invoice-status{
-      align-self: flex-start;
-      }
       .totals-table {
         width: 350px;
         font-size: 14px;
+      }
+      .table-container {
+        width: 350px;
+        display: flex;
+        flex-direction: column;
+        
       }
       .totals-table tr {
         border-bottom: 1px solid #e0e0e0;
@@ -711,25 +708,26 @@ function generateInvoiceHTML(
         <div class="top-section">
           <div class="customer-info">
             <div><strong>${escapeHtml(
-    customer.name || customer.business_name || "COMPANY NAME"
-  )}</strong></div>
+              customer.name || customer.business_name || "COMPANY NAME",
+            )}</strong></div>
             <div>${escapeHtml(
-    address.line1 || "STREET NAME & STREET NUMBER"
-  )}</div>
+              address.line1 || "STREET NAME & STREET NUMBER",
+            )}</div>
             <div>${escapeHtml(
-    address.postal_code || "POSTAL CODE"
-  )} ${escapeHtml(address.city || "CITY")}</div>
+              address.postal_code || "POSTAL CODE",
+            )} ${escapeHtml(address.city || "CITY")}</div>
             <div>${escapeHtml(address.country || "COUNTRY")}</div>
-            ${taxId
-      ? `<div>${escapeHtml(taxId)}</div>`
-      : "<div>Company Tax ID</div>"
-    }
+            ${
+              taxId
+                ? `<div>${escapeHtml(taxId)}</div>`
+                : "<div>Company Tax ID</div>"
+            }
           </div>
           
           <div class="invoice-info">
             <div class="invoice-number">${t.invoiceNumber}: #${escapeHtml(
-      orderNumber
-    )}</div>
+              orderNumber,
+            )}</div>
             <div class="invoice-dates">
               <div><strong>${t.invoiceDate}:</strong> ${invoiceDate}</div>
               <div><strong>${t.expiryDate}:</strong> ${dueDateFormatted}</div>
@@ -753,12 +751,13 @@ function generateInvoiceHTML(
         </table>
 
         <div class="totals-section">
+          <div class="table-container">
           <table class="totals-table">
             <tr class="subtotal-row">
               <td>${t.subtotal}:</td>
               <td class="text-right">${currencySymbol} ${subtotal.toFixed(
-      2
-    )}</td>
+                2,
+              )}</td>
             </tr>
             <tr class="tax-row">
               <td>${vatLabel}:</td>
@@ -770,14 +769,16 @@ function generateInvoiceHTML(
             </tr>
           </table>
           <div class="invoice-status">
-            <strong>${t.paid}</strong>
+          <strong>${t.paid}</strong>
+          </div>
           </div>
         </div>
         
-        ${currency.toLowerCase() === "usd"
-      ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
-      : ""
-    }
+        ${
+          currency.toLowerCase() === "usd"
+            ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
+            : ""
+        }
         ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ""}
 
         <div style="display: flex; justify-content: space-between;">
@@ -820,8 +821,6 @@ function generateInvoiceHTML(
   `;
 }
 
-
-
 // Simple HTML-escape to avoid injection in generated HTML
 function escapeHtml(str) {
   return String(str || "")
@@ -837,7 +836,7 @@ async function assignKeysToProducts(
   orderNumber,
   products,
   b2bSupplierId,
-  uid
+  uid,
 ) {
   const results = [];
   for (const product of products) {
@@ -851,13 +850,13 @@ async function assignKeysToProducts(
       productId,
       needed,
       b2bSupplierId,
-      uid
+      uid,
     );
 
     results.push({
       ...product,
       licenseKeys: assignedKeys,
-      replacementHistory: []
+      replacementHistory: [],
     });
   }
 
@@ -870,7 +869,7 @@ async function reserveLicenseKeys(
   productId,
   neededQty,
   b2bSupplierId,
-  uid
+  uid,
 ) {
   if (neededQty <= 0) return [];
 
@@ -878,7 +877,7 @@ async function reserveLicenseKeys(
 
   return await db.runTransaction(async (tx) => {
     console.log(
-      `🔄 Transaction started: order=${orderId}, product=${productId}`
+      `🔄 Transaction started: order=${orderId}, product=${productId}`,
     );
 
     // 1️⃣ Read available keys ONLY for this product
@@ -886,16 +885,16 @@ async function reserveLicenseKeys(
       licenseKeysRef
         .where("status", "==", "available")
         .where("productId", "==", productId)
-        .limit(neededQty)
+        .limit(neededQty),
     );
 
     console.log(
-      `📦 Needed=${neededQty}, Found=${snapshot.size} for product=${productId}`
+      `📦 Needed=${neededQty}, Found=${snapshot.size} for product=${productId}`,
     );
 
     if (snapshot.size < neededQty) {
       throw new Error(
-        `Not enough keys for product ${productId} (needed ${neededQty}, found ${snapshot.size})`
+        `Not enough keys for product ${productId} (needed ${neededQty}, found ${snapshot.size})`,
       );
     }
 
@@ -914,7 +913,7 @@ async function reserveLicenseKeys(
         addedAt: Date.now(),
         replacedAt: null,
         replacementReason: null,
-        licenseDocId: doc.id  // Optional: keep reference to license doc
+        licenseDocId: doc.id, // Optional: keep reference to license doc
       });
 
       tx.update(doc.ref, {
@@ -945,7 +944,7 @@ app.post(
         sig,
         // 'whsec_ed16e1c24a67aaf05721441157b18ea73c196a633594f43803fca553ba780c9d'
         // "whsec_n9vgs7GOQKS1uOzF9Ufoxct5NMX11inK" //omar test webook
-        "whsec_3v6ak8Zl2sGGPyoBt2XUxdJEzGsIHLP9" //sertic test webook
+        "whsec_3v6ak8Zl2sGGPyoBt2XUxdJEzGsIHLP9", //sertic test webook
       );
 
       console.log("🔔 Webhook received:", event.type);
@@ -963,7 +962,7 @@ app.post(
       console.log("❌ Webhook verification failed:", err.message);
       return response.status(400).json({ error: err.message });
     }
-  }
+  },
 );
 
 const emailTemplates = {
@@ -1111,7 +1110,7 @@ async function sendOrderConfirmationEmail(
   customerName,
   customerEmail,
   emailAttachments,
-  companyCountryCode = "EN"
+  companyCountryCode = "EN",
 ) {
   const emailContent = generateEmailContent(customerName, companyCountryCode);
 
@@ -1121,7 +1120,7 @@ async function sendOrderConfirmationEmail(
     customerEmail,
     process.env.EMAIL_USER,
     process.env.EMAIL_USER,
-    emailAttachments
+    emailAttachments,
   );
 }
 async function processPaidOrder(session) {
@@ -1183,12 +1182,12 @@ async function processPaidOrder(session) {
         orderNumber,
         digitalProducts,
         b2bSupplierId,
-        uid
+        uid,
       );
     } catch (err) {
       console.error(
         "❌ Not enough license keys or error reserving keys:",
-        err.message
+        err.message,
       );
 
       // Update order as failed or out-of-stock
@@ -1209,12 +1208,17 @@ async function processPaidOrder(session) {
       products: allProducts,
       internalEntryStatus: "keys_assigned",
     });
-    const licenseData = extractLicenseDataFromSession(session, orderId, orderNumber, productsWithKeys);
+    const licenseData = extractLicenseDataFromSession(
+      session,
+      orderId,
+      orderNumber,
+      productsWithKeys,
+    );
 
     // Generate PDF with the assigned keys embedded
     const pdfBuffer = await generateLicencePDFBuffer(
       licenseData,
-      companyCountry
+      companyCountry,
     );
     const invoicePdfBuffer = await generateInvoicePDFBuffer(
       fullSession,
@@ -1222,18 +1226,18 @@ async function processPaidOrder(session) {
       orderNumber,
       allProducts,
       companyCountry,
-      taxId
+      taxId,
     );
 
     const licensePdfUrl = await uploadPDFToFirebaseStorage(
       orderId,
       orderNumber,
-      pdfBuffer
+      pdfBuffer,
     );
     const invoicePdfUrl = await uploadPDFToFirebaseStorage(
       `${orderNumber}-invoice`,
       orderNumber,
-      invoicePdfBuffer
+      invoicePdfBuffer,
     );
 
     // Save Firestore PDF record
@@ -1257,7 +1261,7 @@ async function processPaidOrder(session) {
       data?.name,
       data?.email,
       emailAttachemnts,
-      companyCountry // 'NL', 'EN', 'FR', or 'DE'
+      companyCountry, // 'NL', 'EN', 'FR', or 'DE'
     );
 
     // Update order as completed with both URLs
@@ -1281,7 +1285,7 @@ async function generateInvoicePDFBuffer(
   orderNumber,
   productsWithKeys,
   companyCountryCode,
-  taxId
+  taxId,
 ) {
   let browser;
   try {
@@ -1291,7 +1295,7 @@ async function generateInvoicePDFBuffer(
       orderNumber,
       productsWithKeys,
       companyCountryCode,
-      taxId
+      taxId,
     );
 
     browser = await puppeteer.launch({
@@ -1326,8 +1330,6 @@ async function generateInvoicePDFBuffer(
   }
 }
 
-
-
 app.use(express.json());
 app.use(bodyParser.json());
 
@@ -1339,8 +1341,6 @@ const calculateOrderAmount = (price) => {
   return price * 100;
 };
 
-
-
 app.get("/", (req, res) => {
   res.send("welcome to microsoftsupplier website");
 });
@@ -1351,11 +1351,12 @@ app.post("/create-checkout-session", async (req, res) => {
   const useremail = req.body.useremail;
   const cat = req.body.foundUser;
   const userData = req.body.userData;
-  const b2bSupplierId = userData?.b2bSupplierId
-  const companyCountry = userData?.companyCountry
+  const b2bSupplierId = userData?.b2bSupplierId;
+  const companyCountry = userData?.companyCountry;
   const poNumber = req.body?.poNumber || null;
   const isUserPayByInvoiceEnabled = req.body?.isUserPayByInvoiceEnabled;
-  const userInvoiceSettings = isUserPayByInvoiceEnabled && req.body?.userInvoiceSettings;
+  const userInvoiceSettings =
+    isUserPayByInvoiceEnabled && req.body?.userInvoiceSettings;
 
   console.log("userData", userData);
   console.log("userInvoiceSettings", userInvoiceSettings);
@@ -1363,11 +1364,11 @@ app.post("/create-checkout-session", async (req, res) => {
   console.log("poNumber", poNumber);
   const isUSCompany = userData?.companyCountry === "US";
   console.log("isUSCompany", isUSCompany);
-  let currency
+  let currency;
   currency = isUSCompany ? "usd" : "eur";
   const lineItems = cart?.map((product) => {
     let b2bpriceWVat = parseFloat(
-      isUSCompany ? product?.["b2bpriceWVat_USD"] : product?.b2bpriceWVat
+      isUSCompany ? product?.["b2bpriceWVat_USD"] : product?.b2bpriceWVat,
     );
     const priceCopy = b2bpriceWVat.toFixed(2);
     const isDigital = product?.type === "digital software";
@@ -1419,13 +1420,13 @@ app.post("/create-checkout-session", async (req, res) => {
       // 1. Prepare line items using your exact existing logic for metadata and pricing
       const paymentLinkLineItems = cart.map((product) => {
         const b2bpriceWVat = parseFloat(
-          isUSCompany ? product?.["b2bpriceWVat_USD"] : product?.b2bpriceWVat
+          isUSCompany ? product?.["b2bpriceWVat_USD"] : product?.b2bpriceWVat,
         );
         const isDigital = product?.type === "digital software";
         const description = product?.selectedLangObj?.id
           ? `Language: ${product.selectedLangObj.lang} PN: ${product.selectedLangObj.PN}`
           : `Language: English`;
-        const unit_amount = parseFloat(b2bpriceWVat * 100)
+        const unit_amount = parseFloat(b2bpriceWVat * 100);
         return {
           price_data: {
             currency: currency,
@@ -1459,7 +1460,7 @@ app.post("/create-checkout-session", async (req, res) => {
           b2bSupplierId: userData?.b2bSupplierId,
           taxId: userData?.taxId,
           companyCountry: userData?.companyCountry,
-          email: userData?.email
+          email: userData?.email,
         },
         // You can disable manual tax or promotion codes to keep the UI minimal
         billing_address_collection: "required",
@@ -1474,24 +1475,20 @@ app.post("/create-checkout-session", async (req, res) => {
             limit: 1,
           },
         },
-      }
-      const paymentLink = await stripe.paymentLinks.create(payByLinkSessionData);
+      };
+      const paymentLink =
+        await stripe.paymentLinks.create(payByLinkSessionData);
       const totalAmountCents = paymentLinkLineItems.reduce((acc, item) => {
         console.log("item.price_data.unit_amount", item.price_data.unit_amount);
 
-        return acc + (parseFloat(item.price_data.unit_amount) * item.quantity);
+        return acc + parseFloat(item.price_data.unit_amount) * item.quantity;
       }, 0);
       const totalAmountMainCurrency = totalAmountCents / 100;
       // 3. Log for your Firebase tracking
       console.log("Payment Link Created:", paymentLink.url);
       console.log("totalAmountCents", totalAmountCents);
       console.log("totalAmountMainCurrency", totalAmountMainCurrency);
-      const paymentLinkUrl = paymentLink.url
-
-
-
-
-
+      const paymentLinkUrl = paymentLink.url;
 
       const uid = userData?.uid;
       const orderNumber = await getNextOrderNumber();
@@ -1518,14 +1515,15 @@ app.post("/create-checkout-session", async (req, res) => {
           name: item?.price_data?.product_data?.name,
           quantity: item?.quantity,
           unitPrice: item?.price_data?.unit_amount / 100,
-          totalPrice: item?.price_data?.product_data?.metadata?.amount_total / 100,
-          isDigital: item?.price_data?.product_data?.metadata?.isDigital === "true", // Retrieve from metadata
+          totalPrice:
+            item?.price_data?.product_data?.metadata?.amount_total / 100,
+          isDigital:
+            item?.price_data?.product_data?.metadata?.isDigital === "true", // Retrieve from metadata
           PN: item?.price_data?.product_data?.metadata?.PN,
           companyCountry,
         })),
       };
       console.log("data", data);
-
 
       // Store order as pending
       const orderDocRef = await db.collection("orders").add(data);
@@ -1541,12 +1539,12 @@ app.post("/create-checkout-session", async (req, res) => {
           orderNumber,
           digitalProducts,
           b2bSupplierId,
-          uid
+          uid,
         );
       } catch (err) {
         console.error(
           "❌ Not enough license keys or error reserving keys:",
-          err.message
+          err.message,
         );
 
         // Update order as failed or out-of-stock
@@ -1559,16 +1557,21 @@ app.post("/create-checkout-session", async (req, res) => {
         // optional: notify admin or send email to customer here
         return;
       }
-      processPayByInvoiceOrder(data, orderNumber, companyCountry, productsWithKeys, phisycalProducts, orderId);
+      processPayByInvoiceOrder(
+        data,
+        orderNumber,
+        companyCountry,
+        productsWithKeys,
+        phisycalProducts,
+        orderId,
+      );
       // 4. Return the link to be attached to your Firebase orders doc
       res.status(200).send();
-
     } catch (error) {
       console.error("Payment Link Error:", error);
       res.status(500).json({ error: error.message });
     }
   } else {
-
     const expirationTime = Math.floor(Date.now() / 1000) + 30 * 60; // 30 minutes in seconds
     const sessionData = {
       line_items: lineItems,
@@ -1685,7 +1688,7 @@ app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
       }),
       "info@microsoftsupplier.com",
       process.env.EMAIL_USER,
-      process.env.EMAIL_USER
+      process.env.EMAIL_USER,
     );
     res
       .status(200)
@@ -1759,7 +1762,7 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
           generateClientStatusEmailHTML(email, "accepted"),
           email,
           process.env.EMAIL_USER,
-          process.env.EMAIL_USER
+          process.env.EMAIL_USER,
         );
 
         // 3. Get Pending Registration Details
@@ -1778,7 +1781,7 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
           creationTime: userRecord.metadata.creationTime, // From Auth metadata
           acceptedAt: Date.now(), // Timestamp for acceptance
           langCode: "en",
-          invoiceSettings: { enabled: false, overDueDay: null }
+          invoiceSettings: { enabled: false, overDueDay: null },
         };
 
         await db
@@ -1820,7 +1823,7 @@ app.post("/api/decline-pendingRegistration", async (req, res) => {
       generateClientStatusEmailHTML(email, "declined"),
       email,
       process.env.EMAIL_USER,
-      process.env.EMAIL_USER
+      process.env.EMAIL_USER,
     );
     await db.collection("pending_registrations").doc(docId).delete();
 
@@ -1837,8 +1840,6 @@ app.post("/api/decline-pendingRegistration", async (req, res) => {
     res.status(500).json(error.message);
   }
 });
-
-
 
 app.post("/api/download", async (req, res) => {
   const { type, url, id } = req.body;
@@ -1865,16 +1866,12 @@ app.post("/api/download", async (req, res) => {
 
   res.setHeader(
     "Content-Disposition",
-    `attachment; filename="invoice-${id}.pdf"`
+    `attachment; filename="invoice-${id}.pdf"`,
   );
   res.setHeader("Content-Type", "application/pdf");
 
   res.send(Buffer.from(buffer));
 });
-
-
-
-
 
 const PORT = process.env.PORT || 4242;
 app.listen(PORT, () => console.log(`Node server listening on port ${PORT}`));
