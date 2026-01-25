@@ -1154,6 +1154,7 @@ async function processPaidOrder(session) {
     if (fullSession?.metadata && fullSession?.metadata?.orderId) {
       const orderId = fullSession?.metadata?.orderId
       const orderNumber = fullSession?.metadata?.orderNumber
+      const companyCountry = fullSession?.metadata?.companyCountry
 
       const orderRef = db.collection("orders").doc(orderId);
       const orderSnap = await orderRef.get();
