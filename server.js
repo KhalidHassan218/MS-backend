@@ -1641,6 +1641,7 @@ app.post("/create-checkout-session", async (req, res) => {
         taxId: userData?.taxId,
         b2bSupplierId: userData?.b2bSupplierId,
         uid: userData?.uid,
+        poNumber: poNumber || "N/A",
       },
       expires_at: expirationTime,
       success_url: `${YOUR_DOMAIN}/success`,
