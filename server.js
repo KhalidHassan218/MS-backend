@@ -1199,6 +1199,8 @@ async function processPaidOrder(session) {
 
     } else {
       const orderNumber = await getNextOrderNumber();
+      console.log("fullSession12",fullSession);
+      
       const data = {
         uid: uid,
         orderNumber: orderNumber,
