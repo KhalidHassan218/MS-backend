@@ -338,7 +338,7 @@ export function generateProformaHTML(
           
           <div class="invoice-info">
                  ${poNumber ? `
-              <div class="po-number">"PO": ${escapeHtml(poNumber)}</div>
+              <div class="po-number">PO: ${escapeHtml(poNumber)}</div>
             ` : ""}
             <div class="invoice-number">${t.invoiceNumber}: #${escapeHtml(
             orderNumber,
