@@ -14,7 +14,7 @@ export function generateProformaHTML(
     companyCountryCode = "EN",
     taxId,
 ) {
-    console.log("data", data);
+    console.log("123", data);
 
     // Get template based on country code, fallback to EN if not found
     const template =
@@ -24,7 +24,7 @@ export function generateProformaHTML(
     const customer = data.customer_details || {};
     console.log("customer", customer);
     const address = customer.address || {};
-    const total = (data.total || 0) / 100;
+    const total = (data.total || 0);
     const currency = (data.currency || "eur").toUpperCase();
     const poNumber = data?.poNumber
     const overdueDate = data?.overdueDate
