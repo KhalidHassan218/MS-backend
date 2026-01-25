@@ -351,11 +351,11 @@ function generateInvoiceHTML(
   const t = template.translations;
 
   const customer = session.customer_details || {};
-  console.log("customer", customer);
   const address = customer.address || {};
   const total = (session.amount_total || 0) / 100;
   const currency = (session.currency || "eur").toUpperCase();
   const poNumber = session?.metadata?.poNumber
+  console.log("poNumber",poNumber);
   // Determine currency symbol
   let currencySymbol = currency;
   if (currency.toLowerCase() === "eur") currencySymbol = "€";
@@ -1141,13 +1141,10 @@ async function sendOrderConfirmationEmail(
 }
 async function processPaidOrder(session) {
   try {
-    console.log("⏳ Processing order...");
 
     const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
       expand: ["line_items.data.price.product"],
     });
-    console.log("fullSession", fullSession);
-    console.log("fullSession.metadata", fullSession?.metadata);
 
     const companyCountry =
       fullSession?.line_items?.data?.[0].price?.product?.metadata
