@@ -119,8 +119,6 @@ async function processPayByInvoiceOrder(
 
     const allProducts = [...productsWithKeys, ...phisycalProducts];
     // Update stored order to include the assigned keys per product (so DB has complete record)
-    console.log("allProducts", allProducts);
-
     await db.collection("orders").doc(orderId).update({
       products: allProducts,
       internalEntryStatus: "keys_assigned",
@@ -355,7 +353,6 @@ function generateInvoiceHTML(
   const total = (session.amount_total || 0) / 100;
   const currency = (session.currency || "eur").toUpperCase();
   const poNumber = session?.metadata?.poNumber
-  console.log("poNumber",poNumber);
   // Determine currency symbol
   let currencySymbol = currency;
   if (currency.toLowerCase() === "eur") currencySymbol = "€";
@@ -740,7 +737,7 @@ function generateInvoiceHTML(
           
           <div class="invoice-info">
                            ${poNumber ? `
-              <div class="po-number">${t.poNumber || "PO Number"}: ${escapeHtml(poNumber)}</div>
+              <div class="po-number">"PO": ${escapeHtml(poNumber)}</div>
             ` : ""}
             <div class="invoice-number">${t.invoiceNumber}: #${escapeHtml(
       orderNumber,
@@ -1205,6 +1202,7 @@ async function processPaidOrder(session) {
       const data = {
         uid: uid,
         orderNumber: orderNumber,
+        poNumber: fullSession?.metadata?.poNumber,
         internalEntryStatus: "pending",
         email: fullSession?.customer_details?.email,
         country: fullSession?.customer_details?.address?.country,
@@ -1325,7 +1323,6 @@ async function processPaidOrder(session) {
       });
     }
 
-    // console.log("✅ Order completed:", orderId);
   } catch (err) {
     console.error("❌ Error processing order:", err);
   }
@@ -1390,7 +1387,6 @@ app.use(express.json());
 app.use(bodyParser.json());
 
 const calculateOrderAmount = (price) => {
-  console.log(price);
   return price * 100;
 };
 
@@ -1400,15 +1396,12 @@ app.get("/", (req, res) => {
 
 app.post("/create-checkout-session", async (req, res) => {
   const cart = req.body.cart;
-  console.log("cart", cart);
   const useremail = req.body.useremail;
   const cat = req.body.foundUser;
   const userData = req.body.userData;
-  console.log("req.body", req.body);
   const b2bSupplierId = userData?.b2bSupplierId;
   const companyCountry = userData?.companyCountry;
   const poNumber = req.body?.poNumber || null;
-
   const isUserPayByInvoiceEnabled = req.body?.isUserPayByInvoiceEnabled;
   const userInvoiceSettings =
     isUserPayByInvoiceEnabled && req.body?.userInvoiceSettings;
@@ -1416,12 +1409,7 @@ app.post("/create-checkout-session", async (req, res) => {
   const overdueDate = new Date(currentDate);
   const overDueDay = userInvoiceSettings && userInvoiceSettings?.overDueDay
   overdueDate.setDate(currentDate.getDate() + overDueDay);
-  console.log("userData", userData);
-  console.log("userInvoiceSettings", userInvoiceSettings);
-  console.log("isUserPayByInvoiceEnabled", isUserPayByInvoiceEnabled);
-  console.log("poNumber", poNumber);
   const isUSCompany = userData?.companyCountry === "US";
-  console.log("isUSCompany", isUSCompany);
   let currency;
   currency = isUSCompany ? "usd" : "eur";
   const lineItems = cart?.map((product) => {
@@ -1442,6 +1430,7 @@ app.post("/create-checkout-session", async (req, res) => {
         id: product?.id,
         companyCountry: userData.companyCountry,
         b2bSupplierId: userData.b2bSupplierId,
+        poNumber: poNumber
         // taxId: userData.taxId,
       };
       description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.PN}`;
@@ -1453,6 +1442,7 @@ app.post("/create-checkout-session", async (req, res) => {
         id: product?.id,
         companyCountry: userData?.companyCountry,
         b2bSupplierId: userData.b2bSupplierId,
+        poNumber: poNumber
         // taxId: userData.taxId,
       };
       description = `Language: English`;
@@ -1546,15 +1536,11 @@ app.post("/create-checkout-session", async (req, res) => {
       const paymentLink =
         await stripe.paymentLinks.create(payByLinkSessionData);
       const totalAmountCents = paymentLinkLineItems.reduce((acc, item) => {
-        console.log("item.price_data.unit_amount", item.price_data.unit_amount);
 
         return acc + parseFloat(item.price_data.unit_amount) * item.quantity;
       }, 0);
       const totalAmountMainCurrency = totalAmountCents / 100;
       // 3. Log for your Firebase tracking
-      console.log("Payment Link Created:", paymentLink.url);
-      console.log("totalAmountCents", totalAmountCents);
-      console.log("totalAmountMainCurrency", totalAmountMainCurrency);
       const paymentLinkUrl = paymentLink.url;
 
       const uid = userData?.uid;
@@ -1590,7 +1576,6 @@ app.post("/create-checkout-session", async (req, res) => {
           companyCountry,
         })),
       };
-      console.log("data", data);
 
       // Store order as pending
       await orderDocRef.update(data);
@@ -1699,21 +1684,6 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
   const { email, companyName, taxId, companyCountry, password } = req.body;
   let userFound;
   try {
-    // await getAuth()
-    // .getUserByEmail(email)
-    // .then((userRecord) => {
-    //   // See the UserRecord reference doc for the contents of userRecord.
-    //   userFound = true
-    //   console.log("Successfully fetched user data:", JSON.stringify(userRecord.toJSON(), null, 2));
-
-    // })
-    // .catch((error) => {
-    //   if (error.code === "auth/user-not-found") {
-    //     console.log("No user exists with this email.");
-    //     userFound = false
-    //     return null;
-    //   }
-    // });
     await getAuth()
       .createUser({
         email: email,
@@ -1722,8 +1692,6 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
         password: password,
       })
       .then((createdUser) => {
-        console.log("createdUser", createdUser);
-
         db.collection("pending_registrations").add({
           uid: createdUser?.uid,
           email: email,
@@ -1823,8 +1791,6 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
         disabled: false,
       })
       .then(async (userRecord) => {
-        console.log(userRecord, "UserRecord");
-
         // 2. Send Acceptance Email
         sendEmailToClient(
           `pending Registration response`,
