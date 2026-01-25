@@ -1328,7 +1328,7 @@ async function processPaidOrder(session) {
       });
     }
 
-    console.log("✅ Order completed:", orderId);
+    // console.log("✅ Order completed:", orderId);
   } catch (err) {
     console.error("❌ Error processing order:", err);
   }
