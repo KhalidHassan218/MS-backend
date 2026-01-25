@@ -24,22 +24,25 @@ async function generateLicencePDFBuffer(
     browser = await puppeteer.launch(
       isLocalMac
         ? {
-            // ✅ macOS (M1–M4) → system Chrome
-            executablePath:
-              "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            headless: "new",
-          }
+          // ✅ macOS (M1–M4) → system Chrome
+          executablePath:
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+          headless: "new",
+        }
         : {
-            // ✅ AWS / serverless → sparticuz chromium
-            args: chromium.args,
-            defaultViewport: chromium.defaultViewport,
-            executablePath: await chromium.executablePath(),
-            headless: chromium.headless,
-          }
+          // ✅ AWS / serverless → sparticuz chromium
+          args: chromium.args,
+          defaultViewport: chromium.defaultViewport,
+          executablePath: await chromium.executablePath(),
+          headless: chromium.headless,
+        }
     );
 
     const page = await browser.newPage();
-    await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+    await page.setContent(htmlContent, {
+      waitUntil: "networkidle0",
+      timeout: 60000,
+    });
 
     return await page.pdf({
       format: "A4",

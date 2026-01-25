@@ -1,4 +1,4 @@
-import templates from "./templates.js";
+import { licenceTranslationTemplate } from "./translationTemplates.js";
 
 function generateReplacmentLicenseHTML(
   licenseData,
@@ -15,7 +15,7 @@ function generateReplacmentLicenseHTML(
   }
 
   const { customer, order, products } = licenseData;
-  const template = templates[companyCountryCode.toUpperCase()] || templates.EN;
+  const template = licenceTranslationTemplate[companyCountryCode.toUpperCase()] || licenceTranslationTemplate.EN;
   const t = template.translations;
   const address = customer.address || {};
   const invoiceDate = new Date(order.date * 1000).toLocaleDateString(

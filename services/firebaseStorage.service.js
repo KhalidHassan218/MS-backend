@@ -1,12 +1,12 @@
 import { getStorage } from "firebase-admin/storage";
 
 export async function uploadPDFToFirebaseStorage(
-  orderId,
   orderNumber,
-  pdfBuffer
+  pdfBuffer,
+  type = "License"
 ) {
   const bucket = getStorage().bucket("supplier-34b95.appspot.com"); // requires admin.initializeApp()
-  const file = bucket.file(`licence/Invoice-${orderId}.pdf`);
+  const file = bucket.file(`${type}/${type}-${orderNumber}.pdf`);
 
   await file.save(pdfBuffer, {
     metadata: { contentType: "application/pdf" },
@@ -15,5 +15,5 @@ export async function uploadPDFToFirebaseStorage(
   // Make file public OR use signed URL
   await file.makePublic();
 
-  return `https://storage.googleapis.com/${bucket.name}/licence/Invoice-${orderId}.pdf`;
+  return `https://storage.googleapis.com/${bucket.name}/${type}/${type}-${orderNumber}.pdf`;
 }

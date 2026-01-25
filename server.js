@@ -25,7 +25,8 @@ import sendEmailToAdmin from "./Utils/sendAdminEmail.js";
 import generateClientStatusEmailHTML from "./templates/Emails/ClientNewRegisterationResponse.js";
 import { uploadPDFToFirebaseStorage } from "./services/firebaseStorage.service.js";
 import generateLicencePDFBuffer from "./services/pdf/generateLicencePDF.service.js";
-import savePDFRecord from "./services/pdf/savePdfRecord.service.js";
+import { generateProformaPDFBuffer } from "./services/pdf/generateProformaPDF.service.js";
+// import savePDFRecord from "./services/pdf/savePdfRecord.service.js";
 puppeteer.use(StealthPlugin());
 
 // const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
@@ -109,6 +110,7 @@ async function processPayByInvoiceOrder(
   productsWithKeys,
   phisycalProducts,
   orderId,
+  taxId
 ) {
   try {
     // const taxId = session?.metadata?.taxId;
@@ -154,35 +156,34 @@ async function processPayByInvoiceOrder(
       companyCountry,
       false,
     );
-    // const invoicePdfBuffer = await generateInvoicePDFBuffer(
-    //   fullSession,
-    //   orderId,
-    //   orderNumber,
-    //   allProducts,
-    //   companyCountry,
-    //   taxId
-    // );
+    const proformaPdfBuffer = await generateProformaPDFBuffer(
+      data,
+      orderNumber,
+      allProducts,
+      companyCountry,
+      taxId
+    );
 
     const licensePdfUrl = await uploadPDFToFirebaseStorage(
-      orderId,
       orderNumber,
       pdfBuffer,
+      "License"
     );
-    // const invoicePdfUrl = await uploadPDFToFirebaseStorage(
-    //   `${orderNumber}-invoice`,
-    //   orderNumber,
-    //   invoicePdfBuffer
-    // );
+    const proformaPdfUrl = await uploadPDFToFirebaseStorage(
+      orderNumber,
+      proformaPdfBuffer,
+      "Proforma"
+    );
 
     // Save Firestore PDF record
-    await savePDFRecord(`${orderNumber}-license`, licensePdfUrl);
+    // await savePDFRecord(`${orderNumber}-license`, licensePdfUrl);
     // await savePDFRecord(`${orderNumber}-invoice`, invoicePdfUrl);
     let emailAttachemnts = [
-      // {
-      //   filename: `Invoice-${orderNumber}.pdf`,
-      //   content: invoicePdfBuffer, // Buffer or string
-      //   contentType: invoicePdfBuffer.contentType || "application/pdf",
-      // },
+      {
+        filename: `Proforma-${orderNumber}.pdf`,
+        content: proformaPdfBuffer, // Buffer or string
+        contentType: proformaPdfBuffer.contentType || "application/pdf",
+      },
     ];
     if (productsWithKeys?.length > 0) {
       emailAttachemnts.push({
@@ -200,9 +201,9 @@ async function processPayByInvoiceOrder(
 
     // Update order as completed with both URLs
     await db.collection("orders").doc(orderId).update({
-      invoiceGeneratedAt: new Date(),
+      proFormaGenerateddAt: new Date(),
       internalEntryStatus: "completed",
-      // invoiceUrl: invoicePdfUrl,
+      proformaUrl: proformaPdfUrl,
       licenseUrl: licensePdfUrl,
     });
     console.log("✅ Order completed:", orderId);
@@ -216,6 +217,7 @@ const invoiceTemplates = {
     language: "nl-NL",
     translations: {
       invoiceNumber: "Factuurnummer",
+      poNumber: "Bestelnummer",
       invoiceDate: "Factuurdatum",
       expiryDate: "Vervaldatum",
       date: "DATUM",
@@ -245,6 +247,7 @@ const invoiceTemplates = {
     language: "en-US",
     translations: {
       invoiceNumber: "Invoice Number",
+      poNumber: "PO number",
       invoiceDate: "Invoice Date",
       expiryDate: "Expiry Date",
       date: "DATE",
@@ -275,6 +278,7 @@ const invoiceTemplates = {
     language: "fr-FR",
     translations: {
       invoiceNumber: "Numéro de facture",
+      poNumber: "Numéro de commande",
       invoiceDate: "Date de facture",
       expiryDate: "Date d'échéance",
       date: "DATE",
@@ -305,6 +309,7 @@ const invoiceTemplates = {
     language: "de-DE",
     translations: {
       invoiceNumber: "Rechnungsnummer",
+      poNumber: "Bestellnummer",
       invoiceDate: "Rechnungsdatum",
       expiryDate: "Fälligkeitsdatum",
       date: "DATUM",
@@ -350,7 +355,7 @@ function generateInvoiceHTML(
   const address = customer.address || {};
   const total = (session.amount_total || 0) / 100;
   const currency = (session.currency || "eur").toUpperCase();
-
+  const poNumber = session?.metadata?.poNumber
   // Determine currency symbol
   let currencySymbol = currency;
   if (currency.toLowerCase() === "eur") currencySymbol = "€";
@@ -519,6 +524,16 @@ function generateInvoiceHTML(
         font-size: 18px;
         display: inline-block;
         margin-bottom: 15px;
+      }
+      .po-number {
+        background: #333b29ff;
+        color: white;
+        padding: 2px 7px; /* Slightly smaller padding */
+        font-weight: bold;
+        font-size: 16px;
+        display: block;
+        margin-bottom: 8px;
+        width:fit-content;
       }
       .invoice-dates {
         font-size: 14px;
@@ -708,26 +723,28 @@ function generateInvoiceHTML(
         <div class="top-section">
           <div class="customer-info">
             <div><strong>${escapeHtml(
-              customer.name || customer.business_name || "COMPANY NAME",
-            )}</strong></div>
+    customer.name || customer.business_name || "COMPANY NAME",
+  )}</strong></div>
             <div>${escapeHtml(
-              address.line1 || "STREET NAME & STREET NUMBER",
-            )}</div>
+    address.line1 || "STREET NAME & STREET NUMBER",
+  )}</div>
             <div>${escapeHtml(
-              address.postal_code || "POSTAL CODE",
-            )} ${escapeHtml(address.city || "CITY")}</div>
+    address.postal_code || "POSTAL CODE",
+  )} ${escapeHtml(address.city || "CITY")}</div>
             <div>${escapeHtml(address.country || "COUNTRY")}</div>
-            ${
-              taxId
-                ? `<div>${escapeHtml(taxId)}</div>`
-                : "<div>Company Tax ID</div>"
-            }
+            ${taxId
+      ? `<div>${escapeHtml(taxId)}</div>`
+      : "<div>Company Tax ID</div>"
+    }
           </div>
           
           <div class="invoice-info">
+                           ${poNumber ? `
+              <div class="po-number">${t.poNumber || "PO Number"}: ${escapeHtml(poNumber)}</div>
+            ` : ""}
             <div class="invoice-number">${t.invoiceNumber}: #${escapeHtml(
-              orderNumber,
-            )}</div>
+      orderNumber,
+    )}</div>
             <div class="invoice-dates">
               <div><strong>${t.invoiceDate}:</strong> ${invoiceDate}</div>
               <div><strong>${t.expiryDate}:</strong> ${dueDateFormatted}</div>
@@ -756,8 +773,8 @@ function generateInvoiceHTML(
             <tr class="subtotal-row">
               <td>${t.subtotal}:</td>
               <td class="text-right">${currencySymbol} ${subtotal.toFixed(
-                2,
-              )}</td>
+      2,
+    )}</td>
             </tr>
             <tr class="tax-row">
               <td>${vatLabel}:</td>
@@ -774,11 +791,10 @@ function generateInvoiceHTML(
           </div>
         </div>
         
-        ${
-          currency.toLowerCase() === "usd"
-            ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
-            : ""
-        }
+        ${currency.toLowerCase() === "usd"
+      ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
+      : ""
+    }
         ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ""}
 
         <div style="display: flex; justify-content: space-between;">
@@ -1107,7 +1123,7 @@ function generateEmailContent(customerName, companyCountryCode = "EN") {
 
 // Main function to send email with attachments
 async function sendOrderConfirmationEmail(
-  customerName,
+  customerName = '',
   customerEmail,
   emailAttachments,
   companyCountryCode = "EN",
@@ -1126,7 +1142,6 @@ async function sendOrderConfirmationEmail(
 async function processPaidOrder(session) {
   try {
     console.log("⏳ Processing order...");
-    const orderNumber = await getNextOrderNumber();
 
     const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
       expand: ["line_items.data.price.product"],
@@ -1140,138 +1155,179 @@ async function processPaidOrder(session) {
     const taxId = fullSession?.metadata?.taxId;
     const b2bSupplierId = fullSession?.metadata?.b2bSupplierId;
     const uid = fullSession?.metadata?.uid;
-    const data = {
-      uid: uid,
-      orderNumber: orderNumber,
-      internalEntryStatus: "pending",
-      email: fullSession?.customer_details?.email,
-      country: fullSession?.customer_details?.address?.country,
-      city: fullSession?.customer_details?.address?.city,
-      address1: fullSession?.customer_details?.address?.line1,
-      address2: fullSession?.customer_details?.address?.line2,
-      postal_code: fullSession?.customer_details?.address?.postal_code,
-      bussinessName: fullSession?.customer_details?.business_name,
-      total: fullSession?.amount_total / 100,
-      currency: fullSession?.currency,
-      createdAt: new Date(fullSession?.created * 1000),
-      products: fullSession?.line_items?.data?.map((item) => ({
-        productId: item?.price?.product?.metadata?.id,
-        name: item?.price?.product?.name,
-        quantity: item?.quantity,
-        unitPrice: item?.price?.unit_amount / 100,
-        totalPrice: item?.amount_total / 100,
-        isDigital: item?.price?.product?.metadata?.isDigital === "true", // Retrieve from metadata
-        PN: item?.price?.product?.metadata?.PN,
-        companyCountry,
-      })),
-    };
 
-    // Store order as pending
-    const orderDocRef = await db.collection("orders").add(data);
-    const orderId = orderDocRef.id;
 
-    // Assign keys to products (this will update licenseKeys docs in firestore)
-    let digitalProducts =
-      data.products?.filter((product) => product.isDigital) ?? [];
-    let phisycalProducts =
-      data.products?.filter((product) => !product.isDigital) ?? [];
-    let productsWithKeys;
-    try {
-      productsWithKeys = await assignKeysToProducts(
+    if (fullSession?.metadata && fullSession?.metadata?.orderId) {
+      const orderId = fullSession?.metadata?.orderId
+      const orderNumber = fullSession?.metadata?.orderNumber
+
+      const orderRef = db.collection("orders").doc(orderId);
+      const orderSnap = await orderRef.get();
+      const orderData = orderSnap.data();
+      const allProducts = orderData.products ?? [];
+
+      const invoicePdfBuffer = await generateInvoicePDFBuffer(
+        fullSession,
         orderId,
         orderNumber,
-        digitalProducts,
-        b2bSupplierId,
-        uid,
-      );
-    } catch (err) {
-      console.error(
-        "❌ Not enough license keys or error reserving keys:",
-        err.message,
+        allProducts,
+        companyCountry,
+        taxId,
       );
 
-      // Update order as failed or out-of-stock
+      const invoicePdfUrl = await uploadPDFToFirebaseStorage(
+        orderNumber,
+        invoicePdfBuffer,
+        "Invoice"
+      );
+
+      let emailAttachemnts = [
+        {
+          filename: `Invoice-${orderNumber}.pdf`,
+          content: invoicePdfBuffer, // Buffer or string
+          contentType: invoicePdfBuffer.contentType || "application/pdf",
+        },
+      ];
+
+      // Update order as completed with both URLs
+
+      await orderRef.update({
+        invoiceGeneratedAt: new Date(),
+        paymentStatus: "paid",
+        invoiceUrl: invoicePdfUrl,
+      });
+      await sendOrderConfirmationEmail(
+        "",
+        fullSession?.metadata?.email,
+        emailAttachemnts,
+        companyCountry, // 'NL', 'EN', 'FR', or 'DE'
+      );
+
+    } else {
+      const orderNumber = await getNextOrderNumber();
+      const data = {
+        uid: uid,
+        orderNumber: orderNumber,
+        internalEntryStatus: "pending",
+        email: fullSession?.customer_details?.email,
+        country: fullSession?.customer_details?.address?.country,
+        city: fullSession?.customer_details?.address?.city,
+        address1: fullSession?.customer_details?.address?.line1,
+        address2: fullSession?.customer_details?.address?.line2,
+        postal_code: fullSession?.customer_details?.address?.postal_code,
+        bussinessName: fullSession?.customer_details?.business_name,
+        total: fullSession?.amount_total / 100,
+        currency: fullSession?.currency,
+        createdAt: new Date(fullSession?.created * 1000),
+        products: fullSession?.line_items?.data?.map((item) => ({
+          productId: item?.price?.product?.metadata?.id,
+          name: item?.price?.product?.name,
+          quantity: item?.quantity,
+          unitPrice: item?.price?.unit_amount / 100,
+          totalPrice: item?.amount_total / 100,
+          isDigital: item?.price?.product?.metadata?.isDigital === "true", // Retrieve from metadata
+          PN: item?.price?.product?.metadata?.PN,
+          companyCountry,
+        })),
+      };
+
+      let digitalProducts =
+        data.products?.filter((product) => product.isDigital) ?? [];
+      let phisycalProducts =
+        data.products?.filter((product) => !product.isDigital) ?? [];
+      const orderDocRef = await db.collection("orders").add(data);
+      const orderId = orderDocRef.id;
+      let productsWithKeys;
+      try {
+        productsWithKeys = await assignKeysToProducts(
+          orderId,
+          orderNumber,
+          digitalProducts,
+          b2bSupplierId,
+          uid,
+        );
+      } catch (err) {
+        console.error(
+          "❌ Not enough license keys or error reserving keys:",
+          err.message,
+        );
+
+        // Update order as failed or out-of-stock
+        await db.collection("orders").doc(orderId).update({
+          internalEntryStatus: "failed",
+          failureReason: err.message,
+          invoiceGeneratedAt: null,
+        });
+
+        // optional: notify admin or send email to customer here
+        return;
+      }
+      const allProducts = [...productsWithKeys, ...phisycalProducts];
       await db.collection("orders").doc(orderId).update({
-        internalEntryStatus: "failed",
-        failureReason: err.message,
-        invoiceGeneratedAt: null,
+        products: allProducts,
+        internalEntryStatus: "keys_assigned",
       });
+      const licenseData = extractLicenseDataFromSession(
+        session,
+        orderId,
+        orderNumber,
+        productsWithKeys,
+      );
+      // Generate PDF with the assigned keys embedded
+      const pdfBuffer = await generateLicencePDFBuffer(
+        licenseData,
+        companyCountry,
+      );
+      const invoicePdfBuffer = await generateInvoicePDFBuffer(
+        fullSession,
+        orderId,
+        orderNumber,
+        allProducts,
+        companyCountry,
+        taxId,
+      );
 
-      // optional: notify admin or send email to customer here
-      return;
-    }
-    const allProducts = [...productsWithKeys, ...phisycalProducts];
-    // Update stored order to include the assigned keys per product (so DB has complete record)
-    console.log("allProducts", allProducts);
+      const licensePdfUrl = await uploadPDFToFirebaseStorage(
+        orderNumber,
+        pdfBuffer,
+        "License"
+      );
+      const invoicePdfUrl = await uploadPDFToFirebaseStorage(
+        orderNumber,
+        invoicePdfBuffer,
+        "Invoice"
+      );
+      let emailAttachemnts = [
+        {
+          filename: `Invoice-${orderNumber}.pdf`,
+          content: invoicePdfBuffer, // Buffer or string
+          contentType: invoicePdfBuffer.contentType || "application/pdf",
+        },
+      ];
+      if (productsWithKeys?.length > 0) {
+        emailAttachemnts.push({
+          filename: `License-${orderNumber}.pdf`,
+          content: pdfBuffer, // Buffer or string
+          contentType: pdfBuffer.contentType || "application/pdf",
+        });
+      }
+      await sendOrderConfirmationEmail(
+        data?.name,
+        data?.email,
+        emailAttachemnts,
+        companyCountry, // 'NL', 'EN', 'FR', or 'DE'
+      );
 
-    await db.collection("orders").doc(orderId).update({
-      products: allProducts,
-      internalEntryStatus: "keys_assigned",
-    });
-    const licenseData = extractLicenseDataFromSession(
-      session,
-      orderId,
-      orderNumber,
-      productsWithKeys,
-    );
-
-    // Generate PDF with the assigned keys embedded
-    const pdfBuffer = await generateLicencePDFBuffer(
-      licenseData,
-      companyCountry,
-    );
-    const invoicePdfBuffer = await generateInvoicePDFBuffer(
-      fullSession,
-      orderId,
-      orderNumber,
-      allProducts,
-      companyCountry,
-      taxId,
-    );
-
-    const licensePdfUrl = await uploadPDFToFirebaseStorage(
-      orderId,
-      orderNumber,
-      pdfBuffer,
-    );
-    const invoicePdfUrl = await uploadPDFToFirebaseStorage(
-      `${orderNumber}-invoice`,
-      orderNumber,
-      invoicePdfBuffer,
-    );
-
-    // Save Firestore PDF record
-    await savePDFRecord(`${orderNumber}-license`, licensePdfUrl);
-    await savePDFRecord(`${orderNumber}-invoice`, invoicePdfUrl);
-    let emailAttachemnts = [
-      {
-        filename: `Invoice-${orderNumber}.pdf`,
-        content: invoicePdfBuffer, // Buffer or string
-        contentType: invoicePdfBuffer.contentType || "application/pdf",
-      },
-    ];
-    if (productsWithKeys?.length > 0) {
-      emailAttachemnts.push({
-        filename: `License-${orderNumber}.pdf`,
-        content: pdfBuffer, // Buffer or string
-        contentType: pdfBuffer.contentType || "application/pdf",
+      // Update order as completed with both URLs
+      await db.collection("orders").doc(orderId).update({
+        invoiceGeneratedAt: new Date(),
+        internalEntryStatus: "completed",
+        paymentStatus: "paid",
+        invoiceUrl: invoicePdfUrl,
+        licenseUrl: licensePdfUrl,
       });
     }
-    await sendOrderConfirmationEmail(
-      data?.name,
-      data?.email,
-      emailAttachemnts,
-      companyCountry, // 'NL', 'EN', 'FR', or 'DE'
-    );
 
-    // Update order as completed with both URLs
-    await db.collection("orders").doc(orderId).update({
-      invoiceGeneratedAt: new Date(),
-      internalEntryStatus: "completed",
-      paymentStatus: "paid",
-      invoiceUrl: invoicePdfUrl,
-      licenseUrl: licensePdfUrl,
-    });
     console.log("✅ Order completed:", orderId);
   } catch (err) {
     console.error("❌ Error processing order:", err);
@@ -1351,13 +1407,18 @@ app.post("/create-checkout-session", async (req, res) => {
   const useremail = req.body.useremail;
   const cat = req.body.foundUser;
   const userData = req.body.userData;
+  console.log("req.body", req.body);
   const b2bSupplierId = userData?.b2bSupplierId;
   const companyCountry = userData?.companyCountry;
   const poNumber = req.body?.poNumber || null;
+
   const isUserPayByInvoiceEnabled = req.body?.isUserPayByInvoiceEnabled;
   const userInvoiceSettings =
     isUserPayByInvoiceEnabled && req.body?.userInvoiceSettings;
-
+  const currentDate = new Date();
+  const overdueDate = new Date(currentDate);
+  const overDueDay = userInvoiceSettings && userInvoiceSettings?.overDueDay
+  overdueDate.setDate(currentDate.getDate() + overDueDay);
   console.log("userData", userData);
   console.log("userInvoiceSettings", userInvoiceSettings);
   console.log("isUserPayByInvoiceEnabled", isUserPayByInvoiceEnabled);
@@ -1450,12 +1511,21 @@ app.post("/create-checkout-session", async (req, res) => {
 
       // 2. Create the Payment Link
       // This creates a permanent URL (no 24h limit) that you can store in Firebase
+      const orderNumber = await getNextOrderNumber();
+      const orderDocRef = await db.collection("orders").add({
+        orderNumber,
+        createdAt: new Date(),
+      });
+      const orderId = orderDocRef.id;
+
       const payByLinkSessionData = {
         line_items: paymentLinkLineItems,
         currency: currency,
         metadata: {
           poNumber: poNumber || "N/A",
           orderType: "pay_by_invoice",
+          orderNumber: orderNumber,
+          orderId: orderId,
           uid: userData?.uid,
           b2bSupplierId: userData?.b2bSupplierId,
           taxId: userData?.taxId,
@@ -1491,17 +1561,16 @@ app.post("/create-checkout-session", async (req, res) => {
       const paymentLinkUrl = paymentLink.url;
 
       const uid = userData?.uid;
-      const orderNumber = await getNextOrderNumber();
 
       const data = {
         uid: uid,
-        orderNumber: orderNumber,
         internalEntryStatus: "pending",
-        paymentStatus: "Payment due",
+        paymentStatus: "payment due",
         paymentUrl: paymentLinkUrl,
         email: userData?.email,
         country: userData?.companyCountry,
         poNumber: poNumber,
+        companyName: userData?.companyName,
         // city: fullSession?.customer_details?.address?.city,
         // address1: fullSession?.customer_details?.address?.line1,
         // address2: fullSession?.customer_details?.address?.line2,
@@ -1510,6 +1579,7 @@ app.post("/create-checkout-session", async (req, res) => {
         total: totalAmountMainCurrency,
         currency: currency,
         createdAt: new Date(),
+        overdueDate: overdueDate,
         products: paymentLinkLineItems.map((item) => ({
           productId: item?.price_data?.product_data?.metadata?.id,
           name: item?.price_data?.product_data?.name,
@@ -1526,8 +1596,7 @@ app.post("/create-checkout-session", async (req, res) => {
       console.log("data", data);
 
       // Store order as pending
-      const orderDocRef = await db.collection("orders").add(data);
-      const orderId = orderDocRef.id;
+      await orderDocRef.update(data);
       let digitalProducts =
         data.products?.filter((product) => product.isDigital) ?? [];
       let phisycalProducts =
@@ -1557,6 +1626,8 @@ app.post("/create-checkout-session", async (req, res) => {
         // optional: notify admin or send email to customer here
         return;
       }
+      let taxId = userData?.taxId
+
       processPayByInvoiceOrder(
         data,
         orderNumber,
@@ -1564,6 +1635,7 @@ app.post("/create-checkout-session", async (req, res) => {
         productsWithKeys,
         phisycalProducts,
         orderId,
+        taxId
       );
       // 4. Return the link to be attached to your Firebase orders doc
       res.status(200).send();

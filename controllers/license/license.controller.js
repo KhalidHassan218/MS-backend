@@ -2,7 +2,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import generateLicencePDFBuffer from "../../services/pdf/generateLicencePDF.service.js";
 import { uploadPDFToFirebaseStorage } from "../../services/firebaseStorage.service.js";
 import sendEmailWithAttachment from "../../Utils/sendEmailWithAttachment.js";
-import savePDFRecord from "../../services/pdf/savePdfRecord.service.js";
+// import savePDFRecord from "../../services/pdf/savePdfRecord.service.js";
 import generateKeyReplacementEmail from "../../services/emails/generateKeyReplacementEmail.js";
 
 const replaceKeyAndGenerateLicensePdf = async (req, res) => {
@@ -217,10 +217,11 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
     const licensePdfUrl = await uploadPDFToFirebaseStorage(
       orderId,
       orderNumber,
-      pdfBuffer
+      pdfBuffer,
+      "License"
     );
 
-    await savePDFRecord(`${orderNumber}-license`, licensePdfUrl);
+    // await savePDFRecord(`${orderNumber}-license`, licensePdfUrl);
 
     // 5️⃣ Email
     const emailContent = generateKeyReplacementEmail(companyCountry);

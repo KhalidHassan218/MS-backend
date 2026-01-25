@@ -1,4 +1,5 @@
-import templates from "./templates.js";
+import { licenceTranslationTemplate } from "./translationTemplates.js";
+
 function escapeHtml(str) {
   return String(str || "")
     .replace(/&/g, "&amp;")
@@ -14,7 +15,7 @@ function generateLicenceHTML(
   console.log("licenseData", licenseData);
 
   const { customer, order, products } = licenseData;
-  const template = templates[companyCountryCode.toUpperCase()] || templates.EN;
+  const template = licenceTranslationTemplate[companyCountryCode.toUpperCase()] || licenceTranslationTemplate.EN;
   const t = template.translations;
   const address = customer.address || {};
   const invoiceDate = new Date(order.date * 1000).toLocaleDateString(
