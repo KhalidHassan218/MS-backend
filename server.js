@@ -14,7 +14,7 @@ import fetch from "node-fetch";
 const stripe = new Stripe(stripeSecretKey);
 
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-
+import  { generateVerificationEmailHTML, verificationTemplates } from "./Utils/verificationEmail.js";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import chromium from "@sparticuz/chromium";
@@ -945,6 +945,8 @@ async function reserveLicenseKeys(
   });
 }
 
+
+
 app.post(
   "/webhooks",
   express.raw({ type: "application/json" }),
@@ -1382,10 +1384,10 @@ async function generateInvoicePDFBuffer(
     }
   }
 }
-
 app.use(express.json());
 app.use(bodyParser.json());
 
+// Ensure JSON body parsing middleware is used before any routes
 app.use(express.json());
 app.use(bodyParser.json());
 
@@ -1397,6 +1399,192 @@ app.get("/", (req, res) => {
   res.send("welcome to microsoftsupplier website");
 });
 
+// Common translations for verification API responses
+const verificationApiMessages = {
+  EN: {
+    missing: 'Missing token or uid',
+    notFound: 'User not found',
+    invalid: 'Invalid or expired verification link',
+    verified: 'Email verified successfully',
+    error: 'An error occurred',
+    alreadySent: 'Verification email already sent. Please check your inbox.',
+    alreadyVerified: 'Email is already verified. No email sent.',
+    sent: 'Verification email sent successfully',
+    firebaseNotFound: 'User not found in Firebase Auth',
+    unauthorized: 'Unauthorized: UID mismatch',
+    missingData: 'Missing data',
+  },
+  NL: {
+    missing: 'Ontbrekende token of uid',
+    notFound: 'Gebruiker niet gevonden',
+    invalid: 'Ongeldige of verlopen verificatielink',
+    verified: 'E-mailadres succesvol geverifieerd',
+    error: 'Er is een fout opgetreden',
+    alreadySent: 'Verificatie-e-mail is al verzonden. Controleer uw inbox.',
+    alreadyVerified: 'E-mailadres is al geverifieerd. Geen e-mail verzonden.',
+    sent: 'Verificatie-e-mail succesvol verzonden',
+    firebaseNotFound: 'Gebruiker niet gevonden in Firebase Auth',
+    unauthorized: 'Niet gemachtigd: UID komt niet overeen',
+    missingData: 'Ontbrekende gegevens',
+  },
+  FR: {
+    missing: 'Token ou uid manquant',
+    notFound: 'Utilisateur non trouvé',
+    invalid: 'Lien de vérification invalide ou expiré',
+    verified: 'E-mail vérifié avec succès',
+    error: 'Une erreur est survenue',
+    alreadySent: 'E-mail de vérification déjà envoyé. Veuillez vérifier votre boîte de réception.',
+    alreadyVerified: 'E-mail déjà vérifié. Aucun e-mail envoyé.',
+    sent: 'E-mail de vérification envoyé avec succès',
+    firebaseNotFound: 'Utilisateur non trouvé dans Firebase Auth',
+    unauthorized: 'Non autorisé : UID ne correspond pas',
+    missingData: 'Données manquantes',
+  },
+  DE: {
+    missing: 'Fehlendes Token oder UID',
+    notFound: 'Benutzer nicht gefunden',
+    invalid: 'Ungültiger oder abgelaufener Verifizierungslink',
+    verified: 'E-Mail erfolgreich verifiziert',
+    error: 'Ein Fehler ist aufgetreten',
+    alreadySent: 'Verifizierungs-E-Mail wurde bereits gesendet. Bitte prüfen Sie Ihr Postfach.',
+    alreadyVerified: 'E-Mail ist bereits verifiziert. Keine E-Mail gesendet.',
+    sent: 'Verifizierungs-E-Mail erfolgreich gesendet',
+    firebaseNotFound: 'Benutzer in Firebase Auth nicht gefunden',
+    unauthorized: 'Nicht autorisiert: UID stimmt nicht überein',
+    missingData: 'Fehlende Daten',
+  },
+};
+
+function getVerificationMsg(lang, key) {
+  const t = verificationApiMessages[lang?.toUpperCase()] || verificationApiMessages.EN;
+  return t[key] || verificationApiMessages.EN[key] || '';
+}
+
+// API route to handle email verification
+app.get('/api/verify', async (req, res) => {
+  try {
+    const { token, uid, lang = 'EN' } = req.query;
+    if (!token || !uid) {
+      return res.status(400).json({ success: false, message: getVerificationMsg(lang, 'missing') });
+    }
+    const userDocRef = db.collection('users').doc(uid);
+    const userDoc = await userDocRef.get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, message: getVerificationMsg(lang, 'notFound') });
+    }
+    const userData = userDoc.data();
+    const now = Date.now();
+    if (
+      userData.verificationId !== token ||
+      !userData.verificationExpiry ||
+      userData.verificationExpiry < now
+    ) {
+      return res.status(400).json({ success: false, message: getVerificationMsg(lang, 'invalid') });
+    }
+    // Mark user as verified and remove verificationId/expiry in Firestore
+    await userDocRef.set({
+      verified: true,
+      verificationId: null,
+      verificationExpiry: null,
+      verifiedAt: now,
+    }, { merge: true });
+    // Also update Firebase Auth user to set emailVerified: true
+    try {
+      await getAuth().updateUser(uid, { emailVerified: true });
+    } catch (err) {
+      // If user not found in Auth, ignore and proceed (optional: log error)
+      console.error('Error updating Firebase Auth user:', err);
+    }
+    return res.json({ success: true, message: getVerificationMsg(lang, 'verified') });
+  } catch (err) {
+    const lang = req.query?.lang || 'EN';
+    res.status(500).json({ success: false, message: getVerificationMsg(lang, 'error') });
+  }
+});
+
+app.post("/api/send-verification", async (req, res) => {
+  try {
+    console.log("bodyy", req.body);
+    const { email, name, lang = "EN", verifyUrl, uid } = req.body;
+    // Ensure all required fields are present
+    if (!email || !verifyUrl || !uid) {
+      return res.status(400).json({ success: false, message: getVerificationMsg(lang, 'missingData') });
+    }
+    // Check that the user sending the request matches the user info being handled
+    if (!uid) {
+      return res.status(403).json({ success: false, message: getVerificationMsg(lang, 'unauthorized') });
+    }
+    // Check if user exists in Firestore
+    const userDocRef = db.collection('users').doc(uid);
+    const userDoc = await userDocRef.get();
+    // Check if user is already verified in Firebase Auth
+    let firebaseUser;
+    try {
+      firebaseUser = await getAuth().getUser(uid);
+    } catch (error) {
+      return res.status(404).json({ success: false, message: getVerificationMsg(lang, 'firebaseNotFound') });
+    }
+    if (firebaseUser.emailVerified) {
+      return res.status(200).json({
+        success: true,
+        message: getVerificationMsg(lang, 'alreadyVerified'),
+      });
+    }
+    // Helper to get now and expiry
+    const now = Date.now();
+    const expiryMs = 15 * 60 * 1000; // 15 minutes
+    let verificationId, verificationExpiry;
+    // Check for existing valid verification token
+    let userDataDb = userDoc.exists ? userDoc.data() : {};
+    if (
+      userDataDb.verificationId &&
+      userDataDb.verificationExpiry &&
+      userDataDb.verificationExpiry > now
+    ) {
+      // Already has a valid, unexpired verification token
+      return res.status(200).json({
+        success: true,
+        message: getVerificationMsg(lang, 'alreadySent'),
+      });
+    }
+    // Generate new verificationId (token) synchronously
+    const crypto = await import('crypto');
+    verificationId = crypto.randomBytes(32).toString('hex');
+    verificationExpiry = now + expiryMs;
+    // Save verificationId and expiry to user doc
+    if (!userDoc.exists) {
+      await userDocRef.set({
+        createdAt: now,
+        verificationId,
+        verificationExpiry,
+      });
+    } else {
+      await userDocRef.set({
+        updatedAt: now,
+        verificationId,
+        verificationExpiry,
+      }, { merge: true });
+    }
+    // Generate verification link with token
+    const baseUrl = verifyUrl.replace(/\/$/, '');
+    const verificationLink = `${baseUrl}?token=${verificationId}&uid=${encodeURIComponent(uid)}`;
+    // Generate verification email HTML with the link
+    const html = generateVerificationEmailHTML(verificationLink, name, lang);
+    const subject = (verificationTemplates[lang?.toUpperCase()] || verificationTemplates.EN).subject;
+    await sendEmailWithAttachment(
+      subject,
+      html,
+      email,
+      process.env.EMAIL_USER,
+      process.env.EMAIL_USER,
+      []
+    );
+    res.json({ success: true, message: getVerificationMsg(lang, 'sent') });
+  } catch (err) {
+    const lang = req.body?.lang || 'EN';
+    res.status(500).json({ success: false, message: getVerificationMsg(lang, 'error') });
+  }
+});
 app.post("/create-checkout-session", async (req, res) => {
   const cart = req.body.cart;
   const useremail = req.body.useremail;
