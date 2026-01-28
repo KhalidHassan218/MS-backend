@@ -1,4 +1,4 @@
-import { getFirestore } from "firebase-admin/firestore";
+// Firebase Firestore removed. Use Supabase instead.
 
 
 async function savePDFRecord(orderId, pdfUrl) {

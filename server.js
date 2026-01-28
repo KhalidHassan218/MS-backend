@@ -7,13 +7,11 @@ import Stripe from "stripe";
 import cors from "cors";
 import bodyParser from "body-parser";
 import sendEmail from "./Utils/sendEmail.js";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
 import fetch from "node-fetch";
 
 const stripe = new Stripe(stripeSecretKey);
 
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+// import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import  { generateVerificationEmailHTML, verificationTemplates } from "./Utils/verificationEmail.js";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
@@ -23,27 +21,13 @@ import generateRegistrationEmailHTML from "./templates/Emails/newRegisteredCompa
 import sendEmailToClient from "./Utils/sendEmailToClient.js";
 import sendEmailToAdmin from "./Utils/sendAdminEmail.js";
 import generateClientStatusEmailHTML from "./templates/Emails/ClientNewRegisterationResponse.js";
-import { uploadPDFToFirebaseStorage } from "./services/firebaseStorage.service.js";
+import { uploadPDFToSupabaseStorage } from "./services/supabaseStorage.service.js";
 import generateLicencePDFBuffer from "./services/pdf/generateLicencePDF.service.js";
 import { generateProformaPDFBuffer } from "./services/pdf/generateProformaPDF.service.js";
 // import savePDFRecord from "./services/pdf/savePdfRecord.service.js";
 puppeteer.use(StealthPlugin());
 
-// const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
-if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-  throw new Error(
-    "FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set.",
-  );
-}
-
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-
-initializeApp({
-  credential: cert(serviceAccount),
-  storageBucket: "supplier-34b95.appspot.com", // ← ADD THIS LINE
-  // databaseURL: "https://supplier-34b95-default-rtdb.firebaseio.com" // only if using Realtime DB
-});
-const db = getFirestore();
+// Firebase initialization removed. Use Supabase for all DB/storage operations.
 // YOUR_DOMAIN = "https://microsoftsupplier.com";
 // YOUR_DOMAIN = "http://localhost:3000";
 const YOUR_DOMAIN = "https://ms-test-ser.vercel.app";
@@ -52,29 +36,8 @@ const app = express();
 app.use(cors());
 app.use(express.static("public"));
 
-async function getNextOrderNumber() {
-  const counterRef = db.collection("counters").doc("orderCounter");
-
-  return await db.runTransaction(async (transaction) => {
-    const counterDoc = await transaction.get(counterRef);
-
-    if (!counterDoc.exists) {
-      // Initialize if doesn't exist
-      transaction.set(counterRef, { current: 6250 });
-      return 6250;
-    }
-
-    const current = counterDoc.data().current;
-    const next = current + 1;
-
-    transaction.update(counterRef, {
-      current: next,
-      lastUpdated: new Date(),
-    });
-
-    return next;
-  });
-}
+import { getNextOrderNumber } from './Utils/supabaseOrderUtils.js';
+import { insertOrder, updateOrder } from './Utils/supabaseOrderService.js';
 const extractLicenseDataFromSession = (
   session,
   orderId,
@@ -119,9 +82,9 @@ async function processPayByInvoiceOrder(
 
     const allProducts = [...productsWithKeys, ...phisycalProducts];
     // Update stored order to include the assigned keys per product (so DB has complete record)
-    await db.collection("orders").doc(orderId).update({
-      products: allProducts,
-      internalEntryStatus: "keys_assigned",
+    await updateOrder(orderId, {
+      // Add products to a related table if needed
+      internal_status: "keys_assigned",
     });
     const adaptedSession = {
       created: Math.floor(data.createdAt.getTime() / 1000), // match Stripe session timestamp
@@ -162,12 +125,12 @@ async function processPayByInvoiceOrder(
       taxId
     );
 
-    const licensePdfUrl = await uploadPDFToFirebaseStorage(
+    const licensePdfUrl = await uploadPDFToSupabaseStorage(
       orderNumber,
       pdfBuffer,
       "License"
     );
-    const proformaPdfUrl = await uploadPDFToFirebaseStorage(
+    const proformaPdfUrl = await uploadPDFToSupabaseStorage(
       orderNumber,
       proformaPdfBuffer,
       "Proforma"
@@ -198,11 +161,11 @@ async function processPayByInvoiceOrder(
     );
 
     // Update order as completed with both URLs
-    await db.collection("orders").doc(orderId).update({
-      proFormaGenerateddAt: new Date(),
-      internalEntryStatus: "completed",
-      proformaUrl: proformaPdfUrl,
-      licenseUrl: licensePdfUrl,
+    await updateOrder(orderId, {
+      proforma_generated_at: new Date().toISOString(),
+      internal_status: "completed",
+      proforma_url: proformaPdfUrl,
+      license_url: licensePdfUrl,
     });
     console.log("✅ Order completed:", orderId);
   } catch (err) {
@@ -1172,7 +1135,7 @@ async function processPaidOrder(session) {
         taxId,
       );
 
-      const invoicePdfUrl = await uploadPDFToFirebaseStorage(
+      const invoicePdfUrl = await uploadPDFToSupabaseStorage(
         orderNumber,
         invoicePdfBuffer,
         "Invoice"
@@ -1235,8 +1198,8 @@ async function processPaidOrder(session) {
         data.products?.filter((product) => product.isDigital) ?? [];
       let phisycalProducts =
         data.products?.filter((product) => !product.isDigital) ?? [];
-      const orderDocRef = await db.collection("orders").add(data);
-      const orderId = orderDocRef.id;
+      const order = await insertOrder(data);
+      const orderId = order.id;
       let productsWithKeys;
       try {
         productsWithKeys = await assignKeysToProducts(
@@ -1253,19 +1216,19 @@ async function processPaidOrder(session) {
         );
 
         // Update order as failed or out-of-stock
-        await db.collection("orders").doc(orderId).update({
-          internalEntryStatus: "failed",
-          failureReason: err.message,
-          invoiceGeneratedAt: null,
+        await updateOrder(orderId, {
+          internal_status: "failed",
+          failure_reason: err.message,
+          invoice_generated_at: null,
         });
 
         // optional: notify admin or send email to customer here
         return;
       }
       const allProducts = [...productsWithKeys, ...phisycalProducts];
-      await db.collection("orders").doc(orderId).update({
-        products: allProducts,
-        internalEntryStatus: "keys_assigned",
+      await updateOrder(orderId, {
+        // Add products to a related table if needed
+        internal_status: "keys_assigned",
       });
       const licenseData = extractLicenseDataFromSession(
         session,
@@ -1287,12 +1250,12 @@ async function processPaidOrder(session) {
         taxId,
       );
 
-      const licensePdfUrl = await uploadPDFToFirebaseStorage(
+      const licensePdfUrl = await uploadPDFToSupabaseStorage(
         orderNumber,
         pdfBuffer,
         "License"
       );
-      const invoicePdfUrl = await uploadPDFToFirebaseStorage(
+      const invoicePdfUrl = await uploadPDFToSupabaseStorage(
         orderNumber,
         invoicePdfBuffer,
         "Invoice"
@@ -1319,12 +1282,12 @@ async function processPaidOrder(session) {
       );
 
       // Update order as completed with both URLs
-      await db.collection("orders").doc(orderId).update({
-        invoiceGeneratedAt: new Date(),
-        internalEntryStatus: "completed",
-        paymentStatus: "paid",
-        invoiceUrl: invoicePdfUrl,
-        licenseUrl: licensePdfUrl,
+      await updateOrder(orderId, {
+        invoice_generated_at: new Date().toISOString(),
+        internal_status: "completed",
+        payment_status: "paid",
+        invoice_url: invoicePdfUrl,
+        license_url: licensePdfUrl,
       });
     }
 
@@ -1790,10 +1753,10 @@ app.post("/create-checkout-session", async (req, res) => {
         );
 
         // Update order as failed or out-of-stock
-        await db.collection("orders").doc(orderId).update({
-          internalEntryStatus: "failed",
-          failureReason: err.message,
-          invoiceGeneratedAt: null,
+        await updateOrder(orderId, {
+          internal_status: "failed",
+          failure_reason: err.message,
+          invoice_generated_at: null,
         });
 
         // optional: notify admin or send email to customer here
