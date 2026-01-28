@@ -24,6 +24,8 @@ import generateClientStatusEmailHTML from "./templates/Emails/ClientNewRegistera
 import { uploadPDFToSupabaseStorage } from "./services/supabaseStorage.service.js";
 import generateLicencePDFBuffer from "./services/pdf/generateLicencePDF.service.js";
 import { generateProformaPDFBuffer } from "./services/pdf/generateProformaPDF.service.js";
+import { supabase, supabaseAdmin } from './config/supabase.js';
+
 // import savePDFRecord from "./services/pdf/savePdfRecord.service.js";
 puppeteer.use(StealthPlugin());
 
@@ -1837,32 +1839,34 @@ app.post("/api/sendemail", async (req, res) => {
 });
 app.post("/api/registerNewPendingUser", async (req, res) => {
   const { email, companyName, taxId, companyCountry, password } = req.body;
-  let userFound;
   try {
-    await getAuth()
-      .createUser({
-        email: email,
-        emailVerified: false,
-        disabled: true,
-        password: password,
-      })
-      .then((createdUser) => {
-        db.collection("pending_registrations").add({
-          uid: createdUser?.uid,
-          email: email,
-          taxId: taxId,
-          companyName: companyName,
-          companyCountry: companyCountry,
-          createdAt: Date.now(),
-        });
-      })
-      .catch((error) => {
-        console.log("error creating a new registered user", error);
-        return null;
-      });
-    res.status(200).json({ success: true, userFound: userFound });
+    // Create user in Supabase Auth
+    const { data: user, error: userError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: false,
+    });
+    if (userError) {
+      console.log("error creating a new registered user", userError);
+      return res.status(500).json({ success: false, message: userError.message });
+    }
+    // Insert pending registration in Supabase table
+    const { error: regError } = await supabase.from('pending_registrations').insert([
+      {
+        uid: user.user?.id,
+        email,
+        tax_id: taxId,
+        company_name: companyName,
+        company_country: companyCountry,
+        created_at: Date.now(),
+      },
+    ]);
+    if (regError) {
+      return res.status(500).json({ success: false, message: regError.message });
+    }
+    res.status(200).json({ success: true });
   } catch (error) {
-    res.status(500).json(error.message);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
