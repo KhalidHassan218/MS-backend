@@ -1432,33 +1432,41 @@ app.get('/api/verify', async (req, res) => {
     if (!token || !uid) {
       return res.status(400).json({ success: false, message: getVerificationMsg(lang, 'missing') });
     }
-    const userDocRef = db.collection('users').doc(uid);
-    const userDoc = await userDocRef.get();
-    if (!userDoc.exists) {
+    // Fetch profile from Supabase profiles table
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', uid)
+      .single();
+    if (profileError || !profile) {
       return res.status(404).json({ success: false, message: getVerificationMsg(lang, 'notFound') });
     }
-    const userData = userDoc.data();
-    const now = Date.now();
+    const now = new Date();
     if (
-      userData.verificationId !== token ||
-      !userData.verificationExpiry ||
-      userData.verificationExpiry < now
+      profile.verification_token !== token ||
+      !profile.verification_expires_at ||
+      new Date(profile.verification_expires_at).getTime() < now.getTime()
     ) {
       return res.status(400).json({ success: false, message: getVerificationMsg(lang, 'invalid') });
     }
-    // Mark user as verified and remove verificationId/expiry in Firestore
-    await userDocRef.set({
-      verified: true,
-      verificationId: null,
-      verificationExpiry: null,
-      verifiedAt: now,
-    }, { merge: true });
-    // Also update Firebase Auth user to set emailVerified: true
+    // Mark profile as verified and remove verification_token/expiry, set verified_at
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        verification_token: null,
+        verification_expires_at: null,
+        verified_at: now.toISOString(),
+      })
+      .eq('id', uid);
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+    // Also update Supabase Auth user to set email_confirm: true
     try {
-      await getAuth().updateUser(uid, { emailVerified: true });
+      await supabaseAdmin.auth.admin.updateUserById(uid, { email_confirm: true });
     } catch (err) {
       // If user not found in Auth, ignore and proceed (optional: log error)
-      console.error('Error updating Firebase Auth user:', err);
+      console.error('Error updating Supabase Auth user:', err);
     }
     return res.json({ success: true, message: getVerificationMsg(lang, 'verified') });
   } catch (err) {
@@ -1469,70 +1477,60 @@ app.get('/api/verify', async (req, res) => {
 
 app.post("/api/send-verification", async (req, res) => {
   try {
-    console.log("bodyy", req.body);
     const { email, name, lang = "EN", verifyUrl, uid } = req.body;
-    // Ensure all required fields are present
     if (!email || !verifyUrl || !uid) {
       return res.status(400).json({ success: false, message: getVerificationMsg(lang, 'missingData') });
     }
-    // Check that the user sending the request matches the user info being handled
     if (!uid) {
       return res.status(403).json({ success: false, message: getVerificationMsg(lang, 'unauthorized') });
     }
-    // Check if user exists in Firestore
-    const userDocRef = db.collection('users').doc(uid);
-    const userDoc = await userDocRef.get();
-    // Check if user is already verified in Firebase Auth
-    let firebaseUser;
-    try {
-      firebaseUser = await getAuth().getUser(uid);
-    } catch (error) {
-      return res.status(404).json({ success: false, message: getVerificationMsg(lang, 'firebaseNotFound') });
+    // Fetch profile from Supabase
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', uid)
+      .single();
+    if (profileError || !profile) {
+      return res.status(404).json({ success: false, message: getVerificationMsg(lang, 'notFound') });
     }
-    if (firebaseUser.emailVerified) {
+    // Check if already verified
+    if (profile.verified_at) {
       return res.status(200).json({
         success: true,
         message: getVerificationMsg(lang, 'alreadyVerified'),
       });
     }
-    // Helper to get now and expiry
-    const now = Date.now();
-    const expiryMs = 15 * 60 * 1000; // 15 minutes
-    let verificationId, verificationExpiry;
     // Check for existing valid verification token
-    let userDataDb = userDoc.exists ? userDoc.data() : {};
+    const now = new Date();
+    const expiryMs = 15 * 60 * 1000; // 15 minutes
     if (
-      userDataDb.verificationId &&
-      userDataDb.verificationExpiry &&
-      userDataDb.verificationExpiry > now
+      profile.verification_token &&
+      profile.verification_expires_at &&
+      new Date(profile.verification_expires_at).getTime() > now.getTime()
     ) {
-      // Already has a valid, unexpired verification token
       return res.status(200).json({
         success: true,
         message: getVerificationMsg(lang, 'alreadySent'),
       });
     }
-    // Generate new verificationId (token) synchronously
+    // Generate new verification token
     const crypto = await import('crypto');
-    verificationId = crypto.randomBytes(32).toString('hex');
-    verificationExpiry = now + expiryMs;
-    // Save verificationId and expiry to user doc
-    if (!userDoc.exists) {
-      await userDocRef.set({
-        createdAt: now,
-        verificationId,
-        verificationExpiry,
-      });
-    } else {
-      await userDocRef.set({
-        updatedAt: now,
-        verificationId,
-        verificationExpiry,
-      }, { merge: true });
+    const verification_token = crypto.randomBytes(32).toString('hex');
+    const verification_expires_at = new Date(now.getTime() + expiryMs).toISOString();
+    // Update profile with new token and expiry
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        verification_token,
+        verification_expires_at,
+      })
+      .eq('id', uid);
+    if (updateError) {
+      throw new Error(updateError.message);
     }
     // Generate verification link with token
     const baseUrl = verifyUrl.replace(/\/$/, '');
-    const verificationLink = `${baseUrl}?token=${verificationId}&uid=${encodeURIComponent(uid)}`;
+    const verificationLink = `${baseUrl}?token=${verification_token}&uid=${encodeURIComponent(uid)}`;
     // Generate verification email HTML with the link
     const html = generateVerificationEmailHTML(verificationLink, name, lang);
     const subject = (verificationTemplates[lang?.toUpperCase()] || verificationTemplates.EN).subject;
@@ -1844,7 +1842,7 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
     const { data: user, error: userError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: false,
+      email_confirm: true,
     });
     if (userError) {
       console.log("error creating a new registered user", userError);
@@ -1911,90 +1909,110 @@ async function getPendingDetails(docId) {
 
 // Function to safely generate the next sequential B2B Account ID
 const getNextB2BAccountId = async () => {
-  const counterRef = db.collection("settings").doc("b2b_account_id_counter");
-
   // Use a transaction to ensure atomic increment and prevent race conditions
-  const newId = await db.runTransaction(async (t) => {
-    const doc = await t.get(counterRef);
+  // Assumes a 'settings' table with a row where id = 'b2b_account_id_counter'
+  let newId;
+  const { data: counterRows, error: fetchError } = await supabase
+    .from('settings')
+    .select('*')
+    .eq('id', 'b2b_account_id_counter')
+    .single();
 
-    // Check if the counter exists (initial setup check)
-    if (!doc.exists) {
-      throw new Error("B2B ID counter not set up!");
-    }
+  if (fetchError || !counterRows) {
+    throw new Error("B2B ID counter not set up!");
+  }
 
-    const currentId = doc.data().last_id;
-    const prefix = doc.data().prefix || "";
+  const currentId = counterRows.last_id;
+  const prefix = counterRows.prefix || "";
+  const nextIdNumber = currentId + 1;
 
-    // 1. Increment the ID number
-    const nextIdNumber = currentId + 1;
+  // Use a Postgres function or upsert to ensure atomicity
+  // Here, we use a single update and check for race conditions (Supabase does not support JS-side transactions)
+  const { error: updateError } = await supabase
+    .from('settings')
+    .update({ last_id: nextIdNumber })
+    .eq('id', 'b2b_account_id_counter');
 
-    // 2. Update the counter in the transaction
-    t.update(counterRef, { last_id: nextIdNumber });
+  if (updateError) {
+    throw new Error("Failed to update B2B ID counter: " + updateError.message);
+  }
 
-    // 3. Return the fully formatted ID
-    // Example: 'B2B-10001'
-    return `${prefix}${nextIdNumber}`;
-  });
-
+  newId = `${prefix}${nextIdNumber}`;
   return newId;
 };
 
 app.post("/api/accept-pendingRegistration", async (req, res) => {
   const { uid, email, docId } = req.body;
-
   try {
     const b2bSupplierId = await getNextB2BAccountId();
-    // 1. Enable the user account in Firebase Auth
-    await getAuth()
-      .updateUser(uid, {
-        disabled: false,
-      })
-      .then(async (userRecord) => {
-        // 2. Send Acceptance Email
-        sendEmailToClient(
-          `pending Registration response`,
-          generateClientStatusEmailHTML(email, "accepted"),
-          email,
-          process.env.EMAIL_USER,
-          process.env.EMAIL_USER,
-        );
-
-        // 3. Get Pending Registration Details
-        const pendingRegistrationSnapshot = await getPendingDetails(docId);
-
-        // 4. *** CONSOLIDATE AND CREATE USER DOCUMENT ***
-        const newUserData = {
-          uid: uid,
-          email: email,
-          isB2B: true,
-          b2bSupplierId: b2bSupplierId,
-          companyName: pendingRegistrationSnapshot.companyName,
-          companyCountry: pendingRegistrationSnapshot.companyCountry,
-          taxId: pendingRegistrationSnapshot.taxId,
-          status: "active", // Set the initial status
-          creationTime: userRecord.metadata.creationTime, // From Auth metadata
-          acceptedAt: Date.now(), // Timestamp for acceptance
-          langCode: "en",
-          invoiceSettings: { enabled: false, overDueDay: null },
-        };
-
-        await db
-          .collection("users")
-          .doc(uid) // Use UID as the document ID
-          .set(newUserData);
-        await db.collection("pending_registrations").doc(docId).delete();
-        await db.collection("registrations_history").add({
+    // 1. Enable the user account in Supabase Auth
+    const { error: updateError, data: userRecord } = await supabaseAdmin.auth.admin.updateUserById(uid, {
+      disabled: false,
+    });
+    if (updateError) {
+      console.log("Error updating user:", updateError);
+      throw new Error(`Auth Update Error: ${updateError.message}`);
+    }
+    // 2. Send Acceptance Email
+    await sendEmailToClient(
+      `pending Registration response`,
+      generateClientStatusEmailHTML(email, "accepted"),
+      email,
+      process.env.EMAIL_USER,
+      process.env.EMAIL_USER,
+    );
+    // 3. Get Pending Registration Details from Supabase
+    const { data: pendingRegistration, error: pendingError } = await supabase
+      .from('pending_registrations')
+      .select('*')
+      .eq('id', docId)
+      .single();
+    if (pendingError || !pendingRegistration) {
+      throw new Error("Pending registration not found");
+    }
+    // 4. Create user profile in Supabase
+    const newUserData = {
+      id: uid,
+      email: email,
+      is_b2b: true,
+      b2b_supplier_id: b2bSupplierId,
+      company_name: pendingRegistration.company_name,
+      company_country: pendingRegistration.company_country,
+      tax_id: pendingRegistration.tax_id,
+      status: "active",
+      created_at: new Date().toISOString(),
+      accepted_at: new Date().toISOString(),
+      lang_code: "en",
+      invoice_settings: { enabled: false, overDueDay: null },
+    };
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert([newUserData]);
+    if (profileError) {
+      throw new Error(profileError.message);
+    }
+    // 5. Delete pending registration
+    const { error: deleteError } = await supabase
+      .from('pending_registrations')
+      .delete()
+      .eq('id', docId);
+    if (deleteError) {
+      throw new Error(deleteError.message);
+    }
+    // 6. Add to registrations_history
+    const { error: regHistError } = await supabase
+      .from('registrations_history')
+      .insert([
+        {
           uid: uid,
           email: email,
           status: "Accepted",
-          createdAt: Date.now(),
-        });
-      })
-      .catch((error) => {
-        console.log("Error updating user:", error);
-        throw new Error(`Auth Update Error: ${error.message}`);
-      });
-
+          created_at: Date.now(),
+        },
+      ]);
+    if (regHistError) {
+      throw new Error(regHistError.message);
+    }
     // Success Response
     res.status(200).json({
       success: true,
@@ -2009,8 +2027,6 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
 });
 app.post("/api/decline-pendingRegistration", async (req, res) => {
   const { uid, email, docId } = req.body;
-
-  let userFound;
   try {
     await sendEmailToClient(
       `pending Registration response`,
@@ -2019,14 +2035,28 @@ app.post("/api/decline-pendingRegistration", async (req, res) => {
       process.env.EMAIL_USER,
       process.env.EMAIL_USER,
     );
-    await db.collection("pending_registrations").doc(docId).delete();
-
-    await db.collection("registrations_history").add({
-      uid: uid,
-      email: email,
-      status: "Declined",
-      createdAt: Date.now(),
-    });
+    // Delete pending registration from Supabase
+    const { error: deleteError } = await supabase
+      .from('pending_registrations')
+      .delete()
+      .eq('id', docId);
+    if (deleteError) {
+      throw new Error(deleteError.message);
+    }
+    // Add to registrations_history in Supabase
+    const { error: regHistError } = await supabase
+      .from('registrations_history')
+      .insert([
+        {
+          uid: uid,
+          email: email,
+          status: "Declined",
+          created_at: Date.now(),
+        },
+      ]);
+    if (regHistError) {
+      throw new Error(regHistError.message);
+    }
     res
       .status(200)
       .json({ success: true, message: "email to admin sent successfully" });
