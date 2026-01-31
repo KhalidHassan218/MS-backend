@@ -4,6 +4,7 @@ import { supabase } from '../config/supabase.js';
 export async function insertOrder(orderData) {
   const company_info = {
     country: orderData?.country,
+    company_name: orderData?.company_name,
     city: orderData?.city,
     address1: orderData?.address1,
     address2: orderData?.address2,
