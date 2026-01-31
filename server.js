@@ -691,33 +691,31 @@ function generateInvoiceHTML(
         <div class="top-section">
           <div class="customer-info">
             <div><strong>${escapeHtml(
-              customer.name || customer.business_name || "COMPANY NAME",
-            )}</strong></div>
+    customer.name || customer.business_name || "COMPANY NAME",
+  )}</strong></div>
             <div>${escapeHtml(
-              address.line1 || "STREET NAME & STREET NUMBER",
-            )}</div>
+    address.line1 || "STREET NAME & STREET NUMBER",
+  )}</div>
             <div>${escapeHtml(
-              address.postal_code || "POSTAL CODE",
-            )} ${escapeHtml(address.city || "CITY")}</div>
+    address.postal_code || "POSTAL CODE",
+  )} ${escapeHtml(address.city || "CITY")}</div>
             <div>${escapeHtml(address.country || "COUNTRY")}</div>
-            ${
-              taxId
-                ? `<div>${escapeHtml(taxId)}</div>`
-                : "<div>Company Tax ID</div>"
-            }
+            ${taxId
+      ? `<div>${escapeHtml(taxId)}</div>`
+      : "<div>Company Tax ID</div>"
+    }
           </div>
           
           <div class="invoice-info">
-                           ${
-                             poNumber
-                               ? `
+                           ${poNumber
+      ? `
               <div class="po-number">PO: ${escapeHtml(poNumber)}</div>
             `
-                               : ""
-                           }
+      : ""
+    }
             <div class="invoice-number">${t.invoiceNumber}: #${escapeHtml(
-              orderNumber,
-            )}</div>
+      orderNumber,
+    )}</div>
             <div class="invoice-dates">
               <div><strong>${t.invoiceDate}:</strong> ${invoiceDate}</div>
               <div><strong>${t.expiryDate}:</strong> ${dueDateFormatted}</div>
@@ -746,8 +744,8 @@ function generateInvoiceHTML(
             <tr class="subtotal-row">
               <td>${t.subtotal}:</td>
               <td class="text-right">${currencySymbol} ${subtotal.toFixed(
-                2,
-              )}</td>
+      2,
+    )}</td>
             </tr>
             <tr class="tax-row">
               <td>${vatLabel}:</td>
@@ -764,11 +762,10 @@ function generateInvoiceHTML(
           </div>
         </div>
         
-        ${
-          currency.toLowerCase() === "usd"
-            ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
-            : ""
-        }
+        ${currency.toLowerCase() === "usd"
+      ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
+      : ""
+    }
         ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ""}
 
         <div style="display: flex; justify-content: space-between;">
@@ -1337,18 +1334,18 @@ async function generateInvoicePDFBuffer(
     browser = await puppeteer.launch(
       isLocalMac
         ? {
-            // ✅ macOS (M1–M4) → system Chrome
-            executablePath:
-              "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            headless: "new",
-          }
+          // ✅ macOS (M1–M4) → system Chrome
+          executablePath:
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+          headless: "new",
+        }
         : {
-            // ✅ AWS / serverless → sparticuz chromium
-            args: chromium.args,
-            defaultViewport: chromium.defaultViewport,
-            executablePath: await chromium.executablePath(),
-            headless: chromium.headless,
-          },
+          // ✅ AWS / serverless → sparticuz chromium
+          args: chromium.args,
+          defaultViewport: chromium.defaultViewport,
+          executablePath: await chromium.executablePath(),
+          headless: chromium.headless,
+        },
     );
     const page = await browser.newPage();
     await page.setContent(htmlContent, {
@@ -1913,38 +1910,31 @@ app.post("/api/sendemail", async (req, res) => {
   }
 });
 app.post("/api/registerNewPendingUser", async (req, res) => {
-  const { email, companyName, taxId, companyCountry, password } = req.body;
+  const { email, company_name, tax_id, company_country, password } = req.body;
   try {
     // Create user in Supabase Auth
-    const { data: user, error: userError } =
-      await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-      });
+    const { data: user, error: userError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
     if (userError) {
       console.log("error creating a new registered user", userError);
-      return res
-        .status(500)
-        .json({ success: false, message: userError.message });
+      return res.status(500).json({ success: false, message: userError.message });
     }
     // Insert pending registration in Supabase table
-    const { error: regError } = await supabase
-      .from("pending_registrations")
-      .insert([
-        {
-          uid: user.user?.id,
-          email,
-          tax_id: taxId,
-          company_name: companyName,
-          company_country: companyCountry,
-          created_at: Date.now(),
-        },
-      ]);
+    const { error: regError } = await supabase.from('pending_registrations').insert([
+      {
+        uid: user.user?.id,
+        email,
+        tax_id: tax_id,
+        company_name: company_name,
+        company_country: company_country,
+        created_at: Date.now(),
+      },
+    ]);
     if (regError) {
-      return res
-        .status(500)
-        .json({ success: false, message: regError.message });
+      return res.status(500).json({ success: false, message: regError.message });
     }
     res.status(200).json({ success: true });
   } catch (error) {
