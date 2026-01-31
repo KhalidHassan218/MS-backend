@@ -12,7 +12,7 @@ import fetch from "node-fetch";
 const stripe = new Stripe(stripeSecretKey);
 
 // import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import  { generateVerificationEmailHTML, verificationTemplates } from "./Utils/verificationEmail.js";
+import { generateVerificationEmailHTML, verificationTemplates } from "./Utils/verificationEmail.js";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import chromium from "@sparticuz/chromium";
@@ -28,7 +28,8 @@ import { supabase, supabaseAdmin } from './config/supabase.js';
 
 // import savePDFRecord from "./services/pdf/savePdfRecord.service.js";
 puppeteer.use(StealthPlugin());
-
+const isLocalMac =
+  process.platform === "darwin" && process.arch === "arm64";
 // Firebase initialization removed. Use Supabase for all DB/storage operations.
 // YOUR_DOMAIN = "https://microsoftsupplier.com";
 // YOUR_DOMAIN = "http://localhost:3000";
@@ -40,6 +41,9 @@ app.use(express.static("public"));
 
 import { getNextOrderNumber } from './Utils/supabaseOrderUtils.js';
 import { insertOrder, updateOrder } from './Utils/supabaseOrderService.js';
+import requireAuth from "./middleware/auth.js";
+import attachProfile from "./middleware/attachProfile.js";
+import { getUserProfile } from "./Utils/getUserProfile.js";
 const extractLicenseDataFromSession = (
   session,
   orderId,
@@ -812,12 +816,12 @@ function escapeHtml(str) {
 async function assignKeysToProducts(
   orderId,
   orderNumber,
-  products,
-  b2bSupplierId,
-  uid,
+  digitalProducts,
+  b2b_supplier_id,
+  id,
 ) {
   const results = [];
-  for (const product of products) {
+  for (const product of digitalProducts) {
     const needed = product.quantity || 0;
     const productId = product?.productId; // or product.productId (whichever your data uses)
 
@@ -827,8 +831,8 @@ async function assignKeysToProducts(
       orderNumber,
       productId,
       needed,
-      b2bSupplierId,
-      uid,
+      b2b_supplier_id,
+      id,
     );
 
     results.push({
@@ -841,73 +845,51 @@ async function assignKeysToProducts(
   return results;
 }
 
+
 async function reserveLicenseKeys(
   orderId,
   orderNumber,
   productId,
   neededQty,
-  b2bSupplierId,
-  uid,
+  b2b_supplier_id,
+  id,
 ) {
   if (neededQty <= 0) return [];
 
-  const licenseKeysRef = db.collection("licenseKeys");
+  console.log(`🔄 Transaction started: order=${orderId}, product=${productId}`);
+  console.log("b2b_supplier_id", b2b_supplier_id);
 
-  return await db.runTransaction(async (tx) => {
-    console.log(
-      `🔄 Transaction started: order=${orderId}, product=${productId}`,
-    );
-
-    // 1️⃣ Read available keys ONLY for this product
-    const snapshot = await tx.get(
-      licenseKeysRef
-        .where("status", "==", "available")
-        .where("productId", "==", productId)
-        .limit(neededQty),
-    );
-
-    console.log(
-      `📦 Needed=${neededQty}, Found=${snapshot.size} for product=${productId}`,
-    );
-
-    if (snapshot.size < neededQty) {
-      throw new Error(
-        `Not enough keys for product ${productId} (needed ${neededQty}, found ${snapshot.size})`,
-      );
-    }
-
-    const reservedKeys = [];
-
-    // 2️⃣ Update them atomically
-    snapshot.docs.forEach((doc) => {
-      const data = doc.data();
-
-      // reservedKeys.push(data.key);
-
-      reservedKeys.push({
-        key: data.key,
-        status: "active",
-        isReplacement: false,
-        addedAt: Date.now(),
-        replacedAt: null,
-        replacementReason: null,
-        licenseDocId: doc.id, // Optional: keep reference to license doc
-      });
-
-      tx.update(doc.ref, {
-        status: "used",
-        orderId,
-        orderNumber,
-        usedAt: FieldValue.serverTimestamp(),
-        b2bSupplierId: b2bSupplierId,
-        uid: uid,
-      });
+  try {
+    const { data: reservedDbKeys, error } = await supabase.rpc('reserve_keys', {
+      p_order_id: orderId,
+      p_order_number: orderNumber,
+      p_product_id: productId,
+      p_needed_qty: neededQty,
+      p_user_id: id,
+      // Safety: If b2b_supplier_id is undefined, send null explicitly
+      p_b2b_supplier_id: b2b_supplier_id || null
     });
 
-    console.log(`✅ Reserved keys for product ${productId}:`, reservedKeys);
+    if (error) throw new Error(error.message);
 
-    return reservedKeys;
-  });
+    // Format to match your original return object exactly
+    const formattedKeys = reservedDbKeys.map((item) => ({
+      key: item.license_key,
+      status: "active",
+      isReplacement: false,
+      addedAt: Date.now(),
+      replacedAt: null,
+      replacementReason: null,
+      licenseDocId: item.id
+    }));
+
+    console.log(`✅ Reserved keys for product ${productId}:`, formattedKeys);
+    return formattedKeys;
+
+  } catch (err) {
+    console.error("Reserve Keys Error:", err.message);
+    throw err;
+  }
 }
 
 
@@ -924,7 +906,8 @@ app.post(
         sig,
         // 'whsec_ed16e1c24a67aaf05721441157b18ea73c196a633594f43803fca553ba780c9d'
         // "whsec_n9vgs7GOQKS1uOzF9Ufoxct5NMX11inK" //omar test webook
-        "whsec_3v6ak8Zl2sGGPyoBt2XUxdJEzGsIHLP9", //sertic test webook
+        // "whsec_3v6ak8Zl2sGGPyoBt2XUxdJEzGsIHLP9", //sertic test webook
+        'whsec_e99e795b6a707aac9b23defdb629f0cd49454277fc3eaa844fef9536f218842d' // local host webhook test
       );
 
       console.log("🔔 Webhook received:", event.type);
@@ -1109,19 +1092,42 @@ async function processPaidOrder(session) {
     const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
       expand: ["line_items.data.price.product"],
     });
+    // console.log("fullSession123", fullSession);
+    const user_id = fullSession?.metadata?.id;
+    let userProfile = null;
+    if (user_id) {
+      userProfile = await getUserProfile(user_id);
+    }
 
-    const companyCountry =
-      fullSession?.line_items?.data?.[0].price?.product?.metadata
-        ?.companyCountry || "US";
-    const taxId = fullSession?.metadata?.taxId;
-    const b2bSupplierId = fullSession?.metadata?.b2bSupplierId;
-    const uid = fullSession?.metadata?.uid;
+    console.log("userProfile", userProfile);
+    const {
+      id,
+      email,
+      company_name,
+      company_country,
+      tax_id,
+      is_b2b,
+      b2b_supplier_id,
+      status,
+      created_at,
+      verification_token,
+      verification_expires_at,
+      verified_at,
+      accepted_at,
+      invoice_settings, // This remains an object { enabled: true, ... }
+      lang_code,
+      company_city,
+      company_house_number,
+      company_street,
+      company_zip_code,
+      updated_at
+    } = userProfile;
 
 
     if (fullSession?.metadata && fullSession?.metadata?.orderId) {
       const orderId = fullSession?.metadata?.orderId
       const orderNumber = fullSession?.metadata?.orderNumber
-      const companyCountry = fullSession?.metadata?.companyCountry
+
 
       const orderRef = db.collection("orders").doc(orderId);
       const orderSnap = await orderRef.get();
@@ -1133,8 +1139,8 @@ async function processPaidOrder(session) {
         orderId,
         orderNumber,
         allProducts,
-        companyCountry,
-        taxId,
+        company_country,
+        tax_id,
       );
 
       const invoicePdfUrl = await uploadPDFToSupabaseStorage(
@@ -1162,28 +1168,29 @@ async function processPaidOrder(session) {
         "",
         fullSession?.metadata?.email,
         emailAttachemnts,
-        companyCountry, // 'NL', 'EN', 'FR', or 'DE'
+        company_country, // 'NL', 'EN', 'FR', or 'DE'
       );
 
     } else {
       const orderNumber = await getNextOrderNumber();
-      console.log("fullSession12",fullSession);
-      
+      console.log("fullSession12", fullSession?.line_items?.data[0]);
+
       const data = {
-        uid: uid,
+        user_id: id,
         orderNumber: orderNumber,
-        poNumber: fullSession?.metadata?.poNumber,
+        poNumber: fullSession?.metadata?.po_number,
         internalEntryStatus: "pending",
-        email: fullSession?.customer_details?.email,
-        country: fullSession?.customer_details?.address?.country,
-        city: fullSession?.customer_details?.address?.city,
-        address1: fullSession?.customer_details?.address?.line1,
-        address2: fullSession?.customer_details?.address?.line2,
-        postal_code: fullSession?.customer_details?.address?.postal_code,
-        bussinessName: fullSession?.customer_details?.business_name,
+        email: email,
+        country: company_country,
+        city: company_city,
+        address1: company_country,
+        address2: `${company_street} ${company_house_number}`,
+        postal_code: company_zip_code,
+        bussinessName: company_name,
         total: fullSession?.amount_total / 100,
         currency: fullSession?.currency,
-        createdAt: new Date(fullSession?.created * 1000),
+        created_at: new Date(),
+        total_amount: fullSession?.amount_total / 100,
         products: fullSession?.line_items?.data?.map((item) => ({
           productId: item?.price?.product?.metadata?.id,
           name: item?.price?.product?.name,
@@ -1191,8 +1198,8 @@ async function processPaidOrder(session) {
           unitPrice: item?.price?.unit_amount / 100,
           totalPrice: item?.amount_total / 100,
           isDigital: item?.price?.product?.metadata?.isDigital === "true", // Retrieve from metadata
-          PN: item?.price?.product?.metadata?.PN,
-          companyCountry,
+          PN: item?.price?.product?.metadata?.pn,
+          image_url: item?.price?.product?.metadata?.image_url,
         })),
       };
 
@@ -1208,8 +1215,8 @@ async function processPaidOrder(session) {
           orderId,
           orderNumber,
           digitalProducts,
-          b2bSupplierId,
-          uid,
+          b2b_supplier_id,
+          id,
         );
       } catch (err) {
         console.error(
@@ -1230,6 +1237,7 @@ async function processPaidOrder(session) {
       const allProducts = [...productsWithKeys, ...phisycalProducts];
       await updateOrder(orderId, {
         // Add products to a related table if needed
+        products: allProducts,
         internal_status: "keys_assigned",
       });
       const licenseData = extractLicenseDataFromSession(
@@ -1241,15 +1249,15 @@ async function processPaidOrder(session) {
       // Generate PDF with the assigned keys embedded
       const pdfBuffer = await generateLicencePDFBuffer(
         licenseData,
-        companyCountry,
+        company_country,
       );
       const invoicePdfBuffer = await generateInvoicePDFBuffer(
         fullSession,
         orderId,
         orderNumber,
         allProducts,
-        companyCountry,
-        taxId,
+        company_country,
+        tax_id,
       );
 
       const licensePdfUrl = await uploadPDFToSupabaseStorage(
@@ -1280,7 +1288,7 @@ async function processPaidOrder(session) {
         data?.name,
         data?.email,
         emailAttachemnts,
-        companyCountry, // 'NL', 'EN', 'FR', or 'DE'
+        company_country, // 'NL', 'EN', 'FR', or 'DE'
       );
 
       // Update order as completed with both URLs
@@ -1318,14 +1326,29 @@ async function generateInvoicePDFBuffer(
       taxId,
     );
 
-    browser = await puppeteer.launch({
-      args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"], // Use chromium's recommended args
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(), // <-- THIS is the key line
-      headless: chromium.headless,
-      ignoreHTTPSErrors: true,
-    });
-
+    // browser = await puppeteer.launch({
+    //   args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox"], // Use chromium's recommended args
+    //   defaultViewport: chromium.defaultViewport,
+    //   executablePath: await chromium.executablePath(), // <-- THIS is the key line
+    //   headless: chromium.headless,
+    //   ignoreHTTPSErrors: true,
+    // });
+    browser = await puppeteer.launch(
+      isLocalMac
+        ? {
+          // ✅ macOS (M1–M4) → system Chrome
+          executablePath:
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+          headless: "new",
+        }
+        : {
+          // ✅ AWS / serverless → sparticuz chromium
+          args: chromium.args,
+          defaultViewport: chromium.defaultViewport,
+          executablePath: await chromium.executablePath(),
+          headless: chromium.headless,
+        }
+    );
     const page = await browser.newPage();
     await page.setContent(htmlContent, {
       waitUntil: "networkidle0",
@@ -1548,56 +1571,83 @@ app.post("/api/send-verification", async (req, res) => {
     res.status(500).json({ success: false, message: getVerificationMsg(lang, 'error') });
   }
 });
-app.post("/create-checkout-session", async (req, res) => {
+app.post("/api/create-checkout-session", requireAuth, attachProfile, async (req, res) => {
+  console.log("profile", req.profile);
+  const {
+    id,
+    email,
+    company_name,
+    company_country,
+    tax_id,
+    is_b2b,
+    b2b_supplier_id,
+    status,
+    created_at,
+    verification_token,
+    verification_expires_at,
+    verified_at,
+    accepted_at,
+    invoice_settings, // This remains an object { enabled: true, ... }
+    lang_code,
+    company_city,
+    company_house_number,
+    company_street,
+    company_zip_code,
+    updated_at
+  } = req.profile;
   const cart = req.body.cart;
-  const useremail = req.body.useremail;
-  const cat = req.body.foundUser;
-  const userData = req.body.userData;
-  const b2bSupplierId = userData?.b2bSupplierId;
-  const companyCountry = userData?.companyCountry;
-  const poNumber = req.body?.poNumber || null;
-  const isUserPayByInvoiceEnabled = req.body?.isUserPayByInvoiceEnabled;
-  const userInvoiceSettings =
-    isUserPayByInvoiceEnabled && req.body?.userInvoiceSettings;
+
+  const po_number = req.body?.po_number || null;
+
+  const is_user_pay_by_invoice_enabled = invoice_settings?.enabled || false;
+
+
+
   const currentDate = new Date();
-  const overdueDate = new Date(currentDate);
-  const overDueDay = userInvoiceSettings && userInvoiceSettings?.overDueDay
-  overdueDate.setDate(currentDate.getDate() + overDueDay);
-  const isUSCompany = userData?.companyCountry === "US";
+  const over_due_date = new Date(currentDate);
+  const over_due_day = is_user_pay_by_invoice_enabled && invoice_settings?.over_due_day
+
+
+  over_due_date.setDate(currentDate.getDate() + over_due_day);
+  const isUSCompany = company_country === "US";
   let currency;
   currency = isUSCompany ? "usd" : "eur";
   const lineItems = cart?.map((product) => {
+    console.log("productproduct", product);
+
     let b2bpriceWVat = parseFloat(
-      isUSCompany ? product?.["b2bpriceWVat_USD"] : product?.b2bpriceWVat,
+      product?.priceWVat
     );
     const priceCopy = b2bpriceWVat.toFixed(2);
     const isDigital = product?.type === "digital software";
     let customFields = null;
     let description = "";
-    const PN = product?.PN;
+    const pn = product?.pn;
     if (product?.selectedLangObj?.id) {
       customFields = {
-        PN: product.selectedLangObj.PN,
+        PN: product.selectedLangObj.pn,
         language: product.selectedLangObj.lang,
         isDigital: isDigital,
-        PN: PN,
+        pn: pn,
         id: product?.id,
-        companyCountry: userData.companyCountry,
-        b2bSupplierId: userData.b2bSupplierId,
-        poNumber: poNumber
-        // taxId: userData.taxId,
+        company_country: company_country,
+        b2b_supplier_id: b2b_supplier_id,
+        po_number: po_number,
+        image_url: product.image_url,
+        // tax_id: tax_id,
       };
       description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.PN}`;
     } else {
       customFields = {
         language: `Language: English`,
         isDigital: isDigital,
-        PN: PN,
+        pn: pn,
         id: product?.id,
-        companyCountry: userData?.companyCountry,
-        b2bSupplierId: userData.b2bSupplierId,
-        poNumber: poNumber
-        // taxId: userData.taxId,
+        company_country: company_country,
+        b2b_supplier_id: b2b_supplier_id,
+        po_number: po_number,
+        image_url: product.image_url,
+        // tax_id: tax_id,
       };
       description = `Language: English`;
     }
@@ -1607,7 +1657,7 @@ app.post("/create-checkout-session", async (req, res) => {
         currency: currency,
         product_data: {
           name: product.name,
-          images: [product.imageUrl],
+          images: [product.image_url],
           metadata: customFields,
           description: description,
         },
@@ -1617,16 +1667,16 @@ app.post("/create-checkout-session", async (req, res) => {
     };
   });
 
-  if (isUserPayByInvoiceEnabled) {
+  if (is_user_pay_by_invoice_enabled) {
     try {
       // 1. Prepare line items using your exact existing logic for metadata and pricing
       const paymentLinkLineItems = cart.map((product) => {
         const b2bpriceWVat = parseFloat(
-          isUSCompany ? product?.["b2bpriceWVat_USD"] : product?.b2bpriceWVat,
+          product?.priceWVat
         );
         const isDigital = product?.type === "digital software";
         const description = product?.selectedLangObj?.id
-          ? `Language: ${product.selectedLangObj.lang} PN: ${product.selectedLangObj.PN}`
+          ? `Language: ${product.selectedLangObj.lang} PN: ${product.selectedLangObj.pn}`
           : `Language: English`;
         const unit_amount = parseFloat(b2bpriceWVat * 100);
         return {
@@ -1636,10 +1686,10 @@ app.post("/create-checkout-session", async (req, res) => {
             product_data: {
               name: product.name,
               description: description,
-              images: [product.imageUrl],
+              images: [product.image_url],
               metadata: {
                 amount_total: product?.quantity * unit_amount,
-                PN: product?.selectedLangObj?.PN || product.PN,
+                pn: product?.selectedLangObj?.pn || product.pn,
                 id: product?.id,
                 isDigital: String(isDigital),
                 language: product?.selectedLangObj?.lang || "English",
@@ -1663,15 +1713,15 @@ app.post("/create-checkout-session", async (req, res) => {
         line_items: paymentLinkLineItems,
         currency: currency,
         metadata: {
-          poNumber: poNumber || "N/A",
+          poNumber: po_number || "N/A",
           orderType: "pay_by_invoice",
           orderNumber: orderNumber,
           orderId: orderId,
-          uid: userData?.uid,
-          b2bSupplierId: userData?.b2bSupplierId,
-          taxId: userData?.taxId,
-          companyCountry: userData?.companyCountry,
-          email: userData?.email,
+          id: id,
+          b2b_supplier_id: b2b_supplier_id,
+          tax_id: tax_id,
+          company_country: company_country,
+          email: email,
         },
         // You can disable manual tax or promotion codes to keep the UI minimal
         billing_address_collection: "required",
@@ -1697,17 +1747,16 @@ app.post("/create-checkout-session", async (req, res) => {
       // 3. Log for your Firebase tracking
       const paymentLinkUrl = paymentLink.url;
 
-      const uid = userData?.uid;
 
       const data = {
-        uid: uid,
+        id: id,
         internalEntryStatus: "pending",
         paymentStatus: "payment due",
         paymentUrl: paymentLinkUrl,
-        email: userData?.email,
-        country: userData?.companyCountry,
-        poNumber: poNumber,
-        companyName: userData?.companyName,
+        email: email,
+        country: company_country,
+        poNumber: po_number,
+        company_name: company_name,
         // city: fullSession?.customer_details?.address?.city,
         // address1: fullSession?.customer_details?.address?.line1,
         // address2: fullSession?.customer_details?.address?.line2,
@@ -1716,7 +1765,7 @@ app.post("/create-checkout-session", async (req, res) => {
         total: totalAmountMainCurrency,
         currency: currency,
         createdAt: new Date(),
-        overdueDate: overdueDate,
+        overdueDate: over_due_date,
         products: paymentLinkLineItems.map((item) => ({
           productId: item?.price_data?.product_data?.metadata?.id,
           name: item?.price_data?.product_data?.name,
@@ -1726,8 +1775,8 @@ app.post("/create-checkout-session", async (req, res) => {
             item?.price_data?.product_data?.metadata?.amount_total / 100,
           isDigital:
             item?.price_data?.product_data?.metadata?.isDigital === "true", // Retrieve from metadata
-          PN: item?.price_data?.product_data?.metadata?.PN,
-          companyCountry,
+          pn: item?.price_data?.product_data?.metadata?.pn,
+          company_country,
         })),
       };
 
@@ -1743,8 +1792,8 @@ app.post("/create-checkout-session", async (req, res) => {
           orderId,
           orderNumber,
           digitalProducts,
-          b2bSupplierId,
-          uid,
+          b2b_supplier_id,
+          id,
         );
       } catch (err) {
         console.error(
@@ -1762,16 +1811,14 @@ app.post("/create-checkout-session", async (req, res) => {
         // optional: notify admin or send email to customer here
         return;
       }
-      let taxId = userData?.taxId
-
       processPayByInvoiceOrder(
         data,
         orderNumber,
-        companyCountry,
+        company_country,
         productsWithKeys,
         phisycalProducts,
         orderId,
-        taxId
+        tax_id
       );
       // 4. Return the link to be attached to your Firebase orders doc
       res.status(200).send();
@@ -1784,26 +1831,24 @@ app.post("/create-checkout-session", async (req, res) => {
     const sessionData = {
       line_items: lineItems,
       mode: "payment",
-      billing_address_collection: "required",
       name_collection: {
         business: {
-          enabled: true, // show Business Name field
-          optional: false, // make it required
+          enabled: false, // show Business Name field
         },
       },
       metadata: {
-        taxId: userData?.taxId,
-        b2bSupplierId: userData?.b2bSupplierId,
-        uid: userData?.uid,
-        poNumber: poNumber || "N/A",
+        tax_id: tax_id,
+        b2b_supplier_id: b2b_supplier_id,
+        id: id,
+        po_number: po_number || "N/A",
       },
       expires_at: expirationTime,
       success_url: `${YOUR_DOMAIN}/success`,
       cancel_url: `${YOUR_DOMAIN}?canceled=true`,
     };
 
-    if (useremail) {
-      sessionData.customer_email = useremail;
+    if (email) {
+      sessionData.customer_email = email;
     }
 
     const session = await stripe.checkout.sessions.create(sessionData);
