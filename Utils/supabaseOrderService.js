@@ -25,6 +25,7 @@ export async function insertOrder(orderData) {
     invoice_url: orderData.invoiceUrl,
     license_url: orderData.licenseUrl,
     created_at: orderData.createdAt || new Date().toISOString(),
+    po_number: orderData?.poNumber || null,
     company_info
     // Add more mappings as needed
   };

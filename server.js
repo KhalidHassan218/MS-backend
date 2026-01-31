@@ -1128,7 +1128,6 @@ async function processPaidOrder(session) {
       const orderId = fullSession?.metadata?.orderId
       const orderNumber = fullSession?.metadata?.orderNumber
 
-
       const orderRef = db.collection("orders").doc(orderId);
       const orderSnap = await orderRef.get();
       const orderData = orderSnap.data();
@@ -1174,10 +1173,12 @@ async function processPaidOrder(session) {
     } else {
       const orderNumber = await getNextOrderNumber();
       console.log("fullSession12", fullSession?.line_items?.data[0]);
+      const po_number = fullSession?.metadata?.po_number || null;
 
       const data = {
         user_id: id,
         orderNumber: orderNumber,
+        po_number: po_number,
         poNumber: fullSession?.metadata?.po_number,
         internalEntryStatus: "pending",
         email: email,
