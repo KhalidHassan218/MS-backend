@@ -12,7 +12,10 @@ import fetch from "node-fetch";
 const stripe = new Stripe(stripeSecretKey);
 
 // import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { generateVerificationEmailHTML, verificationTemplates } from "./Utils/verificationEmail.js";
+import {
+  generateVerificationEmailHTML,
+  verificationTemplates,
+} from "./Utils/verificationEmail.js";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import chromium from "@sparticuz/chromium";
@@ -24,12 +27,11 @@ import generateClientStatusEmailHTML from "./templates/Emails/ClientNewRegistera
 import { uploadPDFToSupabaseStorage } from "./services/supabaseStorage.service.js";
 import generateLicencePDFBuffer from "./services/pdf/generateLicencePDF.service.js";
 import { generateProformaPDFBuffer } from "./services/pdf/generateProformaPDF.service.js";
-import { supabase, supabaseAdmin } from './config/supabase.js';
+import { supabase, supabaseAdmin } from "./config/supabase.js";
 
 // import savePDFRecord from "./services/pdf/savePdfRecord.service.js";
 puppeteer.use(StealthPlugin());
-const isLocalMac =
-  process.platform === "darwin" && process.arch === "arm64";
+const isLocalMac = process.platform === "darwin" && process.arch === "arm64";
 // Firebase initialization removed. Use Supabase for all DB/storage operations.
 // YOUR_DOMAIN = "https://microsoftsupplier.com";
 // YOUR_DOMAIN = "http://localhost:3000";
@@ -39,8 +41,8 @@ const app = express();
 app.use(cors());
 app.use(express.static("public"));
 
-import { getNextOrderNumber } from './Utils/supabaseOrderUtils.js';
-import { insertOrder, updateOrder } from './Utils/supabaseOrderService.js';
+import { getNextOrderNumber } from "./Utils/supabaseOrderUtils.js";
+import { insertOrder, updateOrder } from "./Utils/supabaseOrderService.js";
 import requireAuth from "./middleware/auth.js";
 import attachProfile from "./middleware/attachProfile.js";
 import { getUserProfile } from "./Utils/getUserProfile.js";
@@ -79,7 +81,7 @@ async function processPayByInvoiceOrder(
   productsWithKeys,
   phisycalProducts,
   orderId,
-  taxId
+  taxId,
 ) {
   try {
     // const taxId = session?.metadata?.taxId;
@@ -128,18 +130,18 @@ async function processPayByInvoiceOrder(
       orderNumber,
       allProducts,
       companyCountry,
-      taxId
+      taxId,
     );
 
     const licensePdfUrl = await uploadPDFToSupabaseStorage(
       orderNumber,
       pdfBuffer,
-      "License"
+      "License",
     );
     const proformaPdfUrl = await uploadPDFToSupabaseStorage(
       orderNumber,
       proformaPdfBuffer,
-      "Proforma"
+      "Proforma",
     );
 
     // Save Firestore PDF record
@@ -321,7 +323,7 @@ function generateInvoiceHTML(
   const address = customer.address || {};
   const total = (session.amount_total || 0) / 100;
   const currency = (session.currency || "eur").toUpperCase();
-  const poNumber = session?.metadata?.poNumber
+  const poNumber = session?.metadata?.poNumber;
   // Determine currency symbol
   let currencySymbol = currency;
   if (currency.toLowerCase() === "eur") currencySymbol = "€";
@@ -689,28 +691,33 @@ function generateInvoiceHTML(
         <div class="top-section">
           <div class="customer-info">
             <div><strong>${escapeHtml(
-    customer.name || customer.business_name || "COMPANY NAME",
-  )}</strong></div>
+              customer.name || customer.business_name || "COMPANY NAME",
+            )}</strong></div>
             <div>${escapeHtml(
-    address.line1 || "STREET NAME & STREET NUMBER",
-  )}</div>
+              address.line1 || "STREET NAME & STREET NUMBER",
+            )}</div>
             <div>${escapeHtml(
-    address.postal_code || "POSTAL CODE",
-  )} ${escapeHtml(address.city || "CITY")}</div>
+              address.postal_code || "POSTAL CODE",
+            )} ${escapeHtml(address.city || "CITY")}</div>
             <div>${escapeHtml(address.country || "COUNTRY")}</div>
-            ${taxId
-      ? `<div>${escapeHtml(taxId)}</div>`
-      : "<div>Company Tax ID</div>"
-    }
+            ${
+              taxId
+                ? `<div>${escapeHtml(taxId)}</div>`
+                : "<div>Company Tax ID</div>"
+            }
           </div>
           
           <div class="invoice-info">
-                           ${poNumber ? `
+                           ${
+                             poNumber
+                               ? `
               <div class="po-number">PO: ${escapeHtml(poNumber)}</div>
-            ` : ""}
+            `
+                               : ""
+                           }
             <div class="invoice-number">${t.invoiceNumber}: #${escapeHtml(
-      orderNumber,
-    )}</div>
+              orderNumber,
+            )}</div>
             <div class="invoice-dates">
               <div><strong>${t.invoiceDate}:</strong> ${invoiceDate}</div>
               <div><strong>${t.expiryDate}:</strong> ${dueDateFormatted}</div>
@@ -739,8 +746,8 @@ function generateInvoiceHTML(
             <tr class="subtotal-row">
               <td>${t.subtotal}:</td>
               <td class="text-right">${currencySymbol} ${subtotal.toFixed(
-      2,
-    )}</td>
+                2,
+              )}</td>
             </tr>
             <tr class="tax-row">
               <td>${vatLabel}:</td>
@@ -757,10 +764,11 @@ function generateInvoiceHTML(
           </div>
         </div>
         
-        ${currency.toLowerCase() === "usd"
-      ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
-      : ""
-    }
+        ${
+          currency.toLowerCase() === "usd"
+            ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
+            : ""
+        }
         ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ""}
 
         <div style="display: flex; justify-content: space-between;">
@@ -845,7 +853,6 @@ async function assignKeysToProducts(
   return results;
 }
 
-
 async function reserveLicenseKeys(
   orderId,
   orderNumber,
@@ -860,14 +867,14 @@ async function reserveLicenseKeys(
   console.log("b2b_supplier_id", b2b_supplier_id);
 
   try {
-    const { data: reservedDbKeys, error } = await supabase.rpc('reserve_keys', {
+    const { data: reservedDbKeys, error } = await supabase.rpc("reserve_keys", {
       p_order_id: orderId,
       p_order_number: orderNumber,
       p_product_id: productId,
       p_needed_qty: neededQty,
       p_user_id: id,
       // Safety: If b2b_supplier_id is undefined, send null explicitly
-      p_b2b_supplier_id: b2b_supplier_id || null
+      p_b2b_supplier_id: b2b_supplier_id || null,
     });
 
     if (error) throw new Error(error.message);
@@ -880,19 +887,16 @@ async function reserveLicenseKeys(
       addedAt: Date.now(),
       replacedAt: null,
       replacementReason: null,
-      licenseDocId: item.id
+      licenseDocId: item.id,
     }));
 
     console.log(`✅ Reserved keys for product ${productId}:`, formattedKeys);
     return formattedKeys;
-
   } catch (err) {
     console.error("Reserve Keys Error:", err.message);
     throw err;
   }
 }
-
-
 
 app.post(
   "/webhooks",
@@ -907,7 +911,7 @@ app.post(
         // 'whsec_ed16e1c24a67aaf05721441157b18ea73c196a633594f43803fca553ba780c9d'
         // "whsec_n9vgs7GOQKS1uOzF9Ufoxct5NMX11inK" //omar test webook
         // "whsec_3v6ak8Zl2sGGPyoBt2XUxdJEzGsIHLP9", //sertic test webook
-        'whsec_e99e795b6a707aac9b23defdb629f0cd49454277fc3eaa844fef9536f218842d' // local host webhook test
+        "whsec_e99e795b6a707aac9b23defdb629f0cd49454277fc3eaa844fef9536f218842d", // local host webhook test
       );
 
       console.log("🔔 Webhook received:", event.type);
@@ -1070,7 +1074,7 @@ function generateEmailContent(customerName, companyCountryCode = "EN") {
 
 // Main function to send email with attachments
 async function sendOrderConfirmationEmail(
-  customerName = '',
+  customerName = "",
   customerEmail,
   emailAttachments,
   companyCountryCode = "EN",
@@ -1088,7 +1092,6 @@ async function sendOrderConfirmationEmail(
 }
 async function processPaidOrder(session) {
   try {
-
     const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
       expand: ["line_items.data.price.product"],
     });
@@ -1120,13 +1123,12 @@ async function processPaidOrder(session) {
       company_house_number,
       company_street,
       company_zip_code,
-      updated_at
+      updated_at,
     } = userProfile;
 
-
     if (fullSession?.metadata && fullSession?.metadata?.orderId) {
-      const orderId = fullSession?.metadata?.orderId
-      const orderNumber = fullSession?.metadata?.orderNumber
+      const orderId = fullSession?.metadata?.orderId;
+      const orderNumber = fullSession?.metadata?.orderNumber;
 
       const orderRef = db.collection("orders").doc(orderId);
       const orderSnap = await orderRef.get();
@@ -1145,7 +1147,7 @@ async function processPaidOrder(session) {
       const invoicePdfUrl = await uploadPDFToSupabaseStorage(
         orderNumber,
         invoicePdfBuffer,
-        "Invoice"
+        "Invoice",
       );
 
       let emailAttachemnts = [
@@ -1169,7 +1171,6 @@ async function processPaidOrder(session) {
         emailAttachemnts,
         company_country, // 'NL', 'EN', 'FR', or 'DE'
       );
-
     } else {
       const orderNumber = await getNextOrderNumber();
       console.log("fullSession12", fullSession?.line_items?.data[0]);
@@ -1264,12 +1265,12 @@ async function processPaidOrder(session) {
       const licensePdfUrl = await uploadPDFToSupabaseStorage(
         orderNumber,
         pdfBuffer,
-        "License"
+        "License",
       );
       const invoicePdfUrl = await uploadPDFToSupabaseStorage(
         orderNumber,
         invoicePdfBuffer,
-        "Invoice"
+        "Invoice",
       );
       let emailAttachemnts = [
         {
@@ -1301,7 +1302,6 @@ async function processPaidOrder(session) {
         license_url: licensePdfUrl,
       });
     }
-
   } catch (err) {
     console.error("❌ Error processing order:", err);
   }
@@ -1337,18 +1337,18 @@ async function generateInvoicePDFBuffer(
     browser = await puppeteer.launch(
       isLocalMac
         ? {
-          // ✅ macOS (M1–M4) → system Chrome
-          executablePath:
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-          headless: "new",
-        }
+            // ✅ macOS (M1–M4) → system Chrome
+            executablePath:
+              "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            headless: "new",
+          }
         : {
-          // ✅ AWS / serverless → sparticuz chromium
-          args: chromium.args,
-          defaultViewport: chromium.defaultViewport,
-          executablePath: await chromium.executablePath(),
-          headless: chromium.headless,
-        }
+            // ✅ AWS / serverless → sparticuz chromium
+            args: chromium.args,
+            defaultViewport: chromium.defaultViewport,
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless,
+          },
     );
     const page = await browser.newPage();
     await page.setContent(htmlContent, {
@@ -1391,79 +1391,87 @@ app.get("/", (req, res) => {
 // Common translations for verification API responses
 const verificationApiMessages = {
   EN: {
-    missing: 'Missing token or uid',
-    notFound: 'User not found',
-    invalid: 'Invalid or expired verification link',
-    verified: 'Email verified successfully',
-    error: 'An error occurred',
-    alreadySent: 'Verification email already sent. Please check your inbox.',
-    alreadyVerified: 'Email is already verified. No email sent.',
-    sent: 'Verification email sent successfully',
-    firebaseNotFound: 'User not found in Firebase Auth',
-    unauthorized: 'Unauthorized: UID mismatch',
-    missingData: 'Missing data',
+    missing: "Missing token or uid",
+    notFound: "User not found",
+    invalid: "Invalid or expired verification link",
+    verified: "Email verified successfully",
+    error: "An error occurred",
+    alreadySent: "Verification email already sent. Please check your inbox.",
+    alreadyVerified: "Email is already verified. No email sent.",
+    sent: "Verification email sent successfully",
+    firebaseNotFound: "User not found in Firebase Auth",
+    unauthorized: "Unauthorized: UID mismatch",
+    missingData: "Missing data",
   },
   NL: {
-    missing: 'Ontbrekende token of uid',
-    notFound: 'Gebruiker niet gevonden',
-    invalid: 'Ongeldige of verlopen verificatielink',
-    verified: 'E-mailadres succesvol geverifieerd',
-    error: 'Er is een fout opgetreden',
-    alreadySent: 'Verificatie-e-mail is al verzonden. Controleer uw inbox.',
-    alreadyVerified: 'E-mailadres is al geverifieerd. Geen e-mail verzonden.',
-    sent: 'Verificatie-e-mail succesvol verzonden',
-    firebaseNotFound: 'Gebruiker niet gevonden in Firebase Auth',
-    unauthorized: 'Niet gemachtigd: UID komt niet overeen',
-    missingData: 'Ontbrekende gegevens',
+    missing: "Ontbrekende token of uid",
+    notFound: "Gebruiker niet gevonden",
+    invalid: "Ongeldige of verlopen verificatielink",
+    verified: "E-mailadres succesvol geverifieerd",
+    error: "Er is een fout opgetreden",
+    alreadySent: "Verificatie-e-mail is al verzonden. Controleer uw inbox.",
+    alreadyVerified: "E-mailadres is al geverifieerd. Geen e-mail verzonden.",
+    sent: "Verificatie-e-mail succesvol verzonden",
+    firebaseNotFound: "Gebruiker niet gevonden in Firebase Auth",
+    unauthorized: "Niet gemachtigd: UID komt niet overeen",
+    missingData: "Ontbrekende gegevens",
   },
   FR: {
-    missing: 'Token ou uid manquant',
-    notFound: 'Utilisateur non trouvé',
-    invalid: 'Lien de vérification invalide ou expiré',
-    verified: 'E-mail vérifié avec succès',
-    error: 'Une erreur est survenue',
-    alreadySent: 'E-mail de vérification déjà envoyé. Veuillez vérifier votre boîte de réception.',
-    alreadyVerified: 'E-mail déjà vérifié. Aucun e-mail envoyé.',
-    sent: 'E-mail de vérification envoyé avec succès',
-    firebaseNotFound: 'Utilisateur non trouvé dans Firebase Auth',
-    unauthorized: 'Non autorisé : UID ne correspond pas',
-    missingData: 'Données manquantes',
+    missing: "Token ou uid manquant",
+    notFound: "Utilisateur non trouvé",
+    invalid: "Lien de vérification invalide ou expiré",
+    verified: "E-mail vérifié avec succès",
+    error: "Une erreur est survenue",
+    alreadySent:
+      "E-mail de vérification déjà envoyé. Veuillez vérifier votre boîte de réception.",
+    alreadyVerified: "E-mail déjà vérifié. Aucun e-mail envoyé.",
+    sent: "E-mail de vérification envoyé avec succès",
+    firebaseNotFound: "Utilisateur non trouvé dans Firebase Auth",
+    unauthorized: "Non autorisé : UID ne correspond pas",
+    missingData: "Données manquantes",
   },
   DE: {
-    missing: 'Fehlendes Token oder UID',
-    notFound: 'Benutzer nicht gefunden',
-    invalid: 'Ungültiger oder abgelaufener Verifizierungslink',
-    verified: 'E-Mail erfolgreich verifiziert',
-    error: 'Ein Fehler ist aufgetreten',
-    alreadySent: 'Verifizierungs-E-Mail wurde bereits gesendet. Bitte prüfen Sie Ihr Postfach.',
-    alreadyVerified: 'E-Mail ist bereits verifiziert. Keine E-Mail gesendet.',
-    sent: 'Verifizierungs-E-Mail erfolgreich gesendet',
-    firebaseNotFound: 'Benutzer in Firebase Auth nicht gefunden',
-    unauthorized: 'Nicht autorisiert: UID stimmt nicht überein',
-    missingData: 'Fehlende Daten',
+    missing: "Fehlendes Token oder UID",
+    notFound: "Benutzer nicht gefunden",
+    invalid: "Ungültiger oder abgelaufener Verifizierungslink",
+    verified: "E-Mail erfolgreich verifiziert",
+    error: "Ein Fehler ist aufgetreten",
+    alreadySent:
+      "Verifizierungs-E-Mail wurde bereits gesendet. Bitte prüfen Sie Ihr Postfach.",
+    alreadyVerified: "E-Mail ist bereits verifiziert. Keine E-Mail gesendet.",
+    sent: "Verifizierungs-E-Mail erfolgreich gesendet",
+    firebaseNotFound: "Benutzer in Firebase Auth nicht gefunden",
+    unauthorized: "Nicht autorisiert: UID stimmt nicht überein",
+    missingData: "Fehlende Daten",
   },
 };
 
 function getVerificationMsg(lang, key) {
-  const t = verificationApiMessages[lang?.toUpperCase()] || verificationApiMessages.EN;
-  return t[key] || verificationApiMessages.EN[key] || '';
+  const t =
+    verificationApiMessages[lang?.toUpperCase()] || verificationApiMessages.EN;
+  return t[key] || verificationApiMessages.EN[key] || "";
 }
 
 // API route to handle email verification
-app.get('/api/verify', async (req, res) => {
+app.get("/api/verify", async (req, res) => {
   try {
-    const { token, uid, lang = 'EN' } = req.query;
+    const { token, uid, lang = "EN" } = req.query;
     if (!token || !uid) {
-      return res.status(400).json({ success: false, message: getVerificationMsg(lang, 'missing') });
+      return res
+        .status(400)
+        .json({ success: false, message: getVerificationMsg(lang, "missing") });
     }
     // Fetch profile from Supabase profiles table
     const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', uid)
+      .from("profiles")
+      .select("*")
+      .eq("id", uid)
       .single();
     if (profileError || !profile) {
-      return res.status(404).json({ success: false, message: getVerificationMsg(lang, 'notFound') });
+      return res.status(404).json({
+        success: false,
+        message: getVerificationMsg(lang, "notFound"),
+      });
     }
     const now = new Date();
     if (
@@ -1471,31 +1479,40 @@ app.get('/api/verify', async (req, res) => {
       !profile.verification_expires_at ||
       new Date(profile.verification_expires_at).getTime() < now.getTime()
     ) {
-      return res.status(400).json({ success: false, message: getVerificationMsg(lang, 'invalid') });
+      return res
+        .status(400)
+        .json({ success: false, message: getVerificationMsg(lang, "invalid") });
     }
     // Mark profile as verified and remove verification_token/expiry, set verified_at
     const { error: updateError } = await supabase
-      .from('profiles')
+      .from("profiles")
       .update({
         verification_token: null,
         verification_expires_at: null,
         verified_at: now.toISOString(),
       })
-      .eq('id', uid);
+      .eq("id", uid);
     if (updateError) {
       throw new Error(updateError.message);
     }
     // Also update Supabase Auth user to set email_confirm: true
     try {
-      await supabaseAdmin.auth.admin.updateUserById(uid, { email_confirm: true });
+      await supabaseAdmin.auth.admin.updateUserById(uid, {
+        email_confirm: true,
+      });
     } catch (err) {
       // If user not found in Auth, ignore and proceed (optional: log error)
-      console.error('Error updating Supabase Auth user:', err);
+      console.error("Error updating Supabase Auth user:", err);
     }
-    return res.json({ success: true, message: getVerificationMsg(lang, 'verified') });
+    return res.json({
+      success: true,
+      message: getVerificationMsg(lang, "verified"),
+    });
   } catch (err) {
-    const lang = req.query?.lang || 'EN';
-    res.status(500).json({ success: false, message: getVerificationMsg(lang, 'error') });
+    const lang = req.query?.lang || "EN";
+    res
+      .status(500)
+      .json({ success: false, message: getVerificationMsg(lang, "error") });
   }
 });
 
@@ -1503,25 +1520,34 @@ app.post("/api/send-verification", async (req, res) => {
   try {
     const { email, name, lang = "EN", verifyUrl, uid } = req.body;
     if (!email || !verifyUrl || !uid) {
-      return res.status(400).json({ success: false, message: getVerificationMsg(lang, 'missingData') });
+      return res.status(400).json({
+        success: false,
+        message: getVerificationMsg(lang, "missingData"),
+      });
     }
     if (!uid) {
-      return res.status(403).json({ success: false, message: getVerificationMsg(lang, 'unauthorized') });
+      return res.status(403).json({
+        success: false,
+        message: getVerificationMsg(lang, "unauthorized"),
+      });
     }
     // Fetch profile from Supabase
     const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', uid)
+      .from("profiles")
+      .select("*")
+      .eq("id", uid)
       .single();
     if (profileError || !profile) {
-      return res.status(404).json({ success: false, message: getVerificationMsg(lang, 'notFound') });
+      return res.status(404).json({
+        success: false,
+        message: getVerificationMsg(lang, "notFound"),
+      });
     }
     // Check if already verified
     if (profile.verified_at) {
       return res.status(200).json({
         success: true,
-        message: getVerificationMsg(lang, 'alreadyVerified'),
+        message: getVerificationMsg(lang, "alreadyVerified"),
       });
     }
     // Check for existing valid verification token
@@ -1534,328 +1560,333 @@ app.post("/api/send-verification", async (req, res) => {
     ) {
       return res.status(200).json({
         success: true,
-        message: getVerificationMsg(lang, 'alreadySent'),
+        message: getVerificationMsg(lang, "alreadySent"),
       });
     }
     // Generate new verification token
-    const crypto = await import('crypto');
-    const verification_token = crypto.randomBytes(32).toString('hex');
-    const verification_expires_at = new Date(now.getTime() + expiryMs).toISOString();
+    const crypto = await import("crypto");
+    const verification_token = crypto.randomBytes(32).toString("hex");
+    const verification_expires_at = new Date(
+      now.getTime() + expiryMs,
+    ).toISOString();
     // Update profile with new token and expiry
     const { error: updateError } = await supabase
-      .from('profiles')
+      .from("profiles")
       .update({
         verification_token,
         verification_expires_at,
       })
-      .eq('id', uid);
+      .eq("id", uid);
     if (updateError) {
       throw new Error(updateError.message);
     }
     // Generate verification link with token
-    const baseUrl = verifyUrl.replace(/\/$/, '');
+    const baseUrl = verifyUrl.replace(/\/$/, "");
     const verificationLink = `${baseUrl}?token=${verification_token}&uid=${encodeURIComponent(uid)}`;
     // Generate verification email HTML with the link
     const html = generateVerificationEmailHTML(verificationLink, name, lang);
-    const subject = (verificationTemplates[lang?.toUpperCase()] || verificationTemplates.EN).subject;
+    const subject = (
+      verificationTemplates[lang?.toUpperCase()] || verificationTemplates.EN
+    ).subject;
     await sendEmailWithAttachment(
       subject,
       html,
       email,
       process.env.EMAIL_USER,
       process.env.EMAIL_USER,
-      []
+      [],
     );
-    res.json({ success: true, message: getVerificationMsg(lang, 'sent') });
+    res.json({ success: true, message: getVerificationMsg(lang, "sent") });
   } catch (err) {
-    const lang = req.body?.lang || 'EN';
-    res.status(500).json({ success: false, message: getVerificationMsg(lang, 'error') });
+    const lang = req.body?.lang || "EN";
+    res
+      .status(500)
+      .json({ success: false, message: getVerificationMsg(lang, "error") });
   }
 });
-app.post("/api/create-checkout-session", requireAuth, attachProfile, async (req, res) => {
-  console.log("profile", req.profile);
-  const {
-    id,
-    email,
-    company_name,
-    company_country,
-    tax_id,
-    is_b2b,
-    b2b_supplier_id,
-    status,
-    created_at,
-    verification_token,
-    verification_expires_at,
-    verified_at,
-    accepted_at,
-    invoice_settings, // This remains an object { enabled: true, ... }
-    lang_code,
-    company_city,
-    company_house_number,
-    company_street,
-    company_zip_code,
-    updated_at
-  } = req.profile;
-  const cart = req.body.cart;
+app.post(
+  "/api/create-checkout-session",
+  requireAuth,
+  attachProfile,
+  async (req, res) => {
+    console.log("profile", req.profile);
+    const {
+      id,
+      email,
+      company_name,
+      company_country,
+      tax_id,
+      is_b2b,
+      b2b_supplier_id,
+      status,
+      created_at,
+      verification_token,
+      verification_expires_at,
+      verified_at,
+      accepted_at,
+      invoice_settings, // This remains an object { enabled: true, ... }
+      lang_code,
+      company_city,
+      company_house_number,
+      company_street,
+      company_zip_code,
+      updated_at,
+    } = req.profile;
+    const cart = req.body.cart;
 
-  const po_number = req.body?.po_number || null;
+    const po_number = req.body?.po_number || null;
 
-  const is_user_pay_by_invoice_enabled = invoice_settings?.enabled || false;
+    const is_user_pay_by_invoice_enabled = invoice_settings?.enabled || false;
 
+    const currentDate = new Date();
+    const over_due_date = new Date(currentDate);
+    const over_due_day =
+      is_user_pay_by_invoice_enabled && invoice_settings?.over_due_day;
 
+    over_due_date.setDate(currentDate.getDate() + over_due_day);
+    const isUSCompany = company_country === "US";
+    let currency;
+    currency = isUSCompany ? "usd" : "eur";
+    const lineItems = cart?.map((product) => {
+      console.log("productproduct", product);
 
-  const currentDate = new Date();
-  const over_due_date = new Date(currentDate);
-  const over_due_day = is_user_pay_by_invoice_enabled && invoice_settings?.over_due_day
+      let b2bpriceWVat = parseFloat(product?.priceWVat);
+      const priceCopy = b2bpriceWVat.toFixed(2);
+      const isDigital = product?.type === "digital software";
+      let customFields = null;
+      let description = "";
+      const pn = product?.pn;
+      if (product?.selectedLangObj?.id) {
+        customFields = {
+          PN: product.selectedLangObj.pn,
+          language: product.selectedLangObj.lang,
+          isDigital: isDigital,
+          pn: pn,
+          id: product?.id,
+          company_country: company_country,
+          b2b_supplier_id: b2b_supplier_id,
+          po_number: po_number,
+          image_url: product.image_url,
+          // tax_id: tax_id,
+        };
+        description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.PN}`;
+      } else {
+        customFields = {
+          language: `Language: English`,
+          isDigital: isDigital,
+          pn: pn,
+          id: product?.id,
+          company_country: company_country,
+          b2b_supplier_id: b2b_supplier_id,
+          po_number: po_number,
+          image_url: product.image_url,
+          // tax_id: tax_id,
+        };
+        description = `Language: English`;
+      }
 
-
-  over_due_date.setDate(currentDate.getDate() + over_due_day);
-  const isUSCompany = company_country === "US";
-  let currency;
-  currency = isUSCompany ? "usd" : "eur";
-  const lineItems = cart?.map((product) => {
-    console.log("productproduct", product);
-
-    let b2bpriceWVat = parseFloat(
-      product?.priceWVat
-    );
-    const priceCopy = b2bpriceWVat.toFixed(2);
-    const isDigital = product?.type === "digital software";
-    let customFields = null;
-    let description = "";
-    const pn = product?.pn;
-    if (product?.selectedLangObj?.id) {
-      customFields = {
-        PN: product.selectedLangObj.pn,
-        language: product.selectedLangObj.lang,
-        isDigital: isDigital,
-        pn: pn,
-        id: product?.id,
-        company_country: company_country,
-        b2b_supplier_id: b2b_supplier_id,
-        po_number: po_number,
-        image_url: product.image_url,
-        // tax_id: tax_id,
-      };
-      description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.PN}`;
-    } else {
-      customFields = {
-        language: `Language: English`,
-        isDigital: isDigital,
-        pn: pn,
-        id: product?.id,
-        company_country: company_country,
-        b2b_supplier_id: b2b_supplier_id,
-        po_number: po_number,
-        image_url: product.image_url,
-        // tax_id: tax_id,
-      };
-      description = `Language: English`;
-    }
-
-    return {
-      price_data: {
-        currency: currency,
-        product_data: {
-          name: product.name,
-          images: [product.image_url],
-          metadata: customFields,
-          description: description,
+      return {
+        price_data: {
+          currency: currency,
+          product_data: {
+            name: product.name,
+            images: [product.image_url],
+            metadata: customFields,
+            description: description,
+          },
+          // Fix: Use Math.round here as well
+          unit_amount: Math.round(priceCopy * 100),
         },
-        unit_amount: priceCopy * 100,
-      },
-      quantity: product.calculatequantity || 1,
-    };
-  });
+        quantity: product.calculatequantity || 1,
+      };
+    });
 
-  if (is_user_pay_by_invoice_enabled) {
-    try {
-      // 1. Prepare line items using your exact existing logic for metadata and pricing
-      const paymentLinkLineItems = cart.map((product) => {
-        const b2bpriceWVat = parseFloat(
-          product?.priceWVat
-        );
-        const isDigital = product?.type === "digital software";
-        const description = product?.selectedLangObj?.id
-          ? `Language: ${product.selectedLangObj.lang} PN: ${product.selectedLangObj.pn}`
-          : `Language: English`;
-        const unit_amount = parseFloat(b2bpriceWVat * 100);
-        return {
-          price_data: {
-            currency: currency,
-            unit_amount: unit_amount,
-            product_data: {
-              name: product.name,
-              description: description,
-              images: [product.image_url],
-              metadata: {
-                amount_total: product?.quantity * unit_amount,
-                pn: product?.selectedLangObj?.pn || product.pn,
-                id: product?.id,
-                isDigital: String(isDigital),
-                language: product?.selectedLangObj?.lang || "English",
+    if (is_user_pay_by_invoice_enabled) {
+      try {
+        // 1. Prepare line items using your exact existing logic for metadata and pricing
+        const paymentLinkLineItems = cart.map((product) => {
+          const b2bpriceWVat = parseFloat(product?.priceWVat);
+          const isDigital = product?.type === "digital software";
+          const description = product?.selectedLangObj?.id
+            ? `Language: ${product.selectedLangObj.lang} PN: ${product.selectedLangObj.pn}`
+            : `Language: English`;
+          // Fix: Use Math.round to ensure it is an integer
+          const unit_amount = Math.round(b2bpriceWVat * 100);
+          return {
+            price_data: {
+              currency: currency,
+              unit_amount: unit_amount,
+              product_data: {
+                name: product.name,
+                description: description,
+                images: [product.image_url],
+                metadata: {
+                  amount_total: product?.quantity * unit_amount,
+                  pn: product?.selectedLangObj?.pn || product.pn,
+                  id: product?.id,
+                  isDigital: String(isDigital),
+                  language: product?.selectedLangObj?.lang || "English",
+                },
               },
             },
-          },
-          quantity: product.calculatequantity || 1,
-        };
-      });
-
-      // 2. Create the Payment Link
-      // This creates a permanent URL (no 24h limit) that you can store in Firebase
-      const orderNumber = await getNextOrderNumber();
-      const orderDocRef = await db.collection("orders").add({
-        orderNumber,
-        createdAt: new Date(),
-      });
-      const orderId = orderDocRef.id;
-
-      const payByLinkSessionData = {
-        line_items: paymentLinkLineItems,
-        currency: currency,
-        metadata: {
-          poNumber: po_number || "N/A",
-          orderType: "pay_by_invoice",
-          orderNumber: orderNumber,
-          orderId: orderId,
-          id: id,
-          b2b_supplier_id: b2b_supplier_id,
-          tax_id: tax_id,
-          company_country: company_country,
-          email: email,
-        },
-        // You can disable manual tax or promotion codes to keep the UI minimal
-        billing_address_collection: "required",
-        after_completion: {
-          type: "redirect",
-          redirect: {
-            url: `${YOUR_DOMAIN}/success?status`,
-          },
-        },
-        restrictions: {
-          completed_sessions: {
-            limit: 1,
-          },
-        },
-      };
-      const paymentLink =
-        await stripe.paymentLinks.create(payByLinkSessionData);
-      const totalAmountCents = paymentLinkLineItems.reduce((acc, item) => {
-
-        return acc + parseFloat(item.price_data.unit_amount) * item.quantity;
-      }, 0);
-      const totalAmountMainCurrency = totalAmountCents / 100;
-      // 3. Log for your Firebase tracking
-      const paymentLinkUrl = paymentLink.url;
-
-
-      const data = {
-        id: id,
-        internalEntryStatus: "pending",
-        paymentStatus: "payment due",
-        paymentUrl: paymentLinkUrl,
-        email: email,
-        country: company_country,
-        poNumber: po_number,
-        company_name: company_name,
-        // city: fullSession?.customer_details?.address?.city,
-        // address1: fullSession?.customer_details?.address?.line1,
-        // address2: fullSession?.customer_details?.address?.line2,
-        // postal_code: fullSession?.customer_details?.address?.postal_code,
-        // company_name: fullSession?.customer_details?.business_name,
-        total: totalAmountMainCurrency,
-        currency: currency,
-        createdAt: new Date(),
-        overdueDate: over_due_date,
-        products: paymentLinkLineItems.map((item) => ({
-          productId: item?.price_data?.product_data?.metadata?.id,
-          name: item?.price_data?.product_data?.name,
-          quantity: item?.quantity,
-          unitPrice: item?.price_data?.unit_amount / 100,
-          totalPrice:
-            item?.price_data?.product_data?.metadata?.amount_total / 100,
-          isDigital:
-            item?.price_data?.product_data?.metadata?.isDigital === "true", // Retrieve from metadata
-          pn: item?.price_data?.product_data?.metadata?.pn,
-          company_country,
-        })),
-      };
-
-      // Store order as pending
-      await orderDocRef.update(data);
-      let digitalProducts =
-        data.products?.filter((product) => product.isDigital) ?? [];
-      let phisycalProducts =
-        data.products?.filter((product) => !product.isDigital) ?? [];
-      let productsWithKeys;
-      try {
-        productsWithKeys = await assignKeysToProducts(
-          orderId,
-          orderNumber,
-          digitalProducts,
-          b2b_supplier_id,
-          id,
-        );
-      } catch (err) {
-        console.error(
-          "❌ Not enough license keys or error reserving keys:",
-          err.message,
-        );
-
-        // Update order as failed or out-of-stock
-        await updateOrder(orderId, {
-          internal_status: "failed",
-          failure_reason: err.message,
-          invoice_generated_at: null,
+            quantity: product.calculatequantity || 1,
+          };
         });
 
-        // optional: notify admin or send email to customer here
-        return;
+        // 2. Create the Payment Link
+        // This creates a permanent URL (no 24h limit) that you can store in Firebase
+        const orderNumber = await getNextOrderNumber();
+        const orderDocRef = await db.collection("orders").add({
+          orderNumber,
+          createdAt: new Date(),
+        });
+        const orderId = orderDocRef.id;
+
+        const payByLinkSessionData = {
+          line_items: paymentLinkLineItems,
+          currency: currency,
+          metadata: {
+            poNumber: po_number || "N/A",
+            orderType: "pay_by_invoice",
+            orderNumber: orderNumber,
+            orderId: orderId,
+            id: id,
+            b2b_supplier_id: b2b_supplier_id,
+            tax_id: tax_id,
+            company_country: company_country,
+            email: email,
+          },
+          // You can disable manual tax or promotion codes to keep the UI minimal
+          billing_address_collection: "required",
+          after_completion: {
+            type: "redirect",
+            redirect: {
+              url: `${YOUR_DOMAIN}/success?status`,
+            },
+          },
+          restrictions: {
+            completed_sessions: {
+              limit: 1,
+            },
+          },
+        };
+        const paymentLink =
+          await stripe.paymentLinks.create(payByLinkSessionData);
+        const totalAmountCents = paymentLinkLineItems.reduce((acc, item) => {
+          return acc + parseFloat(item.price_data.unit_amount) * item.quantity;
+        }, 0);
+        const totalAmountMainCurrency = totalAmountCents / 100;
+        // 3. Log for your Firebase tracking
+        const paymentLinkUrl = paymentLink.url;
+
+        const data = {
+          id: id,
+          internalEntryStatus: "pending",
+          paymentStatus: "payment due",
+          paymentUrl: paymentLinkUrl,
+          email: email,
+          country: company_country,
+          poNumber: po_number,
+          company_name: company_name,
+          // city: fullSession?.customer_details?.address?.city,
+          // address1: fullSession?.customer_details?.address?.line1,
+          // address2: fullSession?.customer_details?.address?.line2,
+          // postal_code: fullSession?.customer_details?.address?.postal_code,
+          // company_name: fullSession?.customer_details?.business_name,
+          total: totalAmountMainCurrency,
+          currency: currency,
+          createdAt: new Date(),
+          overdueDate: over_due_date,
+          products: paymentLinkLineItems.map((item) => ({
+            productId: item?.price_data?.product_data?.metadata?.id,
+            name: item?.price_data?.product_data?.name,
+            quantity: item?.quantity,
+            unitPrice: item?.price_data?.unit_amount / 100,
+            totalPrice:
+              item?.price_data?.product_data?.metadata?.amount_total / 100,
+            isDigital:
+              item?.price_data?.product_data?.metadata?.isDigital === "true", // Retrieve from metadata
+            pn: item?.price_data?.product_data?.metadata?.pn,
+            company_country,
+          })),
+        };
+
+        // Store order as pending
+        await orderDocRef.update(data);
+        let digitalProducts =
+          data.products?.filter((product) => product.isDigital) ?? [];
+        let phisycalProducts =
+          data.products?.filter((product) => !product.isDigital) ?? [];
+        let productsWithKeys;
+        try {
+          productsWithKeys = await assignKeysToProducts(
+            orderId,
+            orderNumber,
+            digitalProducts,
+            b2b_supplier_id,
+            id,
+          );
+        } catch (err) {
+          console.error(
+            "❌ Not enough license keys or error reserving keys:",
+            err.message,
+          );
+
+          // Update order as failed or out-of-stock
+          await updateOrder(orderId, {
+            internal_status: "failed",
+            failure_reason: err.message,
+            invoice_generated_at: null,
+          });
+
+          // optional: notify admin or send email to customer here
+          return;
+        }
+        processPayByInvoiceOrder(
+          data,
+          orderNumber,
+          company_country,
+          productsWithKeys,
+          phisycalProducts,
+          orderId,
+          tax_id,
+        );
+        // 4. Return the link to be attached to your Firebase orders doc
+        res.status(200).send();
+      } catch (error) {
+        console.error("Payment Link Error:", error);
+        res.status(500).json({ error: error.message });
       }
-      processPayByInvoiceOrder(
-        data,
-        orderNumber,
-        company_country,
-        productsWithKeys,
-        phisycalProducts,
-        orderId,
-        tax_id
-      );
-      // 4. Return the link to be attached to your Firebase orders doc
-      res.status(200).send();
-    } catch (error) {
-      console.error("Payment Link Error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  } else {
-    const expirationTime = Math.floor(Date.now() / 1000) + 30 * 60; // 30 minutes in seconds
-    const sessionData = {
-      line_items: lineItems,
-      mode: "payment",
-      name_collection: {
-        business: {
-          enabled: false, // show Business Name field
+    } else {
+      const expirationTime = Math.floor(Date.now() / 1000) + 30 * 60; // 30 minutes in seconds
+      const sessionData = {
+        line_items: lineItems,
+        mode: "payment",
+        name_collection: {
+          business: {
+            enabled: false, // show Business Name field
+          },
         },
-      },
-      metadata: {
-        tax_id: tax_id,
-        b2b_supplier_id: b2b_supplier_id,
-        id: id,
-        po_number: po_number || "N/A",
-      },
-      expires_at: expirationTime,
-      success_url: `${YOUR_DOMAIN}/success`,
-      cancel_url: `${YOUR_DOMAIN}?canceled=true`,
-    };
+        metadata: {
+          tax_id: tax_id,
+          b2b_supplier_id: b2b_supplier_id,
+          id: id,
+          po_number: po_number || "N/A",
+        },
+        expires_at: expirationTime,
+        success_url: `${YOUR_DOMAIN}/success`,
+        cancel_url: `${YOUR_DOMAIN}?canceled=true`,
+      };
 
-    if (email) {
-      sessionData.customer_email = email;
+      if (email) {
+        sessionData.customer_email = email;
+      }
+
+      const session = await stripe.checkout.sessions.create(sessionData);
+      res.status(200).send(session.url);
     }
-
-    const session = await stripe.checkout.sessions.create(sessionData);
-    res.status(200).send(session.url);
-  }
-});
+  },
+);
 
 app.post("/api/sendemail", async (req, res) => {
   const { email, companyName, messages } = req.body;
@@ -1885,28 +1916,35 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
   const { email, companyName, taxId, companyCountry, password } = req.body;
   try {
     // Create user in Supabase Auth
-    const { data: user, error: userError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    });
+    const { data: user, error: userError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+      });
     if (userError) {
       console.log("error creating a new registered user", userError);
-      return res.status(500).json({ success: false, message: userError.message });
+      return res
+        .status(500)
+        .json({ success: false, message: userError.message });
     }
     // Insert pending registration in Supabase table
-    const { error: regError } = await supabase.from('pending_registrations').insert([
-      {
-        uid: user.user?.id,
-        email,
-        tax_id: taxId,
-        company_name: companyName,
-        company_country: companyCountry,
-        created_at: Date.now(),
-      },
-    ]);
+    const { error: regError } = await supabase
+      .from("pending_registrations")
+      .insert([
+        {
+          uid: user.user?.id,
+          email,
+          tax_id: taxId,
+          company_name: companyName,
+          company_country: companyCountry,
+          created_at: Date.now(),
+        },
+      ]);
     if (regError) {
-      return res.status(500).json({ success: false, message: regError.message });
+      return res
+        .status(500)
+        .json({ success: false, message: regError.message });
     }
     res.status(200).json({ success: true });
   } catch (error) {
@@ -1959,9 +1997,9 @@ const getNextB2BAccountId = async () => {
   // Assumes a 'settings' table with a row where id = 'b2b_account_id_counter'
   let newId;
   const { data: counterRows, error: fetchError } = await supabase
-    .from('settings')
-    .select('*')
-    .eq('id', 'b2b_account_id_counter')
+    .from("settings")
+    .select("*")
+    .eq("id", "b2b_account_id_counter")
     .single();
 
   if (fetchError || !counterRows) {
@@ -1975,9 +2013,9 @@ const getNextB2BAccountId = async () => {
   // Use a Postgres function or upsert to ensure atomicity
   // Here, we use a single update and check for race conditions (Supabase does not support JS-side transactions)
   const { error: updateError } = await supabase
-    .from('settings')
+    .from("settings")
     .update({ last_id: nextIdNumber })
-    .eq('id', 'b2b_account_id_counter');
+    .eq("id", "b2b_account_id_counter");
 
   if (updateError) {
     throw new Error("Failed to update B2B ID counter: " + updateError.message);
@@ -1992,9 +2030,10 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
   try {
     const b2bSupplierId = await getNextB2BAccountId();
     // 1. Enable the user account in Supabase Auth
-    const { error: updateError, data: userRecord } = await supabaseAdmin.auth.admin.updateUserById(uid, {
-      disabled: false,
-    });
+    const { error: updateError, data: userRecord } =
+      await supabaseAdmin.auth.admin.updateUserById(uid, {
+        disabled: false,
+      });
     if (updateError) {
       console.log("Error updating user:", updateError);
       throw new Error(`Auth Update Error: ${updateError.message}`);
@@ -2009,9 +2048,9 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
     );
     // 3. Get Pending Registration Details from Supabase
     const { data: pendingRegistration, error: pendingError } = await supabase
-      .from('pending_registrations')
-      .select('*')
-      .eq('id', docId)
+      .from("pending_registrations")
+      .select("*")
+      .eq("id", docId)
       .single();
     if (pendingError || !pendingRegistration) {
       throw new Error("Pending registration not found");
@@ -2032,22 +2071,22 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
       invoice_settings: { enabled: false, overDueDay: null },
     };
     const { error: profileError } = await supabase
-      .from('profiles')
+      .from("profiles")
       .upsert([newUserData]);
     if (profileError) {
       throw new Error(profileError.message);
     }
     // 5. Delete pending registration
     const { error: deleteError } = await supabase
-      .from('pending_registrations')
+      .from("pending_registrations")
       .delete()
-      .eq('id', docId);
+      .eq("id", docId);
     if (deleteError) {
       throw new Error(deleteError.message);
     }
     // 6. Add to registrations_history
     const { error: regHistError } = await supabase
-      .from('registrations_history')
+      .from("registrations_history")
       .insert([
         {
           uid: uid,
@@ -2083,15 +2122,15 @@ app.post("/api/decline-pendingRegistration", async (req, res) => {
     );
     // Delete pending registration from Supabase
     const { error: deleteError } = await supabase
-      .from('pending_registrations')
+      .from("pending_registrations")
       .delete()
-      .eq('id', docId);
+      .eq("id", docId);
     if (deleteError) {
       throw new Error(deleteError.message);
     }
     // Add to registrations_history in Supabase
     const { error: regHistError } = await supabase
-      .from('registrations_history')
+      .from("registrations_history")
       .insert([
         {
           uid: uid,
