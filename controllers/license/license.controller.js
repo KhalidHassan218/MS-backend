@@ -14,7 +14,7 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
     productId,
     orderId,
     orderNumber,
-    userId: uid,
+    user_id: uid,
     requestId,
   } = req.body;
 
@@ -35,16 +35,23 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
     const availableKeys = await findAll('license_keys', { status: 'available', product_id: productId });
     if (!availableKeys.length) throw new Error('No available license keys');
     const newKeyObj = availableKeys[0];
-    const newKey = newKeyObj.key_value;
+    console.log("newKeyObj", newKeyObj);
+    console.log("requestData", requestData);
+    
+    const newKey = newKeyObj.license_key;
 
     // 5️⃣ Find old key
-    const oldKey = requestData.license_key;
-    const oldKeyObj = (await findAll('license_keys', { key_value: oldKey, product_id: productId }))[0];
+    const oldKey = requestData.old_key;
+    const oldKeyObj = (await findAll('license_keys', { license_key: oldKey, product_id: productId }))[0];
+console.log("products",products);
 
     // 6️⃣ Update products array in order
     const productIndex = products.findIndex((p) => p.productId === productId);
     if (productIndex === -1) throw new Error('Product not found in order');
     const product = products[productIndex];
+    console.log("product proooo",product);
+    console.log("oldKey oldKey",oldKey);
+    
     const oldKeyIndex = product.licenseKeys.findIndex((k) => k.key === oldKey && k.status === 'active');
     if (oldKeyIndex === -1) throw new Error('Old key not found or already replaced');
     product.licenseKeys[oldKeyIndex] = {
@@ -77,9 +84,12 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
     await updateById('license_keys', newKeyObj.id, {
       status: 'used',
       order_id: orderId,
-      key_value: newKey,
+      license_key: newKey,
       used_at: new Date().toISOString(),
       notes: 'Key replacement',
+      user_id: uid,
+      order_number: orderNumber,
+      b2b_supplier_id: b2bSupplierId,
       is_replacement: true,
     });
     if (oldKeyObj) {
