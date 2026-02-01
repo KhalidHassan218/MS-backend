@@ -25,7 +25,7 @@ export async function insertOrder(orderData) {
     invoice_url: orderData.invoiceUrl,
     license_url: orderData.licenseUrl,
     created_at: orderData.createdAt || new Date().toISOString(),
-    po_number: orderData?.poNumber || null,
+    po_number: orderData?.po_number || null,
     company_info
     // Add more mappings as needed
   };
@@ -43,4 +43,18 @@ export async function updateOrder(orderId, updateData) {
     .select();
   if (error) throw error;
   return data[0];
+}
+// Get a single order by its ID
+export async function getOrderById(orderId) {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('id', orderId)
+    .maybeSingle(); // Returns the object directly, or null if not found
+
+  if (error) {
+    console.error("Error fetching order:", error.message);
+    throw error;
+  }
+  return data;
 }

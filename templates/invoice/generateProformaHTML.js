@@ -1,93 +1,97 @@
 import { invoiceTranslationTemplates } from "./translationTemplates.js";
 function escapeHtml(str) {
-    return String(str || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 export function generateProformaHTML(
-    data,
-    orderNumber,
-    productsWithKeys,
-    companyCountryCode = "EN",
-    taxId,
+  data,
+  orderNumber,
+  productsWithKeys,
+  companyCountryCode = "EN",
+  taxId,
+  company_city,
+  company_house_number,
+  company_street,
+  company_zip_code,
+  company_name,
+  over_due_date
 ) {
-    console.log("123", data);
 
-    // Get template based on country code, fallback to EN if not found
-    const template =
-        invoiceTranslationTemplates[companyCountryCode.toUpperCase()] || invoiceTranslationTemplates.EN;
-    const t = template.translations;
+  // Get template based on country code, fallback to EN if not found
+  const template =
+    invoiceTranslationTemplates[companyCountryCode.toUpperCase()] || invoiceTranslationTemplates.EN;
+  const t = template.translations;
 
-    const customer = data.customer_details || {};
-    console.log("customer", customer);
-    const address = customer.address || {};
-    const total = (data.total || 0);
-    const currency = (data.currency || "eur").toUpperCase();
-    const poNumber = data?.poNumber
-    const overdueDate = data?.overdueDate
-    // Determine currency symbol
-    let currencySymbol = currency;
-    if (currency.toLowerCase() === "eur") currencySymbol = "€";
-    else if (currency.toLowerCase() === "usd") currencySymbol = "$";
-    else if (currency.toLowerCase() === "gbp") currencySymbol = "£";
+  const customer = data.customer_details || {};
+  console.log("customer", customer);
+  const total = (data.total || 0);
+  const currency = (data.currency || "eur").toUpperCase();
+  const po_number = data?.po_number
+  const overdueDate = over_due_date
+  // Determine currency symbol
+  let currencySymbol = currency;
+  if (currency.toLowerCase() === "eur") currencySymbol = "€";
+  else if (currency.toLowerCase() === "usd") currencySymbol = "$";
+  else if (currency.toLowerCase() === "gbp") currencySymbol = "£";
 
-    // Calculate tax based on country and currency
-    let subtotal, tax, vatPercentage;
-    if (companyCountryCode.toUpperCase() === "NL") {
-        // Netherlands: 21% VAT included
-        vatPercentage = 21;
-        subtotal = total / 1.21;
-        tax = total - subtotal;
-    } else if (
-        companyCountryCode.toUpperCase() === "EN" &&
-        currency.toLowerCase() === "usd"
-    ) {
-        // USA: No tax (export)
-        vatPercentage = 0;
-        subtotal = total;
-        tax = 0;
-    } else if (companyCountryCode.toUpperCase() === "FR") {
-        // France: Tax autoliquidation (B2B)
-        vatPercentage = 21;
-        subtotal = total;
-        tax = 0;
-    } else {
-        // Default
-        subtotal = total;
-        tax = 0;
-        vatPercentage = 0;
-    }
+  // Calculate tax based on country and currency
+  let subtotal, tax, vatPercentage;
+  if (companyCountryCode.toUpperCase() === "NL") {
+    // Netherlands: 21% VAT included
+    vatPercentage = 21;
+    subtotal = total / 1.21;
+    tax = total - subtotal;
+  } else if (
+    companyCountryCode.toUpperCase() === "EN" &&
+    currency.toLowerCase() === "usd"
+  ) {
+    // USA: No tax (export)
+    vatPercentage = 0;
+    subtotal = total;
+    tax = 0;
+  } else if (companyCountryCode.toUpperCase() === "FR") {
+    // France: Tax autoliquidation (B2B)
+    vatPercentage = 21;
+    subtotal = total;
+    tax = 0;
+  } else {
+    // Default
+    subtotal = total;
+    tax = 0;
+    vatPercentage = 0;
+  }
 
-    // Format dates based on template language
-    const invoiceDate = new Date(data.createdAt).toLocaleDateString(
-        template.language,
-        {
-            day: "2-digit",
-            month: "long",
-            year: "numeric",
-        },
-    );
+  // Format dates based on template language
+  const invoiceDate = new Date(data.created_at).toLocaleDateString(
+    template.language,
+    {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    },
+  );
 
-    // Due date is 30 days after invoice date
-    const dueDate = new Date(data.created * 1000);
-    dueDate.setDate(dueDate.getDate() + 30);
-    const dueDateFormatted = overdueDate.toLocaleDateString(template.language, {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-    });
+  // Due date is 30 days after invoice date
+  const dueDate = new Date(data.created * 1000);
+  dueDate.setDate(dueDate.getDate() + 30);
+  const dueDateFormatted = overdueDate.toLocaleDateString(template.language, {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
 
-    // Map productsWithKeys to table rows
-    const productsRows = (productsWithKeys || [])
-        .map((product) => {
-            const unitPrice = product.unitPrice || 0;
-            const quantity = product.quantity || 0;
-            const totalPrice = product?.totalPrice;
+  // Map productsWithKeys to table rows
+  const productsRows = (productsWithKeys || [])
+    .map((product) => {
+      const unitPrice = product.unitPrice || 0;
+      const quantity = product.quantity || 0;
+      const totalPrice = product?.totalPrice;
 
-            return `
+      return `
       <tr>
         <td>${invoiceDate}</td>
         <td>${escapeHtml(product.name || "")}</td>
@@ -96,25 +100,25 @@ export function generateProformaHTML(
         <td class="text-right">${currencySymbol} ${totalPrice.toFixed(2)}</td>
       </tr>
     `;
-        })
-        .join("");
+    })
+    .join("");
 
-    // Generate VAT label based on country
-    let vatLabel;
-    if (companyCountryCode.toUpperCase() === "NL") {
-        vatLabel = `${vatPercentage}% ${t.vat}`;
-    } else if (
-        companyCountryCode.toUpperCase() === "EN" &&
-        currency.toLowerCase() === "usd"
-    ) {
-        vatLabel = `${t.vat}: 0% – Export outside EU`;
-    } else if (companyCountryCode.toUpperCase() === "FR") {
-        vatLabel = `${t.vat} ${vatPercentage}% incl`;
-    } else {
-        vatLabel = `${t.vat}`;
-    }
+  // Generate VAT label based on country
+  let vatLabel;
+  if (companyCountryCode.toUpperCase() === "NL") {
+    vatLabel = `${vatPercentage}% ${t.vat}`;
+  } else if (
+    companyCountryCode.toUpperCase() === "EN" &&
+    currency.toLowerCase() === "usd"
+  ) {
+    vatLabel = `${t.vat}: 0% – Export outside EU`;
+  } else if (companyCountryCode.toUpperCase() === "FR") {
+    vatLabel = `${t.vat} ${vatPercentage}% incl`;
+  } else {
+    vatLabel = `${t.vat}`;
+  }
 
-    return `
+  return `
   <html>
   <head>
     <meta charset="UTF-8">
@@ -327,22 +331,28 @@ export function generateProformaHTML(
         <div class="top-section">
           <div class="customer-info">
             <div><strong>${escapeHtml(
-        customer.name || customer.business_name || data?.companyName || "COMPANY NAME",
-    )}</strong></div>
-            <div>${escapeHtml(address.country || data?.country || "COUNTRY")}</div>
+    company_name || "COMPANY NAME",
+  )}</strong></div>
+            <div>${escapeHtml(
+    company_street, company_house_number || "STREET NAME & STREET NUMBER",
+  )}</div>
+            <div>${escapeHtml(
+    company_zip_code || "POSTAL CODE",
+  )} ${escapeHtml(company_city || "CITY")}</div>
+            <div>${escapeHtml(companyCountryCode || "COUNTRY")}</div>
             ${taxId
-            ? `<div>${escapeHtml(taxId)}</div>`
-            : "<div>Company Tax ID</div>"
-        }
+      ? `<div>${escapeHtml(taxId)}</div>`
+      : "<div>Company Tax ID</div>"
+    }
           </div>
           
           <div class="invoice-info">
-                 ${poNumber ? `
-              <div class="po-number">PO: ${escapeHtml(poNumber)}</div>
+                 ${po_number ? `
+              <div class="po-number">PO: ${escapeHtml(po_number)}</div>
             ` : ""}
             <div class="invoice-number">${t.invoiceNumber}: #${escapeHtml(
-            orderNumber,
-        )}</div>
+      orderNumber,
+    )}</div>
     
             <div class="invoice-dates">
               <div><strong>${t.invoiceDate}:</strong> ${invoiceDate}</div>
@@ -372,8 +382,8 @@ export function generateProformaHTML(
             <tr class="subtotal-row">
               <td>${t.subtotal}:</td>
               <td class="text-right">${currencySymbol} ${subtotal.toFixed(
-            2,
-        )}</td>
+      2,
+    )}</td>
             </tr>
             <tr class="tax-row">
               <td>${vatLabel}:</td>
@@ -391,9 +401,9 @@ export function generateProformaHTML(
         </div>
         
         ${currency.toLowerCase() === "usd"
-            ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
-            : ""
-        }
+      ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
+      : ""
+    }
         ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ""}
 
         <div style="display: flex; justify-content: space-between;">

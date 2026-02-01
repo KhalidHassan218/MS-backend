@@ -32,7 +32,6 @@ import { supabase, supabaseAdmin } from "./config/supabase.js";
 // import savePDFRecord from "./services/pdf/savePdfRecord.service.js";
 puppeteer.use(StealthPlugin());
 const isLocalMac = process.platform === "darwin" && process.arch === "arm64";
-// Firebase initialization removed. Use Supabase for all DB/storage operations.
 // YOUR_DOMAIN = "https://microsoftsupplier.com";
 // YOUR_DOMAIN = "http://localhost:3000";
 const YOUR_DOMAIN = "https://ms-test-ser.vercel.app";
@@ -42,7 +41,7 @@ app.use(cors());
 app.use(express.static("public"));
 
 import { getNextOrderNumber } from "./Utils/supabaseOrderUtils.js";
-import { insertOrder, updateOrder } from "./Utils/supabaseOrderService.js";
+import { getOrderById, insertOrder, updateOrder } from "./Utils/supabaseOrderService.js";
 import requireAuth from "./middleware/auth.js";
 import attachProfile from "./middleware/attachProfile.js";
 import { getUserProfile } from "./Utils/getUserProfile.js";
@@ -82,24 +81,31 @@ async function processPayByInvoiceOrder(
   phisycalProducts,
   orderId,
   taxId,
+  company_city,
+  company_house_number,
+  company_street,
+  company_zip_code,
+  company_name,
+  over_due_date
 ) {
   try {
     // const taxId = session?.metadata?.taxId;
+    console.log("orderId", orderId);
 
     // Assign keys to products (this will update licenseKeys docs in firestore)
 
     const allProducts = [...productsWithKeys, ...phisycalProducts];
-    // Update stored order to include the assigned keys per product (so DB has complete record)
     await updateOrder(orderId, {
       // Add products to a related table if needed
+      ...data,
       internal_status: "keys_assigned",
     });
     const adaptedSession = {
-      created: Math.floor(data.createdAt.getTime() / 1000), // match Stripe session timestamp
+      created: new Date(), // match Stripe session timestamp
       currency: data.currency,
       metadata: {
         email: data.email,
-        poNumber: data.poNumber,
+        po_number: data.po_number,
       },
       customer_details: {
         name: data.customer?.name || "",
@@ -131,6 +137,12 @@ async function processPayByInvoiceOrder(
       allProducts,
       companyCountry,
       taxId,
+      company_city,
+      company_house_number,
+      company_street,
+      company_zip_code,
+      company_name,
+      over_due_date
     );
 
     const licensePdfUrl = await uploadPDFToSupabaseStorage(
@@ -186,7 +198,7 @@ const invoiceTemplates = {
     language: "nl-NL",
     translations: {
       invoiceNumber: "Factuurnummer",
-      poNumber: "Bestelnummer",
+      po_number: "Bestelnummer",
       invoiceDate: "Factuurdatum",
       expiryDate: "Vervaldatum",
       date: "DATUM",
@@ -216,7 +228,7 @@ const invoiceTemplates = {
     language: "en-US",
     translations: {
       invoiceNumber: "Invoice Number",
-      poNumber: "PO number",
+      po_number: "PO number",
       invoiceDate: "Invoice Date",
       expiryDate: "Expiry Date",
       date: "DATE",
@@ -247,7 +259,7 @@ const invoiceTemplates = {
     language: "fr-FR",
     translations: {
       invoiceNumber: "Numéro de facture",
-      poNumber: "Numéro de commande",
+      po_number: "Numéro de commande",
       invoiceDate: "Date de facture",
       expiryDate: "Date d'échéance",
       date: "DATE",
@@ -278,7 +290,7 @@ const invoiceTemplates = {
     language: "de-DE",
     translations: {
       invoiceNumber: "Rechnungsnummer",
-      poNumber: "Bestellnummer",
+      po_number: "Bestellnummer",
       invoiceDate: "Rechnungsdatum",
       expiryDate: "Fälligkeitsdatum",
       date: "DATUM",
@@ -313,7 +325,19 @@ function generateInvoiceHTML(
   productsWithKeys,
   companyCountryCode = "EN",
   taxId,
+  company_city,
+  company_house_number,
+  company_street,
+  company_zip_code,
+  company_name
 ) {
+  console.log("company_city", company_city);
+  console.log("company_name", company_name);
+  console.log("company_street", company_street);
+  console.log("company_zip_code", company_zip_code);
+
+
+
   // Get template based on country code, fallback to EN if not found
   const template =
     invoiceTemplates[companyCountryCode.toUpperCase()] || invoiceTemplates.EN;
@@ -323,7 +347,7 @@ function generateInvoiceHTML(
   const address = customer.address || {};
   const total = (session.amount_total || 0) / 100;
   const currency = (session.currency || "eur").toUpperCase();
-  const poNumber = session?.metadata?.poNumber;
+  const po_number = session?.metadata?.po_number;
   // Determine currency symbol
   let currencySymbol = currency;
   if (currency.toLowerCase() === "eur") currencySymbol = "€";
@@ -691,15 +715,15 @@ function generateInvoiceHTML(
         <div class="top-section">
           <div class="customer-info">
             <div><strong>${escapeHtml(
-    customer.name || customer.business_name || "COMPANY NAME",
+    company_name || "COMPANY NAME",
   )}</strong></div>
             <div>${escapeHtml(
-    address.line1 || "STREET NAME & STREET NUMBER",
+    company_street, company_house_number || "STREET NAME & STREET NUMBER",
   )}</div>
             <div>${escapeHtml(
-    address.postal_code || "POSTAL CODE",
-  )} ${escapeHtml(address.city || "CITY")}</div>
-            <div>${escapeHtml(address.country || "COUNTRY")}</div>
+    company_zip_code || "POSTAL CODE",
+  )} ${escapeHtml(company_city || "CITY")}</div>
+            <div>${escapeHtml(companyCountryCode || "COUNTRY")}</div>
             ${taxId
       ? `<div>${escapeHtml(taxId)}</div>`
       : "<div>Company Tax ID</div>"
@@ -707,9 +731,9 @@ function generateInvoiceHTML(
           </div>
           
           <div class="invoice-info">
-                           ${poNumber
+                           ${po_number
       ? `
-              <div class="po-number">PO: ${escapeHtml(poNumber)}</div>
+              <div class="po-number">PO: ${escapeHtml(po_number)}</div>
             `
       : ""
     }
@@ -1099,38 +1123,29 @@ async function processPaidOrder(session) {
       userProfile = await getUserProfile(user_id);
     }
 
-    console.log("userProfile", userProfile);
     const {
       id,
       email,
       company_name,
       company_country,
       tax_id,
-      is_b2b,
       b2b_supplier_id,
-      status,
-      created_at,
-      verification_token,
-      verification_expires_at,
-      verified_at,
-      accepted_at,
       invoice_settings, // This remains an object { enabled: true, ... }
       lang_code,
       company_city,
       company_house_number,
       company_street,
       company_zip_code,
-      updated_at,
     } = userProfile;
 
     if (fullSession?.metadata && fullSession?.metadata?.orderId) {
       const orderId = fullSession?.metadata?.orderId;
       const orderNumber = fullSession?.metadata?.orderNumber;
 
-      const orderRef = db.collection("orders").doc(orderId);
-      const orderSnap = await orderRef.get();
-      const orderData = orderSnap.data();
-      const allProducts = orderData.products ?? [];
+      const orderRef = await getOrderById(orderId);
+      console.log("orderRef0999", orderRef);
+
+      const allProducts = orderRef.products ?? [];
 
       const invoicePdfBuffer = await generateInvoicePDFBuffer(
         fullSession,
@@ -1139,6 +1154,11 @@ async function processPaidOrder(session) {
         allProducts,
         company_country,
         tax_id,
+        company_city,
+        company_house_number,
+        company_street,
+        company_zip_code,
+        company_name,
       );
 
       const invoicePdfUrl = await uploadPDFToSupabaseStorage(
@@ -1156,11 +1176,10 @@ async function processPaidOrder(session) {
       ];
 
       // Update order as completed with both URLs
-
-      await orderRef.update({
-        invoiceGeneratedAt: new Date(),
-        paymentStatus: "paid",
-        invoiceUrl: invoicePdfUrl,
+      await updateOrder(orderRef?.id, {
+        invoice_generated_at: new Date(),
+        payment_status: "paid",
+        invoice_url: invoicePdfUrl,
       });
       await sendOrderConfirmationEmail(
         "",
@@ -1177,8 +1196,8 @@ async function processPaidOrder(session) {
         user_id: id,
         orderNumber: orderNumber,
         po_number: po_number,
-        poNumber: fullSession?.metadata?.po_number,
-        internalEntryStatus: "pending",
+        po_number: fullSession?.metadata?.po_number,
+        internal_status: "pending",
         email: email,
         country: company_country,
         city: company_city,
@@ -1257,6 +1276,11 @@ async function processPaidOrder(session) {
         allProducts,
         company_country,
         tax_id,
+        company_city,
+        company_house_number,
+        company_street,
+        company_zip_code,
+        company_name,
       );
 
       const licensePdfUrl = await uploadPDFToSupabaseStorage(
@@ -1312,6 +1336,11 @@ async function generateInvoicePDFBuffer(
   productsWithKeys,
   companyCountryCode,
   taxId,
+  company_city,
+  company_house_number,
+  company_street,
+  company_zip_code,
+  company_name
 ) {
   let browser;
   try {
@@ -1322,6 +1351,11 @@ async function generateInvoicePDFBuffer(
       productsWithKeys,
       companyCountryCode,
       taxId,
+      company_city,
+      company_house_number,
+      company_street,
+      company_zip_code,
+      company_name
     );
 
     // browser = await puppeteer.launch({
@@ -1613,10 +1647,8 @@ app.post(
       company_name,
       company_country,
       tax_id,
-      is_b2b,
       b2b_supplier_id,
       status,
-      created_at,
       verification_token,
       verification_expires_at,
       verified_at,
@@ -1627,7 +1659,6 @@ app.post(
       company_house_number,
       company_street,
       company_zip_code,
-      updated_at,
     } = req.profile;
     const cart = req.body.cart;
 
@@ -1666,7 +1697,7 @@ app.post(
           image_url: product.image_url,
           // tax_id: tax_id,
         };
-        description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.PN}`;
+        description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.pn}`;
       } else {
         customFields = {
           language: `Language: English`,
@@ -1708,6 +1739,8 @@ app.post(
             ? `Language: ${product.selectedLangObj.lang} PN: ${product.selectedLangObj.pn}`
             : `Language: English`;
           // Fix: Use Math.round to ensure it is an integer
+          console.log("productproduct", product);
+
           const unit_amount = Math.round(b2bpriceWVat * 100);
           return {
             price_data: {
@@ -1716,13 +1749,13 @@ app.post(
               product_data: {
                 name: product.name,
                 description: description,
-                images: [product.image_url],
                 metadata: {
                   amount_total: product?.quantity * unit_amount,
                   pn: product?.selectedLangObj?.pn || product.pn,
                   id: product?.id,
                   isDigital: String(isDigital),
                   language: product?.selectedLangObj?.lang || "English",
+                  image_url: product.image_url,
                 },
               },
             },
@@ -1731,19 +1764,32 @@ app.post(
         });
 
         // 2. Create the Payment Link
-        // This creates a permanent URL (no 24h limit) that you can store in Firebase
         const orderNumber = await getNextOrderNumber();
-        const orderDocRef = await db.collection("orders").add({
-          orderNumber,
-          createdAt: new Date(),
-        });
-        const orderId = orderDocRef.id;
+
+        const { data: order, error } = await supabase
+          .from('orders')
+          .upsert(
+            {
+              order_number: orderNumber,
+              created_at: new Date(),
+            },
+            { onConflict: 'order_number' } // If order_number exists, update instead of error
+          )
+          .select(); // This allows you to get the created record (including the ID) back
+
+        if (error) throw error;
+
+        // This is your "orderDocRef" equivalent
+        console.log("order", order);
+
+        const newOrder = order[0];
+        const orderId = newOrder.id;
 
         const payByLinkSessionData = {
           line_items: paymentLinkLineItems,
           currency: currency,
           metadata: {
-            poNumber: po_number || "N/A",
+            po_number: po_number || "N/A",
             orderType: "pay_by_invoice",
             orderNumber: orderNumber,
             orderId: orderId,
@@ -1777,23 +1823,29 @@ app.post(
         const paymentLinkUrl = paymentLink.url;
 
         const data = {
-          id: id,
-          internalEntryStatus: "pending",
-          paymentStatus: "payment due",
-          paymentUrl: paymentLinkUrl,
+          user_id: id,
+          internal_status: "pending",
+          payment_status: "payment due",
+          payment_url: paymentLinkUrl,
           email: email,
-          country: company_country,
-          poNumber: po_number,
-          company_name: company_name,
+          po_number: po_number,
+          company_info: {
+            country: company_country,
+            company_name: company_name,
+            city: company_city,
+            address1: company_country,
+            address2: `${company_street} ${company_house_number}`,
+            postal_code: company_zip_code,
+            business_name: company_name,
+          },
           // city: fullSession?.customer_details?.address?.city,
           // address1: fullSession?.customer_details?.address?.line1,
           // address2: fullSession?.customer_details?.address?.line2,
           // postal_code: fullSession?.customer_details?.address?.postal_code,
           // company_name: fullSession?.customer_details?.business_name,
-          total: totalAmountMainCurrency,
+          total_amount: totalAmountMainCurrency,
           currency: currency,
-          createdAt: new Date(),
-          overdueDate: over_due_date,
+          created_at: new Date(),
           products: paymentLinkLineItems.map((item) => ({
             productId: item?.price_data?.product_data?.metadata?.id,
             name: item?.price_data?.product_data?.name,
@@ -1805,11 +1857,12 @@ app.post(
               item?.price_data?.product_data?.metadata?.isDigital === "true", // Retrieve from metadata
             pn: item?.price_data?.product_data?.metadata?.pn,
             company_country,
+            image_url: item?.price_data?.product_data?.metadata?.image_url,
           })),
         };
 
         // Store order as pending
-        await orderDocRef.update(data);
+        // await updateOrder(orderId, data);
         let digitalProducts =
           data.products?.filter((product) => product.isDigital) ?? [];
         let phisycalProducts =
@@ -1839,6 +1892,8 @@ app.post(
           // optional: notify admin or send email to customer here
           return;
         }
+        const allProducts = [...productsWithKeys, ...phisycalProducts];
+        data.products = allProducts;
         processPayByInvoiceOrder(
           data,
           orderNumber,
@@ -1847,6 +1902,12 @@ app.post(
           phisycalProducts,
           orderId,
           tax_id,
+          company_city,
+          company_house_number,
+          company_street,
+          company_zip_code,
+          company_name,
+          over_due_date
         );
         // 4. Return the link to be attached to your Firebase orders doc
         res.status(200).send();
@@ -1966,20 +2027,7 @@ app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
   }
 });
 app.use("/api/licenses", licenseRoutes);
-async function getPendingDetails(docId) {
-  const docRef = db.collection("pending_registrations").doc(docId);
 
-  // Await the promise to get the DocumentSnapshot
-  const pendingRegistrationSnapshot = await docRef.get();
-
-  if (pendingRegistrationSnapshot.exists) {
-    // Access the data using .data()
-    const pendingRegistrationDetails = pendingRegistrationSnapshot.data();
-    return pendingRegistrationDetails;
-  } else {
-    return null;
-  }
-}
 
 // Function to safely generate the next sequential B2B Account ID
 const getNextB2BAccountId = async () => {

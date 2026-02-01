@@ -25,7 +25,7 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
 
     // 2️⃣ Get user data
     const userData = await getById('profiles', uid);
-    const { b2b_supplier_id: b2bSupplierId, company_country: companyCountry, email } = userData;
+    const { b2b_supplier_id: b2b_supplier_id, company_country: companyCountry, email } = userData;
 
     // 3️⃣ Get order and products
     const orderData = await getById('orders', orderId);

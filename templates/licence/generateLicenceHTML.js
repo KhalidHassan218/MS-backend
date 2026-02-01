@@ -18,7 +18,7 @@ function generateLicenceHTML(
   const template = licenceTranslationTemplate[companyCountryCode.toUpperCase()] || licenceTranslationTemplate.EN;
   const t = template.translations;
   const address = customer.address || {};
-  const invoiceDate = new Date(order.date).toLocaleDateString(
+  const invoiceDate = new Date().toLocaleDateString(
     template.language,
     {
       day: "2-digit",
