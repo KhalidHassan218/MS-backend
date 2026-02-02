@@ -45,6 +45,7 @@ import { getOrderById, insertOrder, updateOrder } from "./Utils/supabaseOrderSer
 import requireAuth from "./middleware/auth.js";
 import attachProfile from "./middleware/attachProfile.js";
 import { getUserProfile } from "./Utils/getUserProfile.js";
+import { getLangCode } from "./Utils/locale.js";
 const extractLicenseDataFromSession = (
   session,
   orderId,
@@ -1972,7 +1973,7 @@ app.post("/api/sendemail", async (req, res) => {
   }
 });
 app.post("/api/registerNewPendingUser", async (req, res) => {
-  const { email, company_name, tax_id, company_country, password } = req.body;
+  const { email, company_name, tax_id, company_country, company_street, company_house_number, company_zip_code, company_city, password } = req.body;
   try {
     // Create user in Supabase Auth
     const { data: user, error: userError } = await supabaseAdmin.auth.admin.createUser({
@@ -1992,6 +1993,10 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
         tax_id: tax_id,
         company_name: company_name,
         company_country: company_country,
+        company_street: company_street,
+        company_house_number: company_house_number,
+        company_zip_code: company_zip_code,
+        company_city: company_city,
         created_at: Date.now(),
       },
     ]);
@@ -2094,6 +2099,7 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
     if (pendingError || !pendingRegistration) {
       throw new Error("Pending registration not found");
     }
+    const preferredLang = getLangCode(pendingRegistration?.company_country);
     // 4. Create user profile in Supabase
     const newUserData = {
       id: uid,
@@ -2103,10 +2109,14 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
       company_name: pendingRegistration.company_name,
       company_country: pendingRegistration.company_country,
       tax_id: pendingRegistration.tax_id,
+      company_street: pendingRegistration?.company_street,
+      company_house_number: pendingRegistration?.company_house_number,
+      company_zip_code: pendingRegistration?.company_zip_code,
+      company_city: pendingRegistration?.company_city,
       status: "active",
       created_at: new Date().toISOString(),
       accepted_at: new Date().toISOString(),
-      lang_code: "en",
+      lang_code: preferredLang ?? "en",
       invoice_settings: { enabled: false, overDueDay: null },
     };
     const { error: profileError } = await supabase
