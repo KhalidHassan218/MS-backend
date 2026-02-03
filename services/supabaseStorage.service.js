@@ -4,9 +4,11 @@ export async function uploadPDFToSupabaseStorage(orderNumber, pdfBuffer, type = 
   const filePath = `${type}/${type}-${orderNumber}.pdf`;
 
   // 👇 CHANGE THIS LINE: Use supabaseAdmin here!
-  const { data, error } = await supabaseAdmin.storage 
-    .from('pdfs') 
-    .upload(filePath, pdfBuffer, {
+  const fileData = new Uint8Array(pdfBuffer);
+
+  const { data, error } = await supabaseAdmin.storage
+    .from('pdfs')
+    .upload(filePath, fileData, {
       contentType: 'application/pdf',
       upsert: true,
     });
