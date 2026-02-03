@@ -153,7 +153,6 @@ console.log("products",products);
         },
       ]
     );
-
     res.status(200).json({
       success: true,
       message: 'Email with PDF sent successfully',
