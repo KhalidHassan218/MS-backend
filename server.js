@@ -34,7 +34,8 @@ puppeteer.use(StealthPlugin());
 const isLocalMac = process.platform === "darwin" && process.arch === "arm64";
 // YOUR_DOMAIN = "https://microsoftsupplier.com";
 // YOUR_DOMAIN = "http://localhost:3000";
-const YOUR_DOMAIN = "https://ms-test-ser.vercel.app";
+// const YOUR_DOMAIN = "https://ms-test-ser.vercel.app";
+const YOUR_DOMAIN = "https://microsoftsupplier-n-git-deac10-sergioeerselhotmailcoms-projects.vercel.app";
 const app = express();
 
 app.use(cors());
@@ -156,7 +157,13 @@ async function processPayByInvoiceOrder(
       proformaPdfBuffer,
       "Proforma",
     );
-
+  // Update order as completed with both URLs
+    await updateOrder(orderId, {
+      proforma_generated_at: new Date().toISOString(),
+      internal_status: "completed",
+      proforma_url: proformaPdfUrl,
+      license_url: licensePdfUrl,
+    });
     // Save Firestore PDF record
     // await savePDFRecord(`${orderNumber}-license`, licensePdfUrl);
     // await savePDFRecord(`${orderNumber}-invoice`, invoicePdfUrl);
@@ -181,13 +188,7 @@ async function processPayByInvoiceOrder(
       companyCountry, // 'NL', 'EN', 'FR', or 'DE'
     );
 
-    // Update order as completed with both URLs
-    await updateOrder(orderId, {
-      proforma_generated_at: new Date().toISOString(),
-      internal_status: "completed",
-      proforma_url: proformaPdfUrl,
-      license_url: licensePdfUrl,
-    });
+  
     console.log("✅ Order completed:", orderId);
   } catch (err) {
     console.error("❌ Error processing order:", err);
@@ -1296,6 +1297,14 @@ async function processPaidOrder(session) {
         invoicePdfBuffer,
         "Invoice",
       );
+      // Update order as completed with both URLs
+      await updateOrder(orderId, {
+        invoice_generated_at: new Date().toISOString(),
+        internal_status: "completed",
+        payment_status: "paid",
+        invoice_url: invoicePdfUrl,
+        license_url: licensePdfUrl,
+      });
       let emailAttachemnts = [
         {
           filename: `Invoice-${orderNumber}.pdf`,
@@ -1317,14 +1326,7 @@ async function processPaidOrder(session) {
         company_country, // 'NL', 'EN', 'FR', or 'DE'
       );
 
-      // Update order as completed with both URLs
-      await updateOrder(orderId, {
-        invoice_generated_at: new Date().toISOString(),
-        internal_status: "completed",
-        payment_status: "paid",
-        invoice_url: invoicePdfUrl,
-        license_url: licensePdfUrl,
-      });
+
     }
   } catch (err) {
     console.error("❌ Error processing order:", err);
