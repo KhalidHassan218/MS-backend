@@ -28,7 +28,7 @@ export function generateProformaHTML(
 
   const customer = data.customer_details || {};
   console.log("customer", customer);
-  const total = (data.total || 0);
+  const total = (data.total_amount || 0);
   const currency = (data.currency || "eur").toUpperCase();
   const po_number = data?.po_number
   const overdueDate = over_due_date
@@ -55,7 +55,7 @@ export function generateProformaHTML(
     tax = 0;
   } else if (companyCountryCode.toUpperCase() === "FR") {
     // France: Tax autoliquidation (B2B)
-    vatPercentage = 21;
+    vatPercentage = 0;
     subtotal = total;
     tax = 0;
   } else {
