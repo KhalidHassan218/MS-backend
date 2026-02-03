@@ -934,9 +934,9 @@ app.post(
         // 'whsec_ed16e1c24a67aaf05721441157b18ea73c196a633594f43803fca553ba780c9d'
         // "whsec_n9vgs7GOQKS1uOzF9Ufoxct5NMX11inK" //omar test webook
         // "whsec_3v6ak8Zl2sGGPyoBt2XUxdJEzGsIHLP9", //sertic test webook
-        "whsec_DtkDvPPV5nj1Z2Y5cqbzfrpx2zb8T8Mi", //new sertic render webook supabase test
+        // "whsec_DtkDvPPV5nj1Z2Y5cqbzfrpx2zb8T8Mi", //new sertic render webook supabase test
         // "whsec_e99e795b6a707aac9b23defdb629f0cd49454277fc3eaa844fef9536f218842d", // local host webhook test
-        // "whsec_wxA2tKxrWJ7jAYywCLDnMN4M3O6P0OdI", // local host webhook test
+        "whsec_wxA2tKxrWJ7jAYywCLDnMN4M3O6P0OdI", // live webook supabase 
       );
 
       console.log("🔔 Webhook received:", event.type);
