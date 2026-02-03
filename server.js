@@ -157,7 +157,7 @@ async function processPayByInvoiceOrder(
       proformaPdfBuffer,
       "Proforma",
     );
-  // Update order as completed with both URLs
+    // Update order as completed with both URLs
     await updateOrder(orderId, {
       proforma_generated_at: new Date().toISOString(),
       internal_status: "completed",
@@ -188,7 +188,7 @@ async function processPayByInvoiceOrder(
       companyCountry, // 'NL', 'EN', 'FR', or 'DE'
     );
 
-  
+
     console.log("✅ Order completed:", orderId);
   } catch (err) {
     console.error("❌ Error processing order:", err);
@@ -2086,13 +2086,7 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
       throw new Error(`Auth Update Error: ${updateError.message}`);
     }
     // 2. Send Acceptance Email
-    await sendEmailToClient(
-      `pending Registration response`,
-      generateClientStatusEmailHTML(email, "accepted"),
-      email,
-      process.env.EMAIL_USER,
-      process.env.EMAIL_USER,
-    );
+
     // 3. Get Pending Registration Details from Supabase
     const { data: pendingRegistration, error: pendingError } = await supabase
       .from("pending_registrations")
@@ -2149,6 +2143,18 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
       ]);
     if (regHistError) {
       throw new Error(regHistError.message);
+    }
+    try {
+      await sendEmailToClient(
+        `pending Registration response`,
+        generateClientStatusEmailHTML(email, "accepted"),
+        email,
+        process.env.EMAIL_USER,
+        process.env.EMAIL_USER,
+      );
+    } catch (emailError) {
+      // We log this so you know it failed, but we DON'T throw the error
+      console.error("Email failed to send, but registration was successful:", emailError);
     }
     // Success Response
     res.status(200).json({
