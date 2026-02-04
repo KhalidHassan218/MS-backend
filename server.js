@@ -2,7 +2,6 @@ import "dotenv/config";
 import licenseRoutes from "./routes/license/license.routes.js";
 import express from "express";
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY; //sergio test
-// "sk_test_51LbU1MHfTVIOkODVDGnp8QhsHfVIMExL6SS0UajaTfhs8ytFXrFw7X2raMn26h2QJWFTjHU4fClQUelQ4PAxmXg700PZ4tyKYv" omar test
 import Stripe from "stripe";
 import cors from "cors";
 import bodyParser from "body-parser";
