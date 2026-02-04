@@ -936,6 +936,7 @@ app.post(
         // "whsec_DtkDvPPV5nj1Z2Y5cqbzfrpx2zb8T8Mi", //new sertic render webook supabase test
         // "whsec_e99e795b6a707aac9b23defdb629f0cd49454277fc3eaa844fef9536f218842d", // local host webhook test
         "whsec_wxA2tKxrWJ7jAYywCLDnMN4M3O6P0OdI", // live webook supabase 
+        process.env.WEBHOOK_SECRET,
       );
 
       console.log("🔔 Webhook received:", event.type);
