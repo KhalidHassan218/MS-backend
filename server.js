@@ -935,7 +935,7 @@ app.post(
         // "whsec_3v6ak8Zl2sGGPyoBt2XUxdJEzGsIHLP9", //sertic test webook
         // "whsec_DtkDvPPV5nj1Z2Y5cqbzfrpx2zb8T8Mi", //new sertic render webook supabase test
         // "whsec_e99e795b6a707aac9b23defdb629f0cd49454277fc3eaa844fef9536f218842d", // local host webhook test
-        "whsec_wxA2tKxrWJ7jAYywCLDnMN4M3O6P0OdI", // live webook supabase 
+        // "whsec_wxA2tKxrWJ7jAYywCLDnMN4M3O6P0OdI", // live webook supabase 
         process.env.WEBHOOK_SECRET,
       );
 
@@ -1497,6 +1497,8 @@ app.get("/api/verify", async (req, res) => {
         .status(400)
         .json({ success: false, message: getVerificationMsg(lang, "missing") });
     }
+    console.log("webhh", process.env.WEBHOOK_SECRET);
+    
     // Fetch profile from Supabase profiles table
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -1857,7 +1859,7 @@ app.post(
             quantity: item?.quantity,
             unitPrice: item?.price_data?.unit_amount / 100,
             totalPrice:
-              item?.price_data?.product_data?.metadata?.amount_total / 100,
+              item?.price_data?.product_data?.metadata?.amount_total,
             isDigital:
               item?.price_data?.product_data?.metadata?.isDigital === "true", // Retrieve from metadata
             pn: item?.price_data?.product_data?.metadata?.pn,
