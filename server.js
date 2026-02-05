@@ -1557,6 +1557,7 @@ app.get("/api/verify", async (req, res) => {
 app.post("/api/send-verification", async (req, res) => {
   try {
     const { email, name, lang = "EN", verifyUrl, uid } = req.body;
+    console.log("webhh12", process.env.WEBHOOK_SECRET);
     if (!email || !verifyUrl || !uid) {
       return res.status(400).json({
         success: false,
