@@ -27,8 +27,7 @@ export function generateProformaHTML(
   const t = template.translations;
 
   const customer = data.customer_details || {};
-  console.log("data.total_amount", data.total_amount);
-  const total = (data.total_amount / 100 || 0);
+  const total = (data.total_amount || 0);
   const currency = (data.currency || "eur").toUpperCase();
   const po_number = data?.po_number
   const overdueDate = over_due_date
@@ -87,17 +86,18 @@ export function generateProformaHTML(
   // Map productsWithKeys to table rows
   const productsRows = (productsWithKeys || [])
     .map((product) => {
+      console.log("product", product);
+
       const unitPrice = product.unitPrice || 0;
       const quantity = product.quantity || 0;
-      const totalPrice = product?.totalPrice;
-
+      const calculatedRowTotal = unitPrice * quantity;
       return `
       <tr>
         <td>${invoiceDate}</td>
         <td>${escapeHtml(product.name || "")}</td>
         <td class="text-right">${currencySymbol} ${unitPrice.toFixed(2)}</td>
         <td class="text-center">${quantity}</td>
-        <td class="text-right">${currencySymbol} ${totalPrice.toFixed(2)}</td>
+        <td class="text-right">${currencySymbol} ${calculatedRowTotal.toFixed(2)}</td>
       </tr>
     `;
     })
