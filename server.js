@@ -33,8 +33,8 @@ puppeteer.use(StealthPlugin());
 const isLocalMac = process.platform === "darwin" && process.arch === "arm64";
 // YOUR_DOMAIN = "https://microsoftsupplier.com";
 // YOUR_DOMAIN = "http://localhost:3000";
-// const YOUR_DOMAIN = "https://ms-test-ser.vercel.app";
-const YOUR_DOMAIN = "https://microsoftsupplier-n-git-deac10-sergioeerselhotmailcoms-projects.vercel.app";
+const YOUR_DOMAIN = process.env.FRONT_DOAMIN;
+// const YOUR_DOMAIN = "https://microsoftsupplier-n-git-deac10-sergioeerselhotmailcoms-projects.vercel.app";
 const app = express();
 
 app.use(cors());
