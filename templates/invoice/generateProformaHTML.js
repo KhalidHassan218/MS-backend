@@ -27,8 +27,8 @@ export function generateProformaHTML(
   const t = template.translations;
 
   const customer = data.customer_details || {};
-  console.log("customer", customer);
-  const total = (data.total_amount || 0);
+  console.log("data.total_amount", data.total_amount);
+  const total = (data.total_amount / 100 || 0);
   const currency = (data.currency || "eur").toUpperCase();
   const po_number = data?.po_number
   const overdueDate = over_due_date
