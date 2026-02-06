@@ -406,7 +406,7 @@ function generateInvoiceHTML(
     .map((product) => {
       const unitPrice = product.unitPrice || 0;
       const quantity = product.quantity || 0;
-      const totalPrice = product?.totalPrice;
+      const calculatedRowTotal = unitPrice * quantity;
 
       return `
       <tr>
@@ -414,7 +414,7 @@ function generateInvoiceHTML(
         <td>${escapeHtml(product.name || "")}</td>
         <td class="text-right">${currencySymbol} ${unitPrice.toFixed(2)}</td>
         <td class="text-center">${quantity}</td>
-        <td class="text-right">${currencySymbol} ${totalPrice.toFixed(2)}</td>
+        <td class="text-right">${currencySymbol} ${calculatedRowTotal.toFixed(2)}</td>
       </tr>
     `;
     })
