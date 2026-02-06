@@ -15,6 +15,12 @@ export async function generateProformaPDFBuffer(
     productsWithKeys,
     companyCountryCode,
     taxId,
+    company_city,
+    company_house_number,
+    company_street,
+    company_zip_code,
+    company_name,
+    over_due_date
 ) {
     let browser;
     try {
@@ -24,6 +30,12 @@ export async function generateProformaPDFBuffer(
             productsWithKeys,
             companyCountryCode,
             taxId,
+            company_city,
+            company_house_number,
+            company_street,
+            company_zip_code,
+            company_name,
+            over_due_date
         );
 
         browser = await puppeteer.launch(

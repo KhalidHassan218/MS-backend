@@ -1,4 +1,4 @@
-import { getStorage } from "firebase-admin/storage";
+// Firebase storage removed. Use Supabase instead.
 
 export async function uploadPDFToFirebaseStorage(
   orderNumber,
