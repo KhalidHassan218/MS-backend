@@ -347,6 +347,10 @@ function generateInvoiceHTML(
   const customer = session.customer_details || {};
   const address = customer.address || {};
   const total = (session.amount_total || 0) / 100;
+    const formattedTotal = total.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
   const currency = (session.currency || "eur").toUpperCase();
   const po_number = session?.metadata?.po_number;
   // Determine currency symbol
@@ -381,7 +385,10 @@ function generateInvoiceHTML(
     tax = 0;
     vatPercentage = 0;
   }
+  const formattedTax = tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formattedSubtotal = subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  
   // Format dates based on template language
   const invoiceDate = new Date(session.created * 1000).toLocaleDateString(
     template.language,
@@ -405,16 +412,21 @@ function generateInvoiceHTML(
   const productsRows = (productsWithKeys || [])
     .map((product) => {
       const unitPrice = product.unitPrice || 0;
+      const formattedUnitPrice = unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
       const quantity = product.quantity || 0;
       const calculatedRowTotal = unitPrice * quantity;
-
+      const formattedRowTotal = calculatedRowTotal.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
       return `
       <tr>
         <td>${invoiceDate}</td>
         <td>${escapeHtml(product.name || "")}</td>
-        <td class="text-right">${currencySymbol} ${unitPrice.toFixed(2)}</td>
+        <td class="text-right">${currencySymbol} ${formattedUnitPrice}</td>
         <td class="text-center">${quantity}</td>
-        <td class="text-right">${currencySymbol} ${calculatedRowTotal.toFixed(2)}</td>
+        <td class="text-right">${currencySymbol} ${formattedRowTotal}</td>
       </tr>
     `;
     })
@@ -768,17 +780,15 @@ function generateInvoiceHTML(
           <table class="totals-table">
             <tr class="subtotal-row">
               <td>${t.subtotal}:</td>
-              <td class="text-right">${currencySymbol} ${subtotal.toFixed(
-      2,
-    )}</td>
+              <td class="text-right">${currencySymbol} ${formattedSubtotal}</td>
             </tr>
             <tr class="tax-row">
               <td>${vatLabel}:</td>
-              <td class="text-right">${currencySymbol} ${tax.toFixed(2)}</td>
+              <td class="text-right">${currencySymbol} ${formattedTax}</td>
             </tr>
             <tr class="total-row">
               <td>${t.finalTotal}:</td>
-              <td class="text-right">${currencySymbol} ${total.toFixed(2)}</td>
+              <td class="text-right">${currencySymbol} ${formattedTotal}</td>
             </tr>
           </table>
           <div class="invoice-status">
@@ -1492,7 +1502,7 @@ app.get("/api/verify", async (req, res) => {
         .json({ success: false, message: getVerificationMsg(lang, "missing") });
     }
     console.log("webhh", process.env.WEBHOOK_SECRET);
-    
+
     // Fetch profile from Supabase profiles table
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
