@@ -28,6 +28,10 @@ export function generateProformaHTML(
 
   const customer = data.customer_details || {};
   const total = (data.total_amount || 0);
+  const formattedTotal = total.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
   const currency = (data.currency || "eur").toUpperCase();
   const po_number = data?.po_number
   const overdueDate = over_due_date
@@ -63,7 +67,8 @@ export function generateProformaHTML(
     tax = 0;
     vatPercentage = 0;
   }
-
+  const formattedTax = tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formattedSubtotal = subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   // Format dates based on template language
   const invoiceDate = new Date(data.created_at).toLocaleDateString(
     template.language,
@@ -89,15 +94,20 @@ export function generateProformaHTML(
       console.log("product", product);
 
       const unitPrice = product.unitPrice || 0;
+      const formattedUnitPrice = unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const quantity = product.quantity || 0;
       const calculatedRowTotal = unitPrice * quantity;
+      const formattedRowTotal = calculatedRowTotal.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
       return `
       <tr>
         <td>${invoiceDate}</td>
         <td>${escapeHtml(product.name || "")}</td>
-        <td class="text-right">${currencySymbol} ${unitPrice.toFixed(2)}</td>
+        <td class="text-right">${currencySymbol} ${formattedUnitPrice}</td>
         <td class="text-center">${quantity}</td>
-        <td class="text-right">${currencySymbol} ${calculatedRowTotal.toFixed(2)}</td>
+        <td class="text-right">${currencySymbol} ${formattedRowTotal}</td>
       </tr>
     `;
     })
@@ -381,17 +391,15 @@ export function generateProformaHTML(
           <table class="totals-table">
             <tr class="subtotal-row">
               <td>${t.subtotal}:</td>
-              <td class="text-right">${currencySymbol} ${subtotal.toFixed(
-      2,
-    )}</td>
+              <td class="text-right">${currencySymbol} ${formattedSubtotal}</td>
             </tr>
             <tr class="tax-row">
               <td>${vatLabel}:</td>
-              <td class="text-right">${currencySymbol} ${tax.toFixed(2)}</td>
+              <td class="text-right">${currencySymbol} ${formattedTax}</td>
             </tr>
             <tr class="total-row">
               <td>${t.finalTotal}:</td>
-              <td class="text-right">${currencySymbol} ${total.toFixed(2)}</td>
+              <td class="text-right">${currencySymbol} ${formattedTotal}</td>
             </tr>
           </table>
           <div class="invoice-status">
