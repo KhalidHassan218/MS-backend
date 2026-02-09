@@ -1,5 +1,6 @@
 import "dotenv/config";
 import licenseRoutes from "./routes/license/license.routes.js";
+import proformaRoutes from "./routes/proforma/proforma.routes.js";
 import express from "express";
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY; //sergio test
 import Stripe from "stripe";
@@ -99,6 +100,7 @@ async function processPayByInvoiceOrder(
     await updateOrder(orderId, {
       // Add products to a related table if needed
       ...data,
+      payment_due_date: over_due_date,
       internal_status: "keys_assigned",
     });
     const adaptedSession = {
@@ -163,9 +165,6 @@ async function processPayByInvoiceOrder(
       proforma_url: proformaPdfUrl,
       license_url: licensePdfUrl,
     });
-    // Save Firestore PDF record
-    // await savePDFRecord(`${orderNumber}-license`, licensePdfUrl);
-    // await savePDFRecord(`${orderNumber}-invoice`, invoicePdfUrl);
     let emailAttachemnts = [
       {
         filename: `Proforma-${orderNumber}.pdf`,
@@ -347,7 +346,7 @@ function generateInvoiceHTML(
   const customer = session.customer_details || {};
   const address = customer.address || {};
   const total = (session.amount_total || 0) / 100;
-    const formattedTotal = total.toLocaleString('en-US', {
+  const formattedTotal = total.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
@@ -765,9 +764,9 @@ function generateInvoiceHTML(
             <tr>
               <th>${t.date}</th>
               <th>${t.description}</th>
-              <th class="text-right">${t.price}</th>
+              <th class="text-center">${t.price}</th>
               <th class="text-center">${t.amount}</th>
-              <th class="text-right">${t.total}</th>
+              <th class="text-center">${t.total}</th>
             </tr>
           </thead>
           <tbody>
@@ -1416,13 +1415,7 @@ async function generateInvoicePDFBuffer(
 app.use(express.json());
 app.use(bodyParser.json());
 
-// Ensure JSON body parsing middleware is used before any routes
-app.use(express.json());
-app.use(bodyParser.json());
 
-const calculateOrderAmount = (price) => {
-  return price * 100;
-};
 
 app.get("/", (req, res) => {
   res.send("welcome to microsoftsupplier website");
@@ -2043,6 +2036,7 @@ app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
   }
 });
 app.use("/api/licenses", licenseRoutes);
+app.use("/api/proforma", proformaRoutes);
 
 
 // Function to safely generate the next sequential B2B Account ID

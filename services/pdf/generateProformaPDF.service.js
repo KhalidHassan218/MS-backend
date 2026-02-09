@@ -67,10 +67,10 @@ export async function generateProformaPDFBuffer(
             margin: { top: "0", right: "0", bottom: "0", left: "0" },
         });
 
-        console.log("✅ Invoice PDF buffer generated");
+        console.log("✅ proforma PDF buffer generated");
         return pdfBuffer;
     } catch (error) {
-        console.error("❌ Error generating invoice PDF buffer:", error);
+        console.error("❌ Error generating proforma PDF buffer:", error);
         throw error;
     } finally {
         if (browser) {

@@ -82,7 +82,7 @@ export function generateProformaHTML(
   // Due date is 30 days after invoice date
   const dueDate = new Date(data.created * 1000);
   dueDate.setDate(dueDate.getDate() + 30);
-  const dueDateFormatted = overdueDate.toLocaleDateString(template.language, {
+  const dueDateFormatted = new Date(overdueDate)?.toLocaleDateString(template.language, {
     day: "2-digit",
     month: "long",
     year: "numeric",
@@ -105,9 +105,9 @@ export function generateProformaHTML(
       <tr>
         <td>${invoiceDate}</td>
         <td>${escapeHtml(product.name || "")}</td>
-        <td class="text-right">${currencySymbol} ${formattedUnitPrice}</td>
+        <td class="text-center">${currencySymbol} ${formattedUnitPrice}</td>
         <td class="text-center">${quantity}</td>
-        <td class="text-right">${currencySymbol} ${formattedRowTotal}</td>
+        <td class="text-center">${currencySymbol} ${formattedRowTotal}</td>
       </tr>
     `;
     })
@@ -376,9 +376,9 @@ export function generateProformaHTML(
             <tr>
               <th>${t.date}</th>
               <th>${t.description}</th>
-              <th class="text-right">${t.price}</th>
+              <th class="text-center">${t.price}</th>
               <th class="text-center">${t.amount}</th>
-              <th class="text-right">${t.total}</th>
+              <th class="text-center">${t.total}</th>
             </tr>
           </thead>
           <tbody>
