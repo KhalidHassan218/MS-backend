@@ -89,7 +89,7 @@ console.log("products",products);
       notes: 'Key replacement',
       user_id: uid,
       order_number: orderNumber,
-      b2b_supplier_id: b2bSupplierId,
+      b2b_supplier_id: b2b_supplier_id,
       is_replacement: true,
     });
     if (oldKeyObj) {
@@ -139,20 +139,25 @@ console.log("products",products);
 
     // 12️⃣ Email
     const emailContent = generateKeyReplacementEmail(companyCountry);
-    await sendEmailWithAttachment(
-      emailContent.subject,
-      emailContent.html,
-      email,
-      process.env.EMAIL_USER,
-      process.env.EMAIL_USER,
-      [
-        {
-          filename: `License-${orderNumber}.pdf`,
-          content: pdfBuffer,
-          contentType: 'application/pdf',
-        },
-      ]
-    );
+    try {
+      await sendEmailWithAttachment(
+        emailContent.subject,
+        emailContent.html,
+        email,
+        process.env.EMAIL_USER,
+        process.env.EMAIL_USER,
+        [
+          {
+            filename: `License-${orderNumber}.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf',
+          },
+        ]
+      );
+    } catch (error) {
+       console.log("error key replacment email", error);
+       
+    }
     res.status(200).json({
       success: true,
       message: 'Email with PDF sent successfully',
