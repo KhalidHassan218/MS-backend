@@ -1,4 +1,5 @@
 import { uploadPDFToSupabaseStorage } from "../../services/supabaseStorage.service.js";
+import chromium from "@sparticuz/chromium";
 
 
 import { getOrderWithProfile, updateOrder } from "../../Utils/supabaseOrderService.js";
