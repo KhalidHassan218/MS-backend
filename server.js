@@ -1,6 +1,7 @@
 import "dotenv/config";
 import licenseRoutes from "./routes/license/license.routes.js";
 import proformaRoutes from "./routes/proforma/proforma.routes.js";
+import invoiceRoutes from "./routes/invoice/invoice.routes.js";
 import express from "express";
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY; //sergio test
 import Stripe from "stripe";
@@ -2037,6 +2038,7 @@ app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
 });
 app.use("/api/licenses", licenseRoutes);
 app.use("/api/proforma", proformaRoutes);
+app.use("/api/invoice", invoiceRoutes);
 
 
 // Function to safely generate the next sequential B2B Account ID
