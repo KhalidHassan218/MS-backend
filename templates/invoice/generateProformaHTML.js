@@ -27,8 +27,11 @@ export function generateProformaHTML(
   const t = template.translations;
 
   const customer = data.customer_details || {};
-  console.log("customer", customer);
   const total = (data.total_amount || 0);
+  const formattedTotal = total.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
   const currency = (data.currency || "eur").toUpperCase();
   const po_number = data?.po_number
   const overdueDate = over_due_date
@@ -64,7 +67,8 @@ export function generateProformaHTML(
     tax = 0;
     vatPercentage = 0;
   }
-
+  const formattedTax = tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formattedSubtotal = subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   // Format dates based on template language
   const invoiceDate = new Date(data.created_at).toLocaleDateString(
     template.language,
@@ -78,7 +82,7 @@ export function generateProformaHTML(
   // Due date is 30 days after invoice date
   const dueDate = new Date(data.created * 1000);
   dueDate.setDate(dueDate.getDate() + 30);
-  const dueDateFormatted = overdueDate.toLocaleDateString(template.language, {
+  const dueDateFormatted = new Date(overdueDate)?.toLocaleDateString(template.language, {
     day: "2-digit",
     month: "long",
     year: "numeric",
@@ -87,17 +91,23 @@ export function generateProformaHTML(
   // Map productsWithKeys to table rows
   const productsRows = (productsWithKeys || [])
     .map((product) => {
-      const unitPrice = product.unitPrice || 0;
-      const quantity = product.quantity || 0;
-      const totalPrice = product?.totalPrice;
+      console.log("product", product);
 
+      const unitPrice = product.unitPrice || 0;
+      const formattedUnitPrice = unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const quantity = product.quantity || 0;
+      const calculatedRowTotal = unitPrice * quantity;
+      const formattedRowTotal = calculatedRowTotal.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
       return `
       <tr>
         <td>${invoiceDate}</td>
         <td>${escapeHtml(product.name || "")}</td>
-        <td class="text-right">${currencySymbol} ${unitPrice.toFixed(2)}</td>
+        <td class="text-center">${currencySymbol} ${formattedUnitPrice}</td>
         <td class="text-center">${quantity}</td>
-        <td class="text-right">${currencySymbol} ${totalPrice.toFixed(2)}</td>
+        <td class="text-center">${currencySymbol} ${formattedRowTotal}</td>
       </tr>
     `;
     })
@@ -366,9 +376,9 @@ export function generateProformaHTML(
             <tr>
               <th>${t.date}</th>
               <th>${t.description}</th>
-              <th class="text-right">${t.price}</th>
+              <th class="text-center">${t.price}</th>
               <th class="text-center">${t.amount}</th>
-              <th class="text-right">${t.total}</th>
+              <th class="text-center">${t.total}</th>
             </tr>
           </thead>
           <tbody>
@@ -381,17 +391,15 @@ export function generateProformaHTML(
           <table class="totals-table">
             <tr class="subtotal-row">
               <td>${t.subtotal}:</td>
-              <td class="text-right">${currencySymbol} ${subtotal.toFixed(
-      2,
-    )}</td>
+              <td class="text-right">${currencySymbol} ${formattedSubtotal}</td>
             </tr>
             <tr class="tax-row">
               <td>${vatLabel}:</td>
-              <td class="text-right">${currencySymbol} ${tax.toFixed(2)}</td>
+              <td class="text-right">${currencySymbol} ${formattedTax}</td>
             </tr>
             <tr class="total-row">
               <td>${t.finalTotal}:</td>
-              <td class="text-right">${currencySymbol} ${total.toFixed(2)}</td>
+              <td class="text-right">${currencySymbol} ${formattedTotal}</td>
             </tr>
           </table>
           <div class="invoice-status">

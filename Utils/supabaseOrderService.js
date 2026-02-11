@@ -58,3 +58,27 @@ export async function getOrderById(orderId) {
   }
   return data;
 }
+
+export async function getOrderWithProfile(orderId, profileFields = '*') {
+  // 1. Handle if the user passes an array ['name', 'email'] or a string 'name, email'
+  const fieldsString = Array.isArray(profileFields) 
+    ? profileFields.join(', ') 
+    : profileFields;
+
+  // 2. Construct the dynamic select query
+  // This results in something like: "*, profiles(full_name, avatar_url)"
+  const selectQuery = `*, profiles(${fieldsString})`;
+
+  const { data, error } = await supabase
+    .from('orders')
+    .select(selectQuery)
+    .eq('id', orderId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching order:", error.message);
+    throw error;
+  }
+  
+  return data;
+}

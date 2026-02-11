@@ -1,5 +1,7 @@
 import "dotenv/config";
 import licenseRoutes from "./routes/license/license.routes.js";
+import proformaRoutes from "./routes/proforma/proforma.routes.js";
+import invoiceRoutes from "./routes/invoice/invoice.routes.js";
 import express from "express";
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY; //sergio test
 import Stripe from "stripe";
@@ -33,8 +35,8 @@ puppeteer.use(StealthPlugin());
 const isLocalMac = process.platform === "darwin" && process.arch === "arm64";
 // YOUR_DOMAIN = "https://microsoftsupplier.com";
 // YOUR_DOMAIN = "http://localhost:3000";
-// const YOUR_DOMAIN = "https://ms-test-ser.vercel.app";
-const YOUR_DOMAIN = "https://microsoftsupplier-n-git-deac10-sergioeerselhotmailcoms-projects.vercel.app";
+const YOUR_DOMAIN = process.env.FRONT_DOAMIN;
+// const YOUR_DOMAIN = "https://microsoftsupplier-n-git-deac10-sergioeerselhotmailcoms-projects.vercel.app";
 const app = express();
 
 app.use(cors());
@@ -99,6 +101,7 @@ async function processPayByInvoiceOrder(
     await updateOrder(orderId, {
       // Add products to a related table if needed
       ...data,
+      payment_due_date: over_due_date,
       internal_status: "keys_assigned",
     });
     const adaptedSession = {
@@ -163,9 +166,6 @@ async function processPayByInvoiceOrder(
       proforma_url: proformaPdfUrl,
       license_url: licensePdfUrl,
     });
-    // Save Firestore PDF record
-    // await savePDFRecord(`${orderNumber}-license`, licensePdfUrl);
-    // await savePDFRecord(`${orderNumber}-invoice`, invoicePdfUrl);
     let emailAttachemnts = [
       {
         filename: `Proforma-${orderNumber}.pdf`,
@@ -347,6 +347,10 @@ function generateInvoiceHTML(
   const customer = session.customer_details || {};
   const address = customer.address || {};
   const total = (session.amount_total || 0) / 100;
+  const formattedTotal = total.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
   const currency = (session.currency || "eur").toUpperCase();
   const po_number = session?.metadata?.po_number;
   // Determine currency symbol
@@ -381,7 +385,10 @@ function generateInvoiceHTML(
     tax = 0;
     vatPercentage = 0;
   }
+  const formattedTax = tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formattedSubtotal = subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  
   // Format dates based on template language
   const invoiceDate = new Date(session.created * 1000).toLocaleDateString(
     template.language,
@@ -405,16 +412,21 @@ function generateInvoiceHTML(
   const productsRows = (productsWithKeys || [])
     .map((product) => {
       const unitPrice = product.unitPrice || 0;
-      const quantity = product.quantity || 0;
-      const totalPrice = product?.totalPrice;
+      const formattedUnitPrice = unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+      const quantity = product.quantity || 0;
+      const calculatedRowTotal = unitPrice * quantity;
+      const formattedRowTotal = calculatedRowTotal.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
       return `
       <tr>
         <td>${invoiceDate}</td>
         <td>${escapeHtml(product.name || "")}</td>
-        <td class="text-right">${currencySymbol} ${unitPrice.toFixed(2)}</td>
+        <td class="text-right">${currencySymbol} ${formattedUnitPrice}</td>
         <td class="text-center">${quantity}</td>
-        <td class="text-right">${currencySymbol} ${totalPrice.toFixed(2)}</td>
+        <td class="text-right">${currencySymbol} ${formattedRowTotal}</td>
       </tr>
     `;
     })
@@ -753,9 +765,9 @@ function generateInvoiceHTML(
             <tr>
               <th>${t.date}</th>
               <th>${t.description}</th>
-              <th class="text-right">${t.price}</th>
+              <th class="text-center">${t.price}</th>
               <th class="text-center">${t.amount}</th>
-              <th class="text-right">${t.total}</th>
+              <th class="text-center">${t.total}</th>
             </tr>
           </thead>
           <tbody>
@@ -768,17 +780,15 @@ function generateInvoiceHTML(
           <table class="totals-table">
             <tr class="subtotal-row">
               <td>${t.subtotal}:</td>
-              <td class="text-right">${currencySymbol} ${subtotal.toFixed(
-      2,
-    )}</td>
+              <td class="text-right">${currencySymbol} ${formattedSubtotal}</td>
             </tr>
             <tr class="tax-row">
               <td>${vatLabel}:</td>
-              <td class="text-right">${currencySymbol} ${tax.toFixed(2)}</td>
+              <td class="text-right">${currencySymbol} ${formattedTax}</td>
             </tr>
             <tr class="total-row">
               <td>${t.finalTotal}:</td>
-              <td class="text-right">${currencySymbol} ${total.toFixed(2)}</td>
+              <td class="text-right">${currencySymbol} ${formattedTotal}</td>
             </tr>
           </table>
           <div class="invoice-status">
@@ -930,12 +940,6 @@ app.post(
       const event = stripe.webhooks.constructEvent(
         request.body,
         sig,
-        // 'whsec_ed16e1c24a67aaf05721441157b18ea73c196a633594f43803fca553ba780c9d'
-        // "whsec_n9vgs7GOQKS1uOzF9Ufoxct5NMX11inK" //omar test webook
-        // "whsec_3v6ak8Zl2sGGPyoBt2XUxdJEzGsIHLP9", //sertic test webook
-        // "whsec_DtkDvPPV5nj1Z2Y5cqbzfrpx2zb8T8Mi", //new sertic render webook supabase test
-        // "whsec_e99e795b6a707aac9b23defdb629f0cd49454277fc3eaa844fef9536f218842d", // local host webhook test
-        // "whsec_wxA2tKxrWJ7jAYywCLDnMN4M3O6P0OdI", // live webook supabase 
         process.env.WEBHOOK_SECRET,
       );
 
@@ -1412,13 +1416,7 @@ async function generateInvoicePDFBuffer(
 app.use(express.json());
 app.use(bodyParser.json());
 
-// Ensure JSON body parsing middleware is used before any routes
-app.use(express.json());
-app.use(bodyParser.json());
 
-const calculateOrderAmount = (price) => {
-  return price * 100;
-};
 
 app.get("/", (req, res) => {
   res.send("welcome to microsoftsupplier website");
@@ -1498,7 +1496,7 @@ app.get("/api/verify", async (req, res) => {
         .json({ success: false, message: getVerificationMsg(lang, "missing") });
     }
     console.log("webhh", process.env.WEBHOOK_SECRET);
-    
+
     // Fetch profile from Supabase profiles table
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -2039,6 +2037,8 @@ app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
   }
 });
 app.use("/api/licenses", licenseRoutes);
+app.use("/api/proforma", proformaRoutes);
+app.use("/api/invoice", invoiceRoutes);
 
 
 // Function to safely generate the next sequential B2B Account ID

@@ -6,8 +6,7 @@ import chromium from "@sparticuz/chromium";
 
 puppeteer.use(StealthPlugin());
 
-const isLocalMac =
-  process.platform === "darwin" && process.arch === "arm64";
+const isLocalMac = process.platform === "darwin" && process.arch === "arm64";
 
 async function generateLicencePDFBuffer(
   licenseData,
@@ -24,13 +23,10 @@ async function generateLicencePDFBuffer(
     browser = await puppeteer.launch(
       isLocalMac
         ? {
-          // ✅ macOS (M1–M4) → system Chrome
-          executablePath:
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+          executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
           headless: "new",
         }
         : {
-          // ✅ AWS / serverless → sparticuz chromium
           args: chromium.args,
           defaultViewport: chromium.defaultViewport,
           executablePath: await chromium.executablePath(),
@@ -39,6 +35,10 @@ async function generateLicencePDFBuffer(
     );
 
     const page = await browser.newPage();
+    
+    // Set viewport to ensure consistent rendering
+    await page.setViewport({ width: 794, height: 1122 }); 
+
     await page.setContent(htmlContent, {
       waitUntil: "networkidle0",
       timeout: 60000,
@@ -47,6 +47,8 @@ async function generateLicencePDFBuffer(
     return await page.pdf({
       format: "A4",
       printBackground: true,
+      displayHeaderFooter: false, // We are using HTML/CSS for the footer instead
+      preferCSSPageSize: true, // This respects the @page margins defined in HTML
       margin: {
         top: "0",
         right: "0",
