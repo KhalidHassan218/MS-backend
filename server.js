@@ -7,8 +7,10 @@ const stripeSecretKey = process.env.STRIPE_SECRET_KEY; //sergio test
 import Stripe from "stripe";
 import cors from "cors";
 import bodyParser from "body-parser";
-import sendEmail from "./Utils/sendEmail.js";
 import fetch from "node-fetch";
+import { sendAcceptanceEmail, sendDeclineEmail } from './Utils/client-emails.js';
+import { sendAdminPendingRegistrationEmail } from './Utils/admin-emails.js';
+import { sendVerificationEmail } from './Utils/verification-email.js';
 
 const stripe = new Stripe(stripeSecretKey);
 
@@ -16,14 +18,12 @@ const stripe = new Stripe(stripeSecretKey);
 import {
   generateVerificationEmailHTML,
   verificationTemplates,
-} from "./Utils/verificationEmail.js";
+} from "./Utils/verification-email.js";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import chromium from "@sparticuz/chromium";
 import sendEmailWithAttachment from "./Utils/sendEmailWithAttachment.js";
 import generateRegistrationEmailHTML from "./templates/Emails/newRegisteredCompaniesrequest.js";
-import sendEmailToClient from "./Utils/sendEmailToClient.js";
-import sendEmailToAdmin from "./Utils/sendAdminEmail.js";
 import generateClientStatusEmailHTML from "./templates/Emails/ClientNewRegisterationResponse.js";
 import { uploadPDFToSupabaseStorage } from "./services/supabaseStorage.service.js";
 import generateLicencePDFBuffer from "./services/pdf/generateLicencePDF.service.js";
@@ -35,7 +35,7 @@ puppeteer.use(StealthPlugin());
 const isLocalMac = process.platform === "darwin" && process.arch === "arm64";
 // YOUR_DOMAIN = "https://microsoftsupplier.com";
 // YOUR_DOMAIN = "http://localhost:3000";
-const YOUR_DOMAIN = process.env.FRONT_DOAMIN;
+const YOUR_DOMAIN = process.env.FRONT_DOMAIN;
 // const YOUR_DOMAIN = "https://microsoftsupplier-n-git-deac10-sergioeerselhotmailcoms-projects.vercel.app";
 const app = express();
 
@@ -931,7 +931,7 @@ async function reserveLicenseKeys(
 }
 
 app.post(
-  "/webhooks",
+  "/webhook",
   express.raw({ type: "application/json" }),
   async (request, response) => {
     const sig = request.headers["stripe-signature"];
@@ -963,40 +963,40 @@ app.post(
 
 const emailTemplates = {
   NL: {
-    subject: "Uw bestelling bij Microsoft Supplier – Licenties en documentatie",
+    subject: "Uw bestelling bij Microsoft Supplier",
+    title: "Bestelling bevestigd",
     greeting: "Beste",
     thankYou: "Bedankt voor uw bestelling.",
-    processed:
-      "De licenties zijn succesvol verwerkt en de documenten zijn nu beschikbaar.",
-    attachmentsIntro: "In de bijlagen vindt u:",
+    processed: "De licenties zijn succesvol verwerkt en de documenten zijn nu beschikbaar.",
+    attachmentsTitle: "BIJLAGEN",
     attachments: {
       invoice: "De factuur",
       license: "Het licentiedocument (met alle licentiesleutels)",
     },
-    importantInfoTitle: "Belangrijke informatie:",
+    importantTitle: "BELANGRIJKE INFORMATIE",
     importantInfo: [
       "De licenties worden direct online geactiveerd (telefonische activatie is niet nodig)",
       "Garantie: 12 maanden",
       "De licenties zijn afkomstig uit ons interne distributiesysteem",
     ],
-    contactText:
-      "Als u vragen heeft of aanvullende licenties nodig heeft, kunt u contact met ons opnemen via:",
+    contactText: "Vragen? Antwoord op deze e-mail",
     closing: "Met vriendelijke groet",
     founder: "Founder @ Sertic",
-    keyReplacementRequest: "Sleutelvervangingsverzoek", // ✅ New key
+    footer: "MICROSOFT SUPPLIER",
+    copyright: "© 2026",
   },
   EN: {
-    subject: "Your order from Microsoft Supplier – Licenses and documentation",
+    subject: "Your Microsoft Supplier Order",
+    title: "Order Confirmed",
     greeting: "Hello",
     thankYou: "Thank you for your order.",
-    processed:
-      "The licenses have been successfully processed and the documents are now available.",
-    attachmentsIntro: "Please find attached:",
+    processed: "The licenses have been successfully processed and the documents are now available.",
+    attachmentsTitle: "ATTACHMENTS",
     attachments: {
       invoice: "The invoice (VAT 0% – Export outside EU)",
       license: "The license document (containing all license keys)",
     },
-    importantInfoTitle: "Important information:",
+    importantTitle: "IMPORTANT INFORMATION",
     importantInfo: [
       "The licenses activate online immediately (no phone activation required)",
       "Warranty: 12 months",
@@ -1004,96 +1004,181 @@ const emailTemplates = {
       "Delivery method: Digital ESD licenses via email (no physical shipment)",
       "Not subject to U.S. sales tax",
     ],
-    contactText:
-      "If you have any questions or need additional licenses, feel free to contact us at:",
+    contactText: "Questions? Reply to this email",
     closing: "Kind regards",
     founder: "Founder @ Sertic",
-    keyReplacementRequest: "Key replacement request", // ✅ New key
+    footer: "MICROSOFT SUPPLIER",
+    copyright: "© 2026",
   },
   FR: {
-    subject:
-      "Votre commande chez Microsoft Supplier – Licences et documentation",
+    subject: "Votre commande Microsoft Supplier",
+    title: "Commande confirmée",
     greeting: "Bonjour",
     thankYou: "Merci pour votre commande.",
-    processed:
-      "Les licences ont été traitées avec succès et les documents sont désormais disponibles.",
-    attachmentsIntro: "Vous trouverez en pièces jointes :",
+    processed: "Les licences ont été traitées avec succès et les documents sont désormais disponibles.",
+    attachmentsTitle: "PIÈCES JOINTES",
     attachments: {
-      invoice:
-        "La facture (TVA autoliquidée – Article 196 de la directive TVA de l'UE)",
+      invoice: "La facture (TVA autoliquidée – Article 196 de la directive TVA de l'UE)",
       license: "Le document de licence (contenant toutes les clés de licence)",
     },
-    importantInfoTitle: "Informations importantes :",
+    importantTitle: "INFORMATIONS IMPORTANTES",
     importantInfo: [
       "Les licences s'activent directement en ligne (aucune activation téléphonique n'est nécessaire)",
       "Garantie : 12 mois",
       "Les licences proviennent de notre système interne de distribution",
     ],
-    contactText:
-      "Si vous avez des questions ou si vous avez besoin de licences supplémentaires, vous pouvez nous contacter à :",
+    contactText: "Questions ? Répondez à cet e-mail",
     closing: "Cordialement",
     founder: "Founder @ Sertic",
-    keyReplacementRequest: "Demande de remplacement de clé", // ✅ New key
+    footer: "MICROSOFT SUPPLIER",
+    copyright: "© 2026",
   },
   DE: {
-    subject:
-      "Ihre Bestellung bei Microsoft Supplier – Lizenzen und Dokumentation",
+    subject: "Ihre Microsoft Supplier Bestellung",
+    title: "Bestellung bestätigt",
     greeting: "Hallo",
     thankYou: "Vielen Dank für Ihre Bestellung.",
-    processed:
-      "Die Lizenzen wurden erfolgreich verarbeitet und die Dokumente sind jetzt verfügbar.",
-    attachmentsIntro: "Im Anhang finden Sie:",
+    processed: "Die Lizenzen wurden erfolgreich verarbeitet und die Dokumente sind jetzt verfügbar.",
+    attachmentsTitle: "ANHÄNGE",
     attachments: {
       invoice: "Die Rechnung",
       license: "Das Lizenzdokument (mit allen Lizenzschlüsseln)",
     },
-    importantInfoTitle: "Wichtige Informationen:",
+    importantTitle: "WICHTIGE INFORMATIONEN",
     importantInfo: [
       "Die Lizenzen werden sofort online aktiviert (keine telefonische Aktivierung erforderlich)",
       "Garantie: 12 Monate",
       "Die Lizenzen stammen aus unserem internen Vertriebssystem",
     ],
-    contactText:
-      "Wenn Sie Fragen haben oder zusätzliche Lizenzen benötigen, können Sie uns gerne kontaktieren unter:",
+    contactText: "Fragen? Antworten Sie auf diese E-Mail",
     closing: "Mit freundlichen Grüßen",
     founder: "Gründer @ Sertic",
-    keyReplacementRequest: "Schlüsselersatzanfrage", // ✅ New key
+    footer: "MICROSOFT SUPPLIER",
+    copyright: "© 2026",
+  },
+  ES: {
+    subject: "Su pedido de Microsoft Supplier",
+    title: "Pedido confirmado",
+    greeting: "Hola",
+    thankYou: "Gracias por su pedido.",
+    processed: "Las licencias han sido procesadas con éxito y los documentos ya están disponibles.",
+    attachmentsTitle: "ARCHIVOS ADJUNTOS",
+    attachments: {
+      invoice: "La factura",
+      license: "El documento de licencia (con todas las claves de licencia)",
+    },
+    importantTitle: "INFORMACIÓN IMPORTANTE",
+    importantInfo: [
+      "Las licencias se activan en línea inmediatamente (no se requiere activación telefónica)",
+      "Garantía: 12 meses",
+      "Las licencias provienen de nuestro sistema de distribución interno",
+    ],
+    contactText: "¿Preguntas? Responda a este correo",
+    closing: "Saludos cordiales",
+    founder: "Founder @ Sertic",
+    footer: "MICROSOFT SUPPLIER",
+    copyright: "© 2026",
   },
 };
 
 function generateEmailContent(customerName, companyCountryCode = "EN") {
-  // Get template based on country code, fallback to EN if not found
   const template =
     emailTemplates[companyCountryCode.toUpperCase()] || emailTemplates.EN;
 
   const name = customerName || "";
+  const displayName = name ? ` ${name}` : "";
 
-  // Build important info list
   const importantInfoList = template.importantInfo
-    .map((info) => `<li>${info}</li>`)
-    .join("\n         ");
+    .map((info) => `• ${info}`)
+    .join("<br>\n          ");
 
-  const htmlContent = `<p>${template.greeting}${name ? " " + name : ""},</p>
-       <p>${template.thankYou}<br>
-       ${template.processed}</p>
-    
-       <p>${template.attachmentsIntro}</p>
-       <ul>
-         <li>${template.attachments.invoice}</li>
-         <li>${template.attachments.license}</li>
-       </ul>
-    
-       <p><strong>${template.importantInfoTitle}</strong></p>
-       <ul>
-         ${importantInfoList}
-       </ul>
-    
-       <p>${template.contactText}
-       <a href="mailto:info@sertic.nl">info@sertic.nl</a></p>
-    
-       <p>${template.closing},<br>
-       S.R. (Sergio) Eersel<br>
-       ${template.founder}</p>`;
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @media only screen and (max-width: 600px) {
+      .mobile-title { font-size: 20px !important; margin: 0 0 20px 0 !important; }
+      .mobile-text { font-size: 14px !important; }
+      .mobile-small { font-size: 12px !important; }
+      .mobile-padding { padding: 30px 20px 30px !important; }
+      .mobile-content { padding: 0 20px 30px !important; }
+      .mobile-footer { padding: 20px !important; }
+      .mobile-box { padding: 16px !important; margin: 0 0 20px 0 !important; }
+      .mobile-logo { height: 40px !important; }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #F8FAFC;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <div style="background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0;">
+
+      <!-- Logo -->
+      <div class="mobile-padding" style="padding: 50px 40px 40px; text-align: center;">
+        <img class="mobile-logo" src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2FMSlogo.png?alt=media&token=f5524581-bc40-41c6-8c56-61906b61b4b0"
+             alt="Microsoft Supplier"
+             style="height: 48px;">
+      </div>
+
+      <!-- Content -->
+      <div class="mobile-content" style="padding: 0 40px 50px; text-align: center;">
+
+        <h1 class="mobile-title" style="color: #1a202c; margin: 0 0 30px 0; font-size: 26px; font-weight: 400; letter-spacing: -0.3px;">
+          ${template.title}
+        </h1>
+
+        <p class="mobile-text" style="color: #4a5568; margin: 0 0 20px 0; font-size: 16px; line-height: 1.5;">
+          ${template.greeting}${displayName},
+        </p>
+
+        <p class="mobile-text" style="color: #4a5568; margin: 0 0 35px 0; font-size: 16px; line-height: 1.5;">
+          ${template.thankYou} ${template.processed}
+        </p>
+
+        <!-- Attachments Box -->
+        <div class="mobile-box" style="background: #f7fafc; padding: 24px; margin: 0 0 35px 0; text-align: left; border-radius: 6px;">
+          <p class="mobile-small" style="color: #718096; margin: 0 0 12px 0; font-size: 13px; letter-spacing: 0.5px;">${template.attachmentsTitle}</p>
+          <p class="mobile-small" style="color: #2d3748; margin: 0; font-size: 14px; line-height: 1.8;">
+            • ${template.attachments.invoice}<br>
+            • ${template.attachments.license}
+          </p>
+        </div>
+
+        <!-- Important Info Box -->
+        <div class="mobile-box" style="background: #fef3c7; padding: 20px; margin: 0 0 35px 0; text-align: left; border-radius: 6px; border-left: 4px solid #f59e0b;">
+          <p class="mobile-small" style="color: #92400e; margin: 0 0 8px 0; font-size: 13px; font-weight: 600; letter-spacing: 0.5px;">
+            ${template.importantTitle}
+          </p>
+          <p class="mobile-small" style="color: #92400e; margin: 0; font-size: 13px; line-height: 1.6;">
+            ${importantInfoList}
+          </p>
+        </div>
+
+        <p class="mobile-small" style="color: #a0aec0; margin: 0; font-size: 14px;">
+          ${template.contactText}
+        </p>
+
+        <p class="mobile-small" style="color: #4a5568; margin: 30px 0 0 0; font-size: 14px; line-height: 1.8;">
+          ${template.closing},<br>
+          S.R. (Sergio) Eersel<br>
+          <span style="color: #a0aec0;">${template.founder}</span>
+        </p>
+      </div>
+
+      <!-- Footer -->
+      <div class="mobile-footer" style="padding: 30px 40px; text-align: center; border-top: 1px solid #e2e8f0;">
+        <p class="mobile-small" style="color: #a0aec0; margin: 0 0 4px 0; font-size: 13px; letter-spacing: 0.3px;">
+          ${template.footer}
+        </p>
+        <p class="mobile-small" style="color: #cbd5e0; margin: 0; font-size: 12px;">
+          ${template.copyright}
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
 
   return {
     subject: template.subject,
@@ -1552,34 +1637,32 @@ app.get("/api/verify", async (req, res) => {
   }
 });
 
+
 app.post("/api/send-verification", async (req, res) => {
   try {
     const { email, name, lang = "EN", verifyUrl, uid } = req.body;
-    console.log("webhh12", process.env.WEBHOOK_SECRET);
+    
     if (!email || !verifyUrl || !uid) {
       return res.status(400).json({
         success: false,
         message: getVerificationMsg(lang, "missingData"),
       });
     }
-    if (!uid) {
-      return res.status(403).json({
-        success: false,
-        message: getVerificationMsg(lang, "unauthorized"),
-      });
-    }
+
     // Fetch profile from Supabase
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", uid)
       .single();
+      
     if (profileError || !profile) {
       return res.status(404).json({
         success: false,
         message: getVerificationMsg(lang, "notFound"),
       });
     }
+
     // Check if already verified
     if (profile.verified_at) {
       return res.status(200).json({
@@ -1587,9 +1670,11 @@ app.post("/api/send-verification", async (req, res) => {
         message: getVerificationMsg(lang, "alreadyVerified"),
       });
     }
-    // Check for existing valid verification token
+
+    // Check for existing valid verification token (15 minutes)
     const now = new Date();
     const expiryMs = 15 * 60 * 1000; // 15 minutes
+    
     if (
       profile.verification_token &&
       profile.verification_expires_at &&
@@ -1600,12 +1685,14 @@ app.post("/api/send-verification", async (req, res) => {
         message: getVerificationMsg(lang, "alreadySent"),
       });
     }
+
     // Generate new verification token
     const crypto = await import("crypto");
     const verification_token = crypto.randomBytes(32).toString("hex");
     const verification_expires_at = new Date(
       now.getTime() + expiryMs,
     ).toISOString();
+
     // Update profile with new token and expiry
     const { error: updateError } = await supabase
       .from("profiles")
@@ -1614,31 +1701,38 @@ app.post("/api/send-verification", async (req, res) => {
         verification_expires_at,
       })
       .eq("id", uid);
+      
     if (updateError) {
       throw new Error(updateError.message);
     }
+
     // Generate verification link with token
     const baseUrl = verifyUrl.replace(/\/$/, "");
     const verificationLink = `${baseUrl}?token=${verification_token}&uid=${encodeURIComponent(uid)}`;
-    // Generate verification email HTML with the link
-    const html = generateVerificationEmailHTML(verificationLink, name, lang);
-    const subject = (
-      verificationTemplates[lang?.toUpperCase()] || verificationTemplates.EN
-    ).subject;
-    await sendEmailWithAttachment(
-      subject,
-      html,
+
+    // Send verification email using MailerSend
+    await sendVerificationEmail({
       email,
-      process.env.EMAIL_USER,
-      process.env.EMAIL_USER,
-      [],
-    );
-    res.json({ success: true, message: getVerificationMsg(lang, "sent") });
+      verifyUrl: verificationLink,
+      customerName: name,
+      lang: lang.toUpperCase()
+    });
+
+    console.log(`✅ Verification email sent to ${email} (${lang})`);
+
+    res.json({ 
+      success: true, 
+      message: getVerificationMsg(lang, "sent") 
+    });
+    
   } catch (err) {
+    console.error('❌ Verification email error:', err);
     const lang = req.body?.lang || "EN";
-    res
-      .status(500)
-      .json({ success: false, message: getVerificationMsg(lang, "error") });
+    res.status(500).json({ 
+      success: false, 
+      message: getVerificationMsg(lang, "error"),
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 app.post(
@@ -1952,88 +2046,164 @@ app.post(
   },
 );
 
-app.post("/api/sendemail", async (req, res) => {
-  const { email, companyName, messages } = req.body;
+// app.post("/api/sendemail", async (req, res) => {
+//   const { email, companyName, messages } = req.body;
 
-  try {
-    const send_to = process.env.EMAIL_USER;
-    const sent_from = process.env.EMAIL_USER;
-    const reply_to = email;
-    const subject = `Asking regarding buying`;
-    const message = `
-      <p>Dear MicrosoftSupplier team</p>
-      <p>Please click on reply to contact me regarding the GigaSupplier Plan:</p>
-      <h5>My Email Address: </h5>
-      <p>${email}</p>
-      <h5>Company Name : </h5>
-      <p>${companyName}</p>
-      <p>${messages}</p>
-    `;
+//   try {
+//     const send_to = process.env.EMAIL_USER;
+//     const sent_from = process.env.EMAIL_USER;
+//     const reply_to = email;
+//     const subject = `Asking regarding buying`;
+//     const message = `
+//       <p>Dear MicrosoftSupplier team</p>
+//       <p>Please click on reply to contact me regarding the GigaSupplier Plan:</p>
+//       <h5>My Email Address: </h5>
+//       <p>${email}</p>
+//       <h5>Company Name : </h5>
+//       <p>${companyName}</p>
+//       <p>${messages}</p>
+//     `;
 
-    await sendEmail(subject, message, send_to, sent_from, reply_to);
-    res.status(200).json({ success: true, message: "Email Sent" });
-  } catch (error) {
-    res.status(500).json(error.message);
-  }
-});
+//     await sendEmail(subject, message, send_to, sent_from, reply_to);
+//     res.status(200).json({ success: true, message: "Email Sent" });
+//   } catch (error) {
+//     res.status(500).json(error.message);
+//   }
+// });
 app.post("/api/registerNewPendingUser", async (req, res) => {
-  const { email, company_name, tax_id, company_country, company_street, company_house_number, company_zip_code, company_city, password } = req.body;
+  const { 
+    email, 
+    company_name, 
+    tax_id, 
+    company_country, 
+    company_street, 
+    company_house_number, 
+    company_zip_code, 
+    company_city, 
+    password 
+  } = req.body;
+  
   try {
-    // Create user in Supabase Auth
-    const { data: user, error: userError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    });
-    if (userError) {
-      console.log("error creating a new registered user", userError);
-      return res.status(500).json({ success: false, message: userError.message });
-    }
-    // Insert pending registration in Supabase table
-    const { error: regError } = await supabase.from('pending_registrations').insert([
-      {
-        uid: user.user?.id,
+    // 1. Check if user already exists in Auth
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(u => u.email === email);
+    
+    let userId;
+    
+    if (existingUser) {
+      // User exists - check if they have a pending registration
+      const { data: pendingReg } = await supabase
+        .from('pending_registrations')
+        .select('*')
+        .eq('email', email)
+        .single();
+      
+      if (pendingReg) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Registration already pending approval" 
+        });
+      }
+      
+      // User was declined before - reuse the same auth user
+      userId = existingUser.id;
+    } else {
+      // Create new user in Supabase Auth (disabled by default)
+      const { data: user, error: userError } = await supabaseAdmin.auth.admin.createUser({
         email,
-        tax_id: tax_id,
-        company_name: company_name,
-        company_country: company_country,
-        company_street: company_street,
-        company_house_number: company_house_number,
-        company_zip_code: company_zip_code,
-        company_city: company_city,
-        created_at: Date.now(),
-      },
-    ]);
-    if (regError) {
-      return res.status(500).json({ success: false, message: regError.message });
+        password,
+        email_confirm: true,
+        user_metadata: {
+          pending_approval: true
+        }
+      });
+      
+      if (userError) {
+        console.error("Error creating user:", userError);
+        return res.status(500).json({ 
+          success: false, 
+          message: userError.message 
+        });
+      }
+      
+      userId = user.user?.id;
     }
-    res.status(200).json({ success: true });
+    
+    // 2. Insert pending registration
+    const { error: regError } = await supabase
+      .from('pending_registrations')
+      .insert([{
+        uid: userId,
+        email,
+        tax_id,
+        company_name,
+        company_country,
+        company_street,
+        company_house_number,
+        company_zip_code,
+        company_city,
+        created_at: Date.now(),
+      }]);
+    
+    if (regError) {
+      console.error("Error creating pending registration:", regError);
+      return res.status(500).json({ 
+        success: false, 
+        message: regError.message 
+      });
+    }
+    
+    // 3. Send notification to admin
+    const preferredLang = getLangCode(company_country) ?? 'en';
+    
+    try {
+      await sendAdminPendingRegistrationEmail({
+        email,
+        companyName: company_name,
+        taxId: tax_id,
+        companyCountry: company_country,
+        lang: preferredLang
+      });
+    } catch (emailError) {
+      console.error("Admin notification failed:", emailError);
+      // Don't fail the registration if email fails
+    }
+    
+    res.status(200).json({ 
+      success: true,
+      message: "Registration submitted successfully" 
+    });
+    
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Registration error:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
   }
 });
 app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
   const { email, companyName, taxId, companyCountry } = req.body;
 
-  let userFound;
   try {
-    await sendEmailToAdmin(
-      `pending Registration`,
-      generateRegistrationEmailHTML({
-        email: email,
-        company: companyName,
-        country: companyCountry,
-        type: taxId,
-      }),
-      "info@microsoftsupplier.com",
-      process.env.EMAIL_USER,
-      process.env.EMAIL_USER,
-    );
-    res
-      .status(200)
-      .json({ success: true, message: "email to admin sent successfully" });
+    await sendAdminPendingRegistrationEmail({
+      email,
+      companyName,
+      taxId,
+      companyCountry,
+      lang: 'en' // Use user's language or default to English
+    });
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Admin notification sent successfully" 
+    });
   } catch (error) {
-    res.status(500).json(error.message);
+    console.error('❌ Admin email error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
   }
 });
 app.use("/api/licenses", licenseRoutes);
@@ -2075,22 +2245,23 @@ const getNextB2BAccountId = async () => {
   return newId;
 };
 
+
+
+// Accept registration endpoint
 app.post("/api/accept-pendingRegistration", async (req, res) => {
   const { uid, email, docId } = req.body;
   try {
     const b2bSupplierId = await getNextB2BAccountId();
+    
     // 1. Enable the user account in Supabase Auth
-    const { error: updateError, data: userRecord } =
-      await supabaseAdmin.auth.admin.updateUserById(uid, {
-        disabled: false,
-      });
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(uid, {
+      disabled: false,
+    });
     if (updateError) {
-      console.log("Error updating user:", updateError);
       throw new Error(`Auth Update Error: ${updateError.message}`);
     }
-    // 2. Send Acceptance Email
 
-    // 3. Get Pending Registration Details from Supabase
+    // 2. Get Pending Registration Details
     const { data: pendingRegistration, error: pendingError } = await supabase
       .from("pending_registrations")
       .select("*")
@@ -2099,8 +2270,10 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
     if (pendingError || !pendingRegistration) {
       throw new Error("Pending registration not found");
     }
+    
     const preferredLang = getLangCode(pendingRegistration?.company_country);
-    // 4. Create user profile in Supabase
+
+    // 3. Create user profile
     const newUserData = {
       id: uid,
       email: email,
@@ -2119,13 +2292,15 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
       lang_code: preferredLang ?? "en",
       invoice_settings: { enabled: false, overDueDay: null },
     };
+    
     const { error: profileError } = await supabase
       .from("profiles")
       .upsert([newUserData]);
     if (profileError) {
       throw new Error(profileError.message);
     }
-    // 5. Delete pending registration
+
+    // 4. Delete pending registration
     const { error: deleteError } = await supabase
       .from("pending_registrations")
       .delete()
@@ -2133,33 +2308,31 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
     if (deleteError) {
       throw new Error(deleteError.message);
     }
-    // 6. Add to registrations_history
+
+    // 5. Add to registrations_history
     const { error: regHistError } = await supabase
       .from("registrations_history")
-      .insert([
-        {
-          uid: uid,
-          email: email,
-          status: "Accepted",
-          created_at: Date.now(),
-        },
-      ]);
+      .insert([{
+        uid: uid,
+        email: email,
+        status: "Accepted",
+        created_at: Date.now(),
+      }]);
     if (regHistError) {
       throw new Error(regHistError.message);
     }
+
+    // 6. Send acceptance email (with user's preferred language)
     try {
-      await sendEmailToClient(
-        `pending Registration response`,
-        generateClientStatusEmailHTML(email, "accepted"),
+      await sendAcceptanceEmail({
         email,
-        process.env.EMAIL_USER,
-        process.env.EMAIL_USER,
-      );
+        supplierId: b2bSupplierId,
+        lang: preferredLang ?? 'en'
+      });
     } catch (emailError) {
-      // We log this so you know it failed, but we DON'T throw the error
       console.error("Email failed to send, but registration was successful:", emailError);
     }
-    // Success Response
+
     res.status(200).json({
       success: true,
       message: "User accepted and created successfully",
@@ -2171,17 +2344,39 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
     });
   }
 });
+
+// Decline registration endpoint
 app.post("/api/decline-pendingRegistration", async (req, res) => {
   const { uid, email, docId } = req.body;
+  
   try {
-    await sendEmailToClient(
-      `pending Registration response`,
-      generateClientStatusEmailHTML(email, "declined"),
-      email,
-      process.env.EMAIL_USER,
-      process.env.EMAIL_USER,
-    );
-    // Delete pending registration from Supabase
+    // 1. Get user's language preference
+    const { data: pendingRegistration } = await supabase
+      .from("pending_registrations")
+      .select("company_country")
+      .eq("id", docId)
+      .single();
+    
+    const preferredLang = getLangCode(pendingRegistration?.company_country) ?? 'en';
+
+    // 2. Send decline email
+    try {
+      await sendDeclineEmail({
+        email,
+        lang: preferredLang
+      });
+    } catch (emailError) {
+      console.error("Decline email failed:", emailError);
+    }
+
+    // 3. Delete the user from Supabase Auth (cleanup)
+    const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(uid);
+    if (deleteAuthError) {
+      console.error("Failed to delete auth user:", deleteAuthError);
+      // Continue anyway - we still want to clean up the pending registration
+    }
+
+    // 4. Delete pending registration
     const { error: deleteError } = await supabase
       .from("pending_registrations")
       .delete()
@@ -2189,25 +2384,31 @@ app.post("/api/decline-pendingRegistration", async (req, res) => {
     if (deleteError) {
       throw new Error(deleteError.message);
     }
-    // Add to registrations_history in Supabase
+
+    // 5. Add to registrations_history
     const { error: regHistError } = await supabase
       .from("registrations_history")
-      .insert([
-        {
-          uid: uid,
-          email: email,
-          status: "Declined",
-          created_at: Date.now(),
-        },
-      ]);
+      .insert([{
+        uid: uid,
+        email: email,
+        status: "Declined",
+        created_at: Date.now(),
+      }]);
     if (regHistError) {
       throw new Error(regHistError.message);
     }
-    res
-      .status(200)
-      .json({ success: true, message: "email to admin sent successfully" });
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Registration declined successfully" 
+    });
+    
   } catch (error) {
-    res.status(500).json(error.message);
+    console.error("Decline error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 });
 
