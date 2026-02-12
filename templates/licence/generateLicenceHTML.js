@@ -258,12 +258,12 @@ function generateLicenceHTML(licenseData, companyCountryCode = "EN") {
 
         <table class="items-table">
           <thead>
-            <tr><th>Pos N° d'article</th><th>Description</th><th style="text-align: right;">Quantité</th></tr>
+            <tr><th>Pos Item-no.</th><th>Beschrijving</th><th style="text-align: right;">Aantal</th></tr>
           </thead>
           <tbody>
             ${(products || []).map((p, i) => `
               <tr>
-                <td>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(p.PN || "")}</td>
+                <td>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(p.pn || "")}</td>
                 <td style="color: #2c5aa0; font-weight: bold;">${escapeHtml(p.name || "")}</td>
                 <td style="text-align: right;">${p.quantity || 0}</td>
               </tr>
