@@ -931,7 +931,7 @@ async function reserveLicenseKeys(
 }
 
 app.post(
-  "/webhook",
+  "/webhooks",
   express.raw({ type: "application/json" }),
   async (request, response) => {
     const sig = request.headers["stripe-signature"];
