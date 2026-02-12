@@ -147,16 +147,18 @@ export async function sendMail({
         continue;
       }
 
-      throw new Error(
+      // Log error and break
+      console.error(
         `MailerSend API Error (${response.status}): ${
           errorData.message || response.statusText
         }`
       );
+      break;
 
     } catch (error) {
       if (attempt >= maxRetries - 1) {
         console.error('❌ Email failed after maximum retries:', error.message);
-        throw error;
+        break;
       }
       
       attempt++;
@@ -166,7 +168,13 @@ export async function sendMail({
     }
   }
 
-  throw new Error('❌ Email failed after maximum retries.');
+  // Never throw, just log and return failure
+  return {
+    success: false,
+    error: 'Email failed to send. See logs for details.',
+    environment: process.env.NODE_ENV,
+    domain: config.domain,
+  };
 }
 
 export function validateEmail(email) {
