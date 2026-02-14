@@ -1505,6 +1505,13 @@ async function processPaidOrder(session) {
           contentType: invoicePdfBuffer.contentType || "application/pdf",
           condition: true,
         },
+        {
+        key: "license",
+        filename: `License-${orderNumber}.pdf`,
+        content: pdfBuffer,
+        contentType: pdfBuffer.contentType || "application/pdf",
+        condition: productsWithKeys?.length > 0,
+      },
       ];
 
       // Group attachments by recipient email
