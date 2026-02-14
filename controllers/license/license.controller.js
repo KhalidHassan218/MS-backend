@@ -257,6 +257,8 @@ const generateLicensePdf = async (req, res) => {
     const pdfBuffer = await generateLicencePDFBuffer(
       licenseData,
       company_country,
+      false,
+      company_name, company_city, company_street, company_house_number, company_zip_code, tax_id
     );
 
 
@@ -270,7 +272,6 @@ const generateLicensePdf = async (req, res) => {
     const result = await updateOrder(orderId, {
       license_url: licensePdfUrl,
     });
-    console.log("resultresult", result);
 
     res.status(200).json({
       success: true,

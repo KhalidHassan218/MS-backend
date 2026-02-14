@@ -11,15 +11,18 @@ const getConfig = () => {
   
   return {
     apiKey: process.env.MAILERSEND_API_KEY,
-    domain: isProduction 
-      ? 'microsoftsupplier.com' 
-      : 'test-zxk54v8y53pljy6v.mlsender.net',
-    defaultFrom: isProduction
-      ? 'info@microsoftsupplier.com'
-      : 'info@test-zxk54v8y53pljy6v.mlsender.net',
-    defaultReplyTo: isProduction
-      ? 'info@microsoftsupplier.com'
-      : 'info@test-zxk54v8y53pljy6v.mlsender.net',
+    // domain: isProduction 
+    //   ? 'microsoftsupplier.com' 
+    //   : 'test-zxk54v8y53pljy6v.mlsender.net',
+    domain: process.env.MAILERSEND_DOMAIN,
+    defaultFrom:process.env.MAILERSEND_INFOEMAIL,
+    defaultReplyTo: process.env.MAILERSEND_INFOEMAIL
+    // defaultFrom: isProduction
+    //   ? 'info@microsoftsupplier.com'
+    //   : 'info@test-zxk54v8y53pljy6v.mlsender.net',
+    // defaultReplyTo: isProduction
+    //   ? 'info@microsoftsupplier.com'
+    //   : 'info@test-zxk54v8y53pljy6v.mlsender.net',
   };
 };
 

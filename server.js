@@ -89,20 +89,20 @@ async function processPayByInvoiceOrder(
   company_street,
   company_zip_code,
   company_name,
-  over_due_date
+  over_due_date,
+  billing_email,
+  billing_documents
 ) {
   try {
-    // const taxId = session?.metadata?.taxId;
-    console.log("orderId", orderId);
+    console.log("pay_by_invoice_order", orderId);
 
-    // Assign keys to products (this will update licenseKeys docs in firestore)
 
     const allProducts = [...productsWithKeys, ...phisycalProducts];
     await updateOrder(orderId, {
       // Add products to a related table if needed
       ...data,
       payment_due_date: over_due_date,
-      internal_status: "keys_assigned",
+      internal_status: "keys assigned",
     });
     const adaptedSession = {
       created: new Date(), // match Stripe session timestamp
@@ -134,6 +134,7 @@ async function processPayByInvoiceOrder(
       licenseData,
       companyCountry,
       false,
+      company_name, company_city, company_street, company_house_number, company_zip_code, taxId
     );
     const proformaPdfBuffer = await generateProformaPDFBuffer(
       data,
@@ -166,27 +167,51 @@ async function processPayByInvoiceOrder(
       proforma_url: proformaPdfUrl,
       license_url: licensePdfUrl,
     });
-    let emailAttachemnts = [
+    const emailTargets = [
       {
+        key: "proforma",
         filename: `Proforma-${orderNumber}.pdf`,
-        content: proformaPdfBuffer, // Buffer or string
+        content: proformaPdfBuffer,
         contentType: proformaPdfBuffer.contentType || "application/pdf",
+        condition: true,
+      },
+      {
+        key: "license",
+        filename: `License-${orderNumber}.pdf`,
+        content: pdfBuffer,
+        contentType: pdfBuffer.contentType || "application/pdf",
+        condition: productsWithKeys?.length > 0,
       },
     ];
-    if (productsWithKeys?.length > 0) {
-      emailAttachemnts.push({
-        filename: `License-${orderNumber}.pdf`,
-        content: pdfBuffer, // Buffer or string
-        contentType: pdfBuffer.contentType || "application/pdf",
-      });
-    }
-    await sendOrderConfirmationEmail(
-      data?.name,
-      data?.email,
-      emailAttachemnts,
-      companyCountry, // 'NL', 'EN', 'FR', or 'DE'
-    );
 
+    // Group attachments by recipient email
+    const recipientMap = {};
+
+    for (const doc of emailTargets) {
+      if (!doc.condition) continue;
+
+      const attachment = { filename: doc.filename, content: doc.content, contentType: doc.contentType };
+
+      if (billing_documents?.[`${doc.key}_work_email`] && data?.email) {
+        if (!recipientMap[data.email]) recipientMap[data.email] = [];
+        recipientMap[data.email].push(attachment);
+      }
+      if (billing_documents?.[`${doc.key}_billing_email`] && billing_email) {
+        if (!recipientMap[billing_email]) recipientMap[billing_email] = [];
+        recipientMap[billing_email].push(attachment);
+      }
+    }
+
+    // Send one email per recipient with all their attachments
+    for (const [email, attachments] of Object.entries(recipientMap)) {
+      console.log("sending to:", email, "attachments:", attachments.map(a => a.filename));
+      await sendOrderConfirmationEmail(
+        data?.name,
+        email,
+        attachments,
+        companyCountry,
+      );
+    }
 
     console.log("✅ Order completed:", orderId);
   } catch (err) {
@@ -388,7 +413,7 @@ function generateInvoiceHTML(
   const formattedTax = tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const formattedSubtotal = subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  
+
   // Format dates based on template language
   const invoiceDate = new Date(session.created * 1000).toLocaleDateString(
     template.language,
@@ -1229,6 +1254,8 @@ async function processPaidOrder(session) {
       company_house_number,
       company_street,
       company_zip_code,
+      billing_email,
+      billing_documents
     } = userProfile;
 
     if (fullSession?.metadata && fullSession?.metadata?.orderId) {
@@ -1260,13 +1287,13 @@ async function processPaidOrder(session) {
         "Invoice",
       );
 
-      let emailAttachemnts = [
-        {
-          filename: `Invoice-${orderNumber}.pdf`,
-          content: invoicePdfBuffer, // Buffer or string
-          contentType: invoicePdfBuffer.contentType || "application/pdf",
-        },
-      ];
+      // let emailAttachemnts = [
+      //   {
+      //     filename: `Invoice-${orderNumber}.pdf`,
+      //     content: invoicePdfBuffer, // Buffer or string
+      //     contentType: invoicePdfBuffer.contentType || "application/pdf",
+      //   },
+      // ];
 
       // Update order as completed with both URLs
       await updateOrder(orderRef?.id, {
@@ -1274,12 +1301,59 @@ async function processPaidOrder(session) {
         payment_status: "paid",
         invoice_url: invoicePdfUrl,
       });
-      await sendOrderConfirmationEmail(
-        "",
-        fullSession?.metadata?.email,
-        emailAttachemnts,
-        company_country, // 'NL', 'EN', 'FR', or 'DE'
-      );
+      // await sendOrderConfirmationEmail(
+      //   "",
+      //   fullSession?.metadata?.email,
+      //   emailAttachemnts,
+      //   company_country, // 'NL', 'EN', 'FR', or 'DE'
+      // );
+
+
+
+
+
+
+
+      const emailTargets = [
+        {
+          key: "invoice",
+          filename: `Invoice-${orderNumber}.pdf`,
+          content: invoicePdfBuffer,
+          contentType: invoicePdfBuffer.contentType || "application/pdf",
+          condition: true,
+        },
+      ];
+
+      // Group attachments by recipient email
+      const recipientMap = {};
+      const email = fullSession?.metadata?.email
+      for (const doc of emailTargets) {
+        if (!doc.condition) continue;
+
+        const attachment = { filename: doc.filename, content: doc.content, contentType: doc.contentType };
+
+        if (billing_documents?.[`${doc.key}_work_email`] && email) {
+          if (!recipientMap[email]) recipientMap[email] = [];
+          recipientMap[email].push(attachment);
+        }
+        if (billing_documents?.[`${doc.key}_billing_email`] && billing_email) {
+          if (!recipientMap[billing_email]) recipientMap[billing_email] = [];
+          recipientMap[billing_email].push(attachment);
+        }
+      }
+
+      // Send one email per recipient with all their attachments
+      for (const [email, attachments] of Object.entries(recipientMap)) {
+        console.log("sending to:", email, "attachments:", attachments.map(a => a.filename));
+        await sendOrderConfirmationEmail(
+          "",
+          email,
+          emailAttachemnts,
+          company_country, // 'NL', 'EN', 'FR', or 'DE'
+        );
+      }
+
+
     } else {
       const orderNumber = await getNextOrderNumber();
       console.log("fullSession12", fullSession?.line_items?.data[0]);
@@ -1349,7 +1423,7 @@ async function processPaidOrder(session) {
       await updateOrder(orderId, {
         // Add products to a related table if needed
         products: allProducts,
-        internal_status: "keys_assigned",
+        internal_status: "keys assigned",
       });
       const licenseData = extractLicenseDataFromSession(
         session,
@@ -1361,6 +1435,8 @@ async function processPaidOrder(session) {
       const pdfBuffer = await generateLicencePDFBuffer(
         licenseData,
         company_country,
+        false,
+        company_name, company_city, company_street, company_house_number, company_zip_code, tax_id
       );
       const invoicePdfBuffer = await generateInvoicePDFBuffer(
         fullSession,
@@ -1641,7 +1717,7 @@ app.get("/api/verify", async (req, res) => {
 app.post("/api/send-verification", async (req, res) => {
   try {
     const { email, name, lang = "EN", verifyUrl, uid } = req.body;
-    
+
     if (!email || !verifyUrl || !uid) {
       return res.status(400).json({
         success: false,
@@ -1655,7 +1731,7 @@ app.post("/api/send-verification", async (req, res) => {
       .select("*")
       .eq("id", uid)
       .single();
-      
+
     if (profileError || !profile) {
       return res.status(404).json({
         success: false,
@@ -1674,7 +1750,7 @@ app.post("/api/send-verification", async (req, res) => {
     // Check for existing valid verification token (15 minutes)
     const now = new Date();
     const expiryMs = 15 * 60 * 1000; // 15 minutes
-    
+
     if (
       profile.verification_token &&
       profile.verification_expires_at &&
@@ -1701,7 +1777,7 @@ app.post("/api/send-verification", async (req, res) => {
         verification_expires_at,
       })
       .eq("id", uid);
-      
+
     if (updateError) {
       throw new Error(updateError.message);
     }
@@ -1720,16 +1796,16 @@ app.post("/api/send-verification", async (req, res) => {
 
     console.log(`✅ Verification email sent to ${email} (${lang})`);
 
-    res.json({ 
-      success: true, 
-      message: getVerificationMsg(lang, "sent") 
+    res.json({
+      success: true,
+      message: getVerificationMsg(lang, "sent")
     });
-    
+
   } catch (err) {
     console.error('❌ Verification email error:', err);
     const lang = req.body?.lang || "EN";
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: getVerificationMsg(lang, "error"),
       error: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
@@ -1744,6 +1820,7 @@ app.post(
     const {
       id,
       email,
+      billing_email,
       company_name,
       company_country,
       tax_id,
@@ -1759,6 +1836,7 @@ app.post(
       company_house_number,
       company_street,
       company_zip_code,
+      billing_documents
     } = req.profile;
     const cart = req.body.cart;
 
@@ -1776,7 +1854,6 @@ app.post(
     let currency;
     currency = isUSCompany ? "usd" : "eur";
     const lineItems = cart?.map((product) => {
-      console.log("productproduct", product);
 
       let b2bpriceWVat = parseFloat(product?.priceWVat);
       const priceCopy = b2bpriceWVat.toFixed(2);
@@ -1838,8 +1915,6 @@ app.post(
           const description = product?.selectedLangObj?.id
             ? `Language: ${product.selectedLangObj.lang} PN: ${product.selectedLangObj.pn}`
             : `Language: English`;
-          // Fix: Use Math.round to ensure it is an integer
-          console.log("productproduct", product);
 
           const unit_amount = Math.round(b2bpriceWVat * 100);
           return {
@@ -1879,9 +1954,6 @@ app.post(
 
         if (error) throw error;
 
-        // This is your "orderDocRef" equivalent
-        console.log("order", order);
-
         const newOrder = order[0];
         const orderId = newOrder.id;
 
@@ -1900,7 +1972,6 @@ app.post(
             email: email,
           },
           // You can disable manual tax or promotion codes to keep the UI minimal
-          billing_address_collection: "required",
           after_completion: {
             type: "redirect",
             redirect: {
@@ -1991,6 +2062,8 @@ app.post(
 
           // optional: notify admin or send email to customer here
           return;
+          return res.status(500).json({ error: "Not enough license keys available." });
+
         }
         const allProducts = [...productsWithKeys, ...phisycalProducts];
         data.products = allProducts;
@@ -2007,7 +2080,9 @@ app.post(
           company_street,
           company_zip_code,
           company_name,
-          over_due_date
+          over_due_date,
+          billing_email,
+          billing_documents
         );
         // 4. Return the link to be attached to your Firebase orders doc
         res.status(200).send();
@@ -2071,25 +2146,25 @@ app.post(
 //   }
 // });
 app.post("/api/registerNewPendingUser", async (req, res) => {
-  const { 
-    email, 
-    company_name, 
-    tax_id, 
-    company_country, 
-    company_street, 
-    company_house_number, 
-    company_zip_code, 
-    company_city, 
-    password 
+  const {
+    email,
+    company_name,
+    tax_id,
+    company_country,
+    company_street,
+    company_house_number,
+    company_zip_code,
+    company_city,
+    password
   } = req.body;
-  
+
   try {
     // 1. Check if user already exists in Auth
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(u => u.email === email);
-    
+
     let userId;
-    
+
     if (existingUser) {
       // User exists - check if they have a pending registration
       const { data: pendingReg } = await supabase
@@ -2097,14 +2172,14 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
         .select('*')
         .eq('email', email)
         .single();
-      
+
       if (pendingReg) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "Registration already pending approval" 
+        return res.status(400).json({
+          success: false,
+          message: "Registration already pending approval"
         });
       }
-      
+
       // User was declined before - reuse the same auth user
       userId = existingUser.id;
     } else {
@@ -2117,18 +2192,18 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
           pending_approval: true
         }
       });
-      
+
       if (userError) {
         console.error("Error creating user:", userError);
-        return res.status(500).json({ 
-          success: false, 
-          message: userError.message 
+        return res.status(500).json({
+          success: false,
+          message: userError.message
         });
       }
-      
+
       userId = user.user?.id;
     }
-    
+
     // 2. Insert pending registration
     const { error: regError } = await supabase
       .from('pending_registrations')
@@ -2144,18 +2219,18 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
         company_city,
         created_at: Date.now(),
       }]);
-    
+
     if (regError) {
       console.error("Error creating pending registration:", regError);
-      return res.status(500).json({ 
-        success: false, 
-        message: regError.message 
+      return res.status(500).json({
+        success: false,
+        message: regError.message
       });
     }
-    
+
     // 3. Send notification to admin
     const preferredLang = getLangCode(company_country) ?? 'en';
-    
+
     try {
       await sendAdminPendingRegistrationEmail({
         email,
@@ -2168,17 +2243,17 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
       console.error("Admin notification failed:", emailError);
       // Don't fail the registration if email fails
     }
-    
-    res.status(200).json({ 
+
+    res.status(200).json({
       success: true,
-      message: "Registration submitted successfully" 
+      message: "Registration submitted successfully"
     });
-    
+
   } catch (error) {
     console.error("Registration error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 });
@@ -2194,15 +2269,15 @@ app.post("/api/send-admin-email-pendingRegistrations", async (req, res) => {
       lang: 'en' // Use user's language or default to English
     });
 
-    res.status(200).json({ 
-      success: true, 
-      message: "Admin notification sent successfully" 
+    res.status(200).json({
+      success: true,
+      message: "Admin notification sent successfully"
     });
   } catch (error) {
     console.error('❌ Admin email error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });
@@ -2252,7 +2327,7 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
   const { uid, email, docId } = req.body;
   try {
     const b2bSupplierId = await getNextB2BAccountId();
-    
+
     // 1. Enable the user account in Supabase Auth
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(uid, {
       disabled: false,
@@ -2270,7 +2345,7 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
     if (pendingError || !pendingRegistration) {
       throw new Error("Pending registration not found");
     }
-    
+
     const preferredLang = getLangCode(pendingRegistration?.company_country);
 
     // 3. Create user profile
@@ -2292,7 +2367,7 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
       lang_code: preferredLang ?? "en",
       invoice_settings: { enabled: false, overDueDay: null },
     };
-    
+
     const { error: profileError } = await supabase
       .from("profiles")
       .upsert([newUserData]);
@@ -2348,7 +2423,7 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
 // Decline registration endpoint
 app.post("/api/decline-pendingRegistration", async (req, res) => {
   const { uid, email, docId } = req.body;
-  
+
   try {
     // 1. Get user's language preference
     const { data: pendingRegistration } = await supabase
@@ -2356,7 +2431,7 @@ app.post("/api/decline-pendingRegistration", async (req, res) => {
       .select("company_country")
       .eq("id", docId)
       .single();
-    
+
     const preferredLang = getLangCode(pendingRegistration?.company_country) ?? 'en';
 
     // 2. Send decline email
@@ -2398,11 +2473,11 @@ app.post("/api/decline-pendingRegistration", async (req, res) => {
       throw new Error(regHistError.message);
     }
 
-    res.status(200).json({ 
-      success: true, 
-      message: "Registration declined successfully" 
+    res.status(200).json({
+      success: true,
+      message: "Registration declined successfully"
     });
-    
+
   } catch (error) {
     console.error("Decline error:", error);
     res.status(500).json({

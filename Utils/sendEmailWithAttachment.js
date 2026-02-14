@@ -31,8 +31,15 @@ async function sendEmailWithAttachment(
 ) {
   try {
     // Validate recipient email
-    if (!send_to || !send_to.includes('@')) {
-      throw new Error('Invalid recipient email address');
+    // if (!send_to || !send_to.includes('@')) {
+    //   throw new Error('Invalid recipient email address');
+    // }
+
+    const recipients = Array.isArray(send_to) ? send_to : [send_to];
+    for (const email of recipients) {
+      if (!email || !email.includes('@')) {
+        throw new Error(`Invalid recipient email address: ${email}`);
+      }
     }
 
     // Prepare attachments for MailerSend format
