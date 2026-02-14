@@ -1509,15 +1509,14 @@ async function processPaidOrder(session) {
 
       // Group attachments by recipient email
       const recipientMap = {};
-      const email = data?.email
       for (const doc of emailTargets) {
         if (!doc.condition) continue;
 
         const attachment = { filename: doc.filename, content: doc.content, contentType: doc.contentType };
 
-        if (billing_documents?.[`${doc.key}_work_email`] && email) {
-          if (!recipientMap[email]) recipientMap[email] = [];
-          recipientMap[email].push(attachment);
+        if (billing_documents?.[`${doc.key}_work_email`] && data?.email) {
+          if (!recipientMap[data?.email]) recipientMap[email] = [];
+          recipientMap[data?.email].push(attachment);
         }
         if (billing_documents?.[`${doc.key}_billing_email`] && billing_email) {
           if (!recipientMap[billing_email]) recipientMap[billing_email] = [];
