@@ -1348,7 +1348,7 @@ async function processPaidOrder(session) {
         await sendOrderConfirmationEmail(
           "",
           email,
-          emailAttachemnts,
+          attachments,
           company_country, // 'NL', 'EN', 'FR', or 'DE'
         );
       }
@@ -1470,26 +1470,71 @@ async function processPaidOrder(session) {
         invoice_url: invoicePdfUrl,
         license_url: licensePdfUrl,
       });
-      let emailAttachemnts = [
+
+
+
+
+
+      // let emailAttachemnts = [
+      //   {
+      //     filename: `Invoice-${orderNumber}.pdf`,
+      //     content: invoicePdfBuffer, // Buffer or string
+      //     contentType: invoicePdfBuffer.contentType || "application/pdf",
+      //   },
+      // ];
+      // if (productsWithKeys?.length > 0) {
+      //   emailAttachemnts.push({
+      //     filename: `License-${orderNumber}.pdf`,
+      //     content: pdfBuffer, // Buffer or string
+      //     contentType: pdfBuffer.contentType || "application/pdf",
+      //   });
+      // }
+      // await sendOrderConfirmationEmail(
+      //   data?.name,
+      //   data?.email,
+      //   emailAttachemnts,
+      //   company_country, // 'NL', 'EN', 'FR', or 'DE'
+      // );
+
+
+      const emailTargets = [
         {
+          key: "invoice",
           filename: `Invoice-${orderNumber}.pdf`,
-          content: invoicePdfBuffer, // Buffer or string
+          content: invoicePdfBuffer,
           contentType: invoicePdfBuffer.contentType || "application/pdf",
+          condition: true,
         },
       ];
-      if (productsWithKeys?.length > 0) {
-        emailAttachemnts.push({
-          filename: `License-${orderNumber}.pdf`,
-          content: pdfBuffer, // Buffer or string
-          contentType: pdfBuffer.contentType || "application/pdf",
-        });
+
+      // Group attachments by recipient email
+      const recipientMap = {};
+      const email = data?.email
+      for (const doc of emailTargets) {
+        if (!doc.condition) continue;
+
+        const attachment = { filename: doc.filename, content: doc.content, contentType: doc.contentType };
+
+        if (billing_documents?.[`${doc.key}_work_email`] && email) {
+          if (!recipientMap[email]) recipientMap[email] = [];
+          recipientMap[email].push(attachment);
+        }
+        if (billing_documents?.[`${doc.key}_billing_email`] && billing_email) {
+          if (!recipientMap[billing_email]) recipientMap[billing_email] = [];
+          recipientMap[billing_email].push(attachment);
+        }
       }
-      await sendOrderConfirmationEmail(
-        data?.name,
-        data?.email,
-        emailAttachemnts,
-        company_country, // 'NL', 'EN', 'FR', or 'DE'
-      );
+
+      // Send one email per recipient with all their attachments
+      for (const [email, attachments] of Object.entries(recipientMap)) {
+        console.log("sending to:", email, "attachments:", attachments.map(a => a.filename));
+        await sendOrderConfirmationEmail(
+          data?.name,
+          email,
+          attachments,
+          company_country, // 'NL', 'EN', 'FR', or 'DE'
+        );
+      }
 
 
     }
