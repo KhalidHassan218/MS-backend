@@ -2112,7 +2112,6 @@ app.post(
           });
 
           // optional: notify admin or send email to customer here
-          return;
           return res.status(500).json({ error: "Not enough license keys available." });
 
         }
