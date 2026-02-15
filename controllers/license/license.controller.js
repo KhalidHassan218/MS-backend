@@ -140,28 +140,28 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
 
     // 12️⃣ Email
     const emailContent = generateKeyReplacementEmail(companyCountry);
-    try {
-      await sendEmailWithAttachment(
-        emailContent.subject,
-        emailContent.html,
-        email,
-        process.env.EMAIL_USER,
-        process.env.EMAIL_USER,
-        [
-          {
-            filename: `License-${orderNumber}.pdf`,
-            content: pdfBuffer,
-            contentType: 'application/pdf',
-          },
-        ]
-      );
-    } catch (error) {
-      console.log("error key replacment email", error);
+    // try {
+    //   await sendEmailWithAttachment(
+    //     emailContent.subject,
+    //     emailContent.html,
+    //     email,
+    //     process.env.EMAIL_USER,
+    //     process.env.EMAIL_USER,
+    //     [
+    //       {
+    //         filename: `License-${orderNumber}.pdf`,
+    //         content: pdfBuffer,
+    //         contentType: 'application/pdf',
+    //       },
+    //     ]
+    //   );
+    // } catch (error) {
+    //   console.log("error key replacment email", error);
 
-    }
+    // }
     res.status(200).json({
       success: true,
-      message: 'Email with PDF sent successfully',
+      message: 'key replaced successfully',
       oldKey,
       newKey,
     });

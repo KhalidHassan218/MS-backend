@@ -175,13 +175,13 @@ async function processPayByInvoiceOrder(
         contentType: proformaPdfBuffer.contentType || "application/pdf",
         condition: true,
       },
-      {
-        key: "license",
-        filename: `License-${orderNumber}.pdf`,
-        content: pdfBuffer,
-        contentType: pdfBuffer.contentType || "application/pdf",
-        condition: productsWithKeys?.length > 0,
-      },
+      // {
+      //   key: "license",
+      //   filename: `License-${orderNumber}.pdf`,
+      //   content: pdfBuffer,
+      //   contentType: pdfBuffer.contentType || "application/pdf",
+      //   condition: productsWithKeys?.length > 0,
+      // },
     ];
 
     // Group attachments by recipient email
@@ -1505,13 +1505,13 @@ async function processPaidOrder(session) {
           contentType: invoicePdfBuffer.contentType || "application/pdf",
           condition: true,
         },
-        {
-        key: "license",
-        filename: `License-${orderNumber}.pdf`,
-        content: pdfBuffer,
-        contentType: pdfBuffer.contentType || "application/pdf",
-        condition: productsWithKeys?.length > 0,
-      },
+        // {
+        //   key: "license",
+        //   filename: `License-${orderNumber}.pdf`,
+        //   content: pdfBuffer,
+        //   contentType: pdfBuffer.contentType || "application/pdf",
+        //   condition: productsWithKeys?.length > 0,
+        // },
       ];
 
       // Group attachments by recipient email
@@ -1707,7 +1707,6 @@ app.get("/api/verify", async (req, res) => {
         .status(400)
         .json({ success: false, message: getVerificationMsg(lang, "missing") });
     }
-    console.log("webhh", process.env.WEBHOOK_SECRET);
 
     // Fetch profile from Supabase profiles table
     const { data: profile, error: profileError } = await supabase
@@ -1732,13 +1731,24 @@ app.get("/api/verify", async (req, res) => {
         .json({ success: false, message: getVerificationMsg(lang, "invalid") });
     }
     // Mark profile as verified and remove verification_token/expiry, set verified_at
+    const updatePayload = {
+      verification_token: null,
+      verification_expires_at: null,
+      verified_at: now.toISOString(),
+    }
+    // Check if billing email is same 100% as work email and verify as well 
+    if (
+      profile.billing_contact?.email &&
+      profile.email.toLowerCase().trim() === profile.billing_contact.email.toLowerCase().trim()
+    ) {
+      updatePayload.billing_contact = {
+        ...profile.billing_contact,
+        verified_at: now.toISOString(),
+      };
+    }
     const { error: updateError } = await supabase
       .from("profiles")
-      .update({
-        verification_token: null,
-        verification_expires_at: null,
-        verified_at: now.toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", uid);
     if (updateError) {
       throw new Error(updateError.message);
@@ -1798,9 +1808,8 @@ app.post("/api/send-verification", async (req, res) => {
       });
     }
 
-    // Check for existing valid verification token (15 minutes)
     const now = new Date();
-    const expiryMs = 15 * 60 * 1000; // 15 minutes
+    const expiryMs = 24 * 60 * 60 * 1000; // 24 hours
 
     if (
       profile.verification_token &&
@@ -1862,6 +1871,145 @@ app.post("/api/send-verification", async (req, res) => {
     });
   }
 });
+
+
+app.post("/api/send-billing-verification", async (req, res) => {
+  try {
+    const { email, name, lang = "EN", verifyUrl, uid } = req.body;
+
+    if (!email || !verifyUrl || !uid) {
+      return res.status(400).json({ success: false, message: getVerificationMsg(lang, "missingData") });
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("billing_contact")
+      .eq("id", uid)
+      .single();
+
+    if (profileError || !profile) {
+      return res.status(404).json({ success: false, message: getVerificationMsg(lang, "notFound") });
+    }
+
+    const billing = profile.billing_contact || {};
+
+    // 1. Check if billing email is already verified
+    if (billing.verified_at) {
+      return res.status(200).json({ success: true, message: getVerificationMsg(lang, "alreadyVerified") });
+    }
+
+    // 2. CHECK FOR EXISTING VALID TOKEN (Cooldown Logic)
+    const now = new Date();
+    if (
+      billing.verification_token &&
+      billing.verification_expires_at &&
+      new Date(billing.verification_expires_at) > now
+    ) {
+      // If a token exists and hasn't expired, don't send a new one
+      return res.status(200).json({
+        success: true,
+        message: getVerificationMsg(lang, "alreadySent")
+      });
+    }
+
+    // 3. Generate new verification token if none exists or old one expired
+    const crypto = await import("crypto");
+    const token = crypto.randomBytes(32).toString("hex");
+    const oneDayInMs = 24 * 60 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + oneDayInMs).toISOString();
+    // Update the nested billing_contact object
+    const updatedBillingContact = {
+      ...billing,
+      email: email.toLowerCase().trim(),
+      verification_token: token,
+      verification_expires_at: expiresAt
+    };
+
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ billing_contact: updatedBillingContact })
+      .eq("id", uid);
+
+    if (updateError) throw updateError;
+
+    const verificationLink = `${verifyUrl.replace(/\/$/, "")}?token=${token}&uid=${uid}&type=billing`;
+
+    await sendVerificationEmail({
+      email: email.toLowerCase().trim(),
+      verifyUrl: verificationLink,
+      customerName: name,
+      lang: lang.toUpperCase(),
+      isBilling: true
+    });
+
+    res.json({ success: true, message: getVerificationMsg(lang, "sent") });
+  } catch (err) {
+    console.error("Billing Verification Error:", err);
+    res.status(500).json({ success: false, message: getVerificationMsg(lang, "error") });
+  }
+});
+
+
+
+
+app.get("/api/verify-billing", async (req, res) => {
+  try {
+    const { token, uid, lang = "EN" } = req.query;
+
+    if (!token || !uid) {
+      return res.status(400).json({ success: false, message: getVerificationMsg(lang, "missing") });
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("billing_contact")
+      .eq("id", uid)
+      .single();
+
+    if (profileError || !profile || !profile.billing_contact) {
+      return res.status(404).json({ success: false, message: getVerificationMsg(lang, "notFound") });
+    }
+
+    const billing = profile.billing_contact;
+    const now = new Date();
+
+    // Validate the token inside the JSON object
+    if (
+      billing.verification_token !== token ||
+      !billing.verification_expires_at ||
+      new Date(billing.verification_expires_at).getTime() < now.getTime()
+    ) {
+      return res.status(400).json({ success: false, message: getVerificationMsg(lang, "invalid") });
+    }
+
+    // Prepare updated JSON: remove tokens, add verified_at
+    const updatedBillingContact = {
+      ...billing,
+      verification_token: null,
+      verification_expires_at: null,
+      verified_at: now.toISOString(),
+    };
+
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ billing_contact: updatedBillingContact })
+      .eq("id", uid);
+
+    if (updateError) throw updateError;
+
+    return res.json({ success: true, message: getVerificationMsg(lang, "verified") });
+  } catch (err) {
+    res.status(500).json({ success: false, message: getVerificationMsg(lang, "error") });
+  }
+});
+
+
+
+
+
+
+
+
 app.post(
   "/api/create-checkout-session",
   requireAuth,
@@ -2205,8 +2353,10 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
     company_house_number,
     company_zip_code,
     company_city,
+    billing_email,
     password
   } = req.body;
+  console.log("billing_email", billing_email);
 
   try {
     // 1. Check if user already exists in Auth
@@ -2267,6 +2417,7 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
         company_house_number,
         company_zip_code,
         company_city,
+        billing_email: billing_email,
         created_at: Date.now(),
       }]);
 
@@ -2397,6 +2548,7 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
     }
 
     const preferredLang = getLangCode(pendingRegistration?.company_country);
+    console.log("pendingRegistration", pendingRegistration);
 
     // 3. Create user profile
     const newUserData = {
@@ -2411,6 +2563,11 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
       company_house_number: pendingRegistration?.company_house_number,
       company_zip_code: pendingRegistration?.company_zip_code,
       company_city: pendingRegistration?.company_city,
+      billing_contact: {
+        email: pendingRegistration?.billing_email || null, // from req.body
+        is_verified: false,
+        verified_at: null
+      },
       status: "active",
       created_at: new Date().toISOString(),
       accepted_at: new Date().toISOString(),
