@@ -38,7 +38,7 @@ const emailTemplates = {
     importantTitle: "IMPORTANT INFORMATION",
     importantInfo: [
       "The licenses activate online immediately (no phone activation required)",
-      "Warranty: 12 months",
+      "Warranty: 36 months",
       "The licenses are supplied through our internal distribution system",
       "Delivery method: Digital ESD licenses via email (no physical shipment)",
       "Not subject to U.S. sales tax"
@@ -158,7 +158,6 @@ function generateEmailContent(lang) {
           <p class="mobile-small" style="color: #718096; margin: 0 0 12px 0; font-size: 13px; letter-spacing: 0.5px;">${t.attachmentsTitle}</p>
           <p class="mobile-small" style="color: #2d3748; margin: 0; font-size: 14px; line-height: 1.8;">
             • ${t.attachments.invoice}<br>
-            • ${t.attachments.license}
           </p>
         </div>
         <div class="mobile-box" style="background: #fef3c7; padding: 20px; margin: 0 0 35px 0; text-align: left; border-radius: 6px; border-left: 4px solid #f59e0b;">

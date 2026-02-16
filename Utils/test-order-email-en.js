@@ -63,7 +63,7 @@ function generateEmailContent() {
           </p>
           <p class="mobile-small" style="color: #92400e; margin: 0; font-size: 13px; line-height: 1.6;">
             • The licenses activate online immediately (no phone activation required)<br>
-            • Warranty: 12 months<br>
+            • Warranty: 36 months<br>
             • The licenses are supplied through our internal distribution system<br>
             • Delivery method: Digital ESD licenses via email (no physical shipment)<br>
             • Not subject to U.S. sales tax

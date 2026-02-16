@@ -90,7 +90,7 @@ async function processPayByInvoiceOrder(
   company_zip_code,
   company_name,
   over_due_date,
-  billing_email,
+  billing_contact,
   billing_documents
 ) {
   try {
@@ -196,7 +196,8 @@ async function processPayByInvoiceOrder(
         if (!recipientMap[data.email]) recipientMap[data.email] = [];
         recipientMap[data.email].push(attachment);
       }
-      if (billing_documents?.[`${doc.key}_billing_email`] && billing_email) {
+      const billing_email = billing_contact?.email
+      if (billing_documents?.[`${doc.key}_billing_email`] && billing_email && billing_contact?.verified_at) {
         if (!recipientMap[billing_email]) recipientMap[billing_email] = [];
         recipientMap[billing_email].push(attachment);
       }
@@ -997,6 +998,7 @@ const emailTemplates = {
     attachments: {
       invoice: "De factuur",
       license: "Het licentiedocument (met alle licentiesleutels)",
+      proforma: "De proforma factuur (BTW 0% – Export buiten EU)",
     },
     importantTitle: "BELANGRIJKE INFORMATIE",
     importantInfo: [
@@ -1020,11 +1022,12 @@ const emailTemplates = {
     attachments: {
       invoice: "The invoice (VAT 0% – Export outside EU)",
       license: "The license document (containing all license keys)",
+      proforma: "The pro forma invoice (VAT 0% – Export outside EU)",
     },
     importantTitle: "IMPORTANT INFORMATION",
     importantInfo: [
       "The licenses activate online immediately (no phone activation required)",
-      "Warranty: 12 months",
+      "Warranty: 36 months",
       "The licenses are supplied through our internal distribution system",
       "Delivery method: Digital ESD licenses via email (no physical shipment)",
       "Not subject to U.S. sales tax",
@@ -1044,6 +1047,7 @@ const emailTemplates = {
     attachmentsTitle: "PIÈCES JOINTES",
     attachments: {
       invoice: "La facture (TVA autoliquidée – Article 196 de la directive TVA de l'UE)",
+      proforma: "La facture proforma (TVA autoliquidée – Article 196 de la directive TVA de l'UE)",
       license: "Le document de licence (contenant toutes les clés de licence)",
     },
     importantTitle: "INFORMATIONS IMPORTANTES",
@@ -1067,6 +1071,7 @@ const emailTemplates = {
     attachmentsTitle: "ANHÄNGE",
     attachments: {
       invoice: "Die Rechnung",
+      proforma: "Die Proforma-Rechnung (MwSt. 0% – Export außerhalb der EU)",
       license: "Das Lizenzdokument (mit allen Lizenzschlüsseln)",
     },
     importantTitle: "WICHTIGE INFORMATIONEN",
@@ -1106,7 +1111,7 @@ const emailTemplates = {
   },
 };
 
-function generateEmailContent(customerName, companyCountryCode = "EN") {
+function generateEmailContent(customerName, companyCountryCode = "EN", type) {
   const template =
     emailTemplates[companyCountryCode.toUpperCase()] || emailTemplates.EN;
 
@@ -1165,8 +1170,7 @@ function generateEmailContent(customerName, companyCountryCode = "EN") {
         <div class="mobile-box" style="background: #f7fafc; padding: 24px; margin: 0 0 35px 0; text-align: left; border-radius: 6px;">
           <p class="mobile-small" style="color: #718096; margin: 0 0 12px 0; font-size: 13px; letter-spacing: 0.5px;">${template.attachmentsTitle}</p>
           <p class="mobile-small" style="color: #2d3748; margin: 0; font-size: 14px; line-height: 1.8;">
-            • ${template.attachments.invoice}<br>
-            • ${template.attachments.license}
+            • ${type === 'invoice' ? template.attachments.invoice : template.attachments.proforma}<br>
           </p>
         </div>
 
@@ -1217,8 +1221,9 @@ async function sendOrderConfirmationEmail(
   customerEmail,
   emailAttachments,
   companyCountryCode = "EN",
+  type = 'invoice'
 ) {
-  const emailContent = generateEmailContent(customerName, companyCountryCode);
+  const emailContent = generateEmailContent(customerName, companyCountryCode, type);
 
   await sendEmailWithAttachment(
     emailContent.subject,
@@ -1254,7 +1259,7 @@ async function processPaidOrder(session) {
       company_house_number,
       company_street,
       company_zip_code,
-      billing_email,
+      billing_contact,
       billing_documents
     } = userProfile;
 
@@ -1336,7 +1341,8 @@ async function processPaidOrder(session) {
           if (!recipientMap[email]) recipientMap[email] = [];
           recipientMap[email].push(attachment);
         }
-        if (billing_documents?.[`${doc.key}_billing_email`] && billing_email) {
+        const billing_email = billing_contact?.email
+        if (billing_documents?.[`${doc.key}_billing_email`] && billing_email && billing_documents?.verified_at) {
           if (!recipientMap[billing_email]) recipientMap[billing_email] = [];
           recipientMap[billing_email].push(attachment);
         }
@@ -1475,26 +1481,7 @@ async function processPaidOrder(session) {
 
 
 
-      // let emailAttachemnts = [
-      //   {
-      //     filename: `Invoice-${orderNumber}.pdf`,
-      //     content: invoicePdfBuffer, // Buffer or string
-      //     contentType: invoicePdfBuffer.contentType || "application/pdf",
-      //   },
-      // ];
-      // if (productsWithKeys?.length > 0) {
-      //   emailAttachemnts.push({
-      //     filename: `License-${orderNumber}.pdf`,
-      //     content: pdfBuffer, // Buffer or string
-      //     contentType: pdfBuffer.contentType || "application/pdf",
-      //   });
-      // }
-      // await sendOrderConfirmationEmail(
-      //   data?.name,
-      //   data?.email,
-      //   emailAttachemnts,
-      //   company_country, // 'NL', 'EN', 'FR', or 'DE'
-      // );
+
 
 
       const emailTargets = [
@@ -1525,7 +1512,8 @@ async function processPaidOrder(session) {
           if (!recipientMap[data?.email]) recipientMap[email] = [];
           recipientMap[data?.email].push(attachment);
         }
-        if (billing_documents?.[`${doc.key}_billing_email`] && billing_email) {
+        const billing_email = billing_contact?.email
+        if (billing_documents?.[`${doc.key}_billing_email`] && billing_email && billing_documents?.verified_at) {
           if (!recipientMap[billing_email]) recipientMap[billing_email] = [];
           recipientMap[billing_email].push(attachment);
         }
@@ -1539,6 +1527,7 @@ async function processPaidOrder(session) {
           email,
           attachments,
           company_country, // 'NL', 'EN', 'FR', or 'DE'
+          'invoice'
         );
       }
 
@@ -2019,7 +2008,7 @@ app.post(
     const {
       id,
       email,
-      billing_email,
+      billing_contact,
       company_name,
       company_country,
       tax_id,
@@ -2279,7 +2268,7 @@ app.post(
           company_zip_code,
           company_name,
           over_due_date,
-          billing_email,
+          billing_contact,
           billing_documents
         );
         // 4. Return the link to be attached to your Firebase orders doc
@@ -2356,8 +2345,6 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
     billing_email,
     password
   } = req.body;
-  console.log("billing_email", billing_email);
-
   try {
     // 1. Check if user already exists in Auth
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
