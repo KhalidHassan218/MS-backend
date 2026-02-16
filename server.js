@@ -211,6 +211,7 @@ async function processPayByInvoiceOrder(
         email,
         attachments,
         companyCountry,
+        'proforma'
       );
     }
 
@@ -1306,12 +1307,7 @@ async function processPaidOrder(session) {
         payment_status: "paid",
         invoice_url: invoicePdfUrl,
       });
-      // await sendOrderConfirmationEmail(
-      //   "",
-      //   fullSession?.metadata?.email,
-      //   emailAttachemnts,
-      //   company_country, // 'NL', 'EN', 'FR', or 'DE'
-      // );
+
 
 
 
@@ -1356,6 +1352,7 @@ async function processPaidOrder(session) {
           email,
           attachments,
           company_country, // 'NL', 'EN', 'FR', or 'DE'
+          'invoice'
         );
       }
 
