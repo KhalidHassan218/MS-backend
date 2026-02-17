@@ -1338,7 +1338,7 @@ async function processPaidOrder(session) {
           recipientMap[email].push(attachment);
         }
         const billing_email = billing_contact?.email
-        if (billing_documents?.[`${doc.key}_billing_email`] && billing_email && billing_documents?.verified_at) {
+        if (billing_documents?.[`${doc.key}_billing_email`] && billing_email && billing_contact?.verified_at) {
           if (!recipientMap[billing_email]) recipientMap[billing_email] = [];
           recipientMap[billing_email].push(attachment);
         }
