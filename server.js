@@ -997,9 +997,9 @@ const emailTemplates = {
     processed: "De licenties zijn succesvol verwerkt en de documenten zijn nu beschikbaar.",
     attachmentsTitle: "BIJLAGEN",
     attachments: {
-      invoice: "De factuur",
+      invoice: "De factuur (BTW 21% - Export binnen NL)",
       license: "Het licentiedocument (met alle licentiesleutels)",
-      proforma: "De proforma factuur (BTW 0% – Export buiten EU)",
+      proforma: "De proforma factuur (BTW 21% - Export binnen NL)",
     },
     importantTitle: "BELANGRIJKE INFORMATIE",
     importantInfo: [
