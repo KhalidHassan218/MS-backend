@@ -1004,7 +1004,7 @@ const emailTemplates = {
     importantTitle: "BELANGRIJKE INFORMATIE",
     importantInfo: [
       "De licenties worden direct online geactiveerd (telefonische activatie is niet nodig)",
-      "Garantie: 12 maanden",
+      "Garantie: 36 maanden",
       "De licenties zijn afkomstig uit ons interne distributiesysteem",
     ],
     contactText: "Vragen? Antwoord op deze e-mail",
@@ -1054,7 +1054,7 @@ const emailTemplates = {
     importantTitle: "INFORMATIONS IMPORTANTES",
     importantInfo: [
       "Les licences s'activent directement en ligne (aucune activation téléphonique n'est nécessaire)",
-      "Garantie : 12 mois",
+      "Garantie : 36 mois",
       "Les licences proviennent de notre système interne de distribution",
     ],
     contactText: "Questions ? Répondez à cet e-mail",
@@ -1078,7 +1078,7 @@ const emailTemplates = {
     importantTitle: "WICHTIGE INFORMATIONEN",
     importantInfo: [
       "Die Lizenzen werden sofort online aktiviert (keine telefonische Aktivierung erforderlich)",
-      "Garantie: 12 Monate",
+      "Garantie: 36 Monate",
       "Die Lizenzen stammen aus unserem internen Vertriebssystem",
     ],
     contactText: "Fragen? Antworten Sie auf diese E-Mail",
@@ -1101,7 +1101,7 @@ const emailTemplates = {
     importantTitle: "INFORMACIÓN IMPORTANTE",
     importantInfo: [
       "Las licencias se activan en línea inmediatamente (no se requiere activación telefónica)",
-      "Garantía: 12 meses",
+      "Garantía: 36 meses",
       "Las licencias provienen de nuestro sistema de distribución interno",
     ],
     contactText: "¿Preguntas? Responda a este correo",
