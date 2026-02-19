@@ -1,81 +1,73 @@
-import nodemailer from "nodemailer";
+import { sendMail } from './mailersend.js';
 
-const sendEmailWithAttachment = async (
+/**
+ * Send email with attachments using MailerSend
+ * 
+ * @param {string} subject - Email subject
+ * @param {string} message - HTML message content
+ * @param {string} send_to - Recipient email address
+ * @param {string} sent_from - Sender email (optional, uses default)
+ * @param {string} reply_to - Reply-to address (optional)
+ * @param {Array} attachment - Array of attachment objects
+ * @param {number} maxRetries - Maximum retry attempts
+ * 
+ * Attachment format:
+ * [
+ *   {
+ *     content: 'base64-encoded-string',
+ *     filename: 'invoice.pdf',
+ *     disposition: 'attachment' // or 'inline'
+ *   }
+ * ]
+ */
+async function sendEmailWithAttachment(
   subject,
   message,
   send_to,
-  sent_from,
-  reply_to,
-  attachment,
-  maxRetries = 5
-) => {
+  sent_from = null,
+  reply_to = null,
+  attachment = [],
+  maxRetries = 3
+) {
+  try {
+    // Validate recipient email
+    // if (!send_to || !send_to.includes('@')) {
+    //   throw new Error('Invalid recipient email address');
+    // }
 
-  // const transporter = nodemailer.createTransport({
-  //   host: "smtp.strato.de",
-  //   port: 587,
-  //   secure: false,
-  //   auth: {
-  //     user: "invoice@sertic.nl",
-  //     pass: "EqAsRIwEPCM123!<#!",
-  //   },
-  //   tls: { rejectUnauthorized: false },
-  // });
-  // const transporter = nodemailer.createTransport({
-  //   host: "smtp.gmail.com",    // Gmail SMTP server
-  //   port: 587,                  // TLS port
-  //   secure: false,              // true for 465, false for 587
-  //   auth: {
-  //     user: "omar3691113@gmail.com",       // your Gmail address
-  //     pass: "rfsh gplk ymmo wqnb",          // Gmail App Password, not your normal password
-  //   },
-  //   tls: {
-  //     rejectUnauthorized: false
-  //   }
-  // });
-   const transporter = nodemailer.createTransport({
-    host: "smtp-relay.brevo.com",
-    // port: 587,
-    port: 2525,
-    auth: {
-      user: '9cdd6e001@smtp-brevo.com',
-      pass: 'bskuptBWkrHKv5V',
-    },
-    secure: false,
-  });
-  const mailOptions = {
-    from: '<info@microsoftsupplier.com>',
-    to: send_to,
-    replyTo: reply_to,
-    subject: subject,
-    html: message,
-    attachments: attachment ? attachment : [],
-  };
-
-  // ---- RETRY LOGIC ----
-  let attempt = 0;
-  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-  while (attempt < maxRetries) {
-    try {
-      const info = await transporter.sendMail(mailOptions);
-      console.log("📧 Email sent:", info.response);
-      return info;
-    } catch (err) {
-      // Only retry if it's a rate limit (450)
-      if (err.responseCode === 450) {
-        attempt++;
-        console.error(
-          `⚠️ SMTP rate limit hit (450). Retry ${attempt}/${maxRetries} in ${attempt * 2000}ms`
-        );
-        await delay(attempt * 2000); // exponential backoff
-      } else {
-        console.error("❌ Non-retryable email error:", err);
-        throw err; // break on other errors
+    const recipients = Array.isArray(send_to) ? send_to : [send_to];
+    for (const email of recipients) {
+      if (!email || !email.includes('@')) {
+        throw new Error(`Invalid recipient email address: ${email}`);
       }
     }
-  }
 
-  throw new Error("❌ Email failed after maximum retries.");
-};
+    // Prepare attachments for MailerSend format
+    const formattedAttachments = attachment && attachment.length > 0
+      ? attachment.map(att => ({
+          content: att.content, // Base64 string
+          filename: att.filename,
+          disposition: att.disposition || 'attachment',
+        }))
+      : [];
+
+    const result = await sendMail({
+      to: send_to,
+      subject,
+      html: message,
+      from: sent_from,
+      replyTo: reply_to,
+      attachments: formattedAttachments,
+      maxRetries,
+      isMarketing: false, // Transactional email
+    });
+
+    console.log(`📧 Email with attachment sent to ${send_to}`);
+    return result;
+  } catch (error) {
+    console.error('❌ Failed to send email with attachment:', error.message);
+    throw error;
+  }
+}
 
 export default sendEmailWithAttachment;

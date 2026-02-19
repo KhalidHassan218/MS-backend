@@ -2,7 +2,7 @@ export const licenceTranslationTemplate = {
   NL: {
     language: "nl-NL",
     translations: {
-      documentTitle: "Licentie document",
+      documentTitle: "Licentiedocument",
       date: "Datum",
       position: "Pos",
       itemNo: "Item-no.",

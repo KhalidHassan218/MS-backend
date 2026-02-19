@@ -19,8 +19,9 @@ const chunkArray = (arr, size) => {
   return chunks;
 };
 
-function generateLicenceHTML(licenseData, companyCountryCode = "EN") {
+function generateLicenceHTML(licenseData, companyCountryCode = "EN", company_name, company_city, company_street, company_house_number, company_zip_code, taxId) {
   const { customer, order, products } = licenseData;
+
   const template = licenceTranslationTemplate[companyCountryCode.toUpperCase()] || licenceTranslationTemplate.EN;
   const t = template.translations;
   const address = customer.address || {};
@@ -47,7 +48,7 @@ function generateLicenceHTML(licenseData, companyCountryCode = "EN") {
         .join("");
 
       const isLastChunkOfThisProduct = index === totalChunks - 1;
-      
+
       // Forces a new page for every group of 20 keys
       const pageBreakClass = "page-break";
 
@@ -88,7 +89,10 @@ function generateLicenceHTML(licenseData, companyCountryCode = "EN") {
         color: #333;
         line-height: 1.4;
       }
-
+      .product-section{
+        margin-left: 40px;
+        margin-right: 40px;
+      }
       /* Fixed Footer Logo - Will repeat on every page */
       .footer {
         position: fixed;
@@ -125,7 +129,7 @@ function generateLicenceHTML(licenseData, companyCountryCode = "EN") {
       .banner h1 { font-size: 32px; font-weight: 800; }
       .banner-right { text-align: right; font-size: 16px; }
 
-      .customer-info { margin-bottom: 20px; font-size: 15px; font-weight: bold; }
+      .customer-info { margin-bottom: 5px; font-size: 15px; font-weight: bold; }
 
       .doc-header-container {
         display: flex;
@@ -150,9 +154,9 @@ function generateLicenceHTML(licenseData, companyCountryCode = "EN") {
         margin: 20px 0 15px 0;
       }
 
-      .first-page-section {
-        page-break-after: always;
-      }
+      // .first-page-section {
+      //   page-break-after: always;
+      // }
 
       .items-table {
         width: 100%;
@@ -242,12 +246,13 @@ function generateLicenceHTML(licenseData, companyCountryCode = "EN") {
     </div>
 
     <div class="content">
-      <div class="first-page-section">
-        <div class="customer-info">
-          <div>${escapeHtml(customer.name || customer.business_name || "")}</div>
-          <div>${escapeHtml(address.line1 || "")}</div>
-          <div>${escapeHtml(address.country || "")}</div>
-        </div>
+   <div class="customer-info">
+  <div><strong>${escapeHtml(company_name || "COMPANY NAME")}</strong></div>
+  <div>${escapeHtml(`${company_street || "STREET"} ${company_house_number || ""}`)}</div>
+  <div>${escapeHtml(company_zip_code || "POSTAL CODE")} ${escapeHtml(company_city || "CITY")}</div>
+  <div>${escapeHtml(companyCountryCode || "COUNTRY")}</div>
+  <div>${taxId ? escapeHtml(taxId) : "Company Tax ID"}</div>
+</div>
 
         <div class="doc-header-container">
           <div class="blue-doc-box">${dynamicDocTitle}</div>
@@ -258,12 +263,12 @@ function generateLicenceHTML(licenseData, companyCountryCode = "EN") {
 
         <table class="items-table">
           <thead>
-            <tr><th>Pos N° d'article</th><th>Description</th><th style="text-align: right;">Quantité</th></tr>
+            <tr><th>Pos ${t.itemNo}</th><th>${t.description}</th><th style="text-align: right;">${t.quantity}</th></tr>
           </thead>
           <tbody>
             ${(products || []).map((p, i) => `
               <tr>
-                <td>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(p.PN || "")}</td>
+                <td>${i + 1}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${escapeHtml(p.pn || "")}</td>
                 <td style="color: #2c5aa0; font-weight: bold;">${escapeHtml(p.name || "")}</td>
                 <td style="text-align: right;">${p.quantity || 0}</td>
               </tr>

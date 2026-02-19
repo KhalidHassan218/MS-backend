@@ -7,6 +7,7 @@ import generateKeyReplacementEmail from "../../services/emails/generateKeyReplac
 
 
 import { getById, updateById, findOne, findAll } from '../../Utils/supabaseDbUtils.js';
+import { getOrderWithProfile, updateOrder } from "../../Utils/supabaseOrderService.js";
 
 const replaceKeyAndGenerateLicensePdf = async (req, res) => {
   const {
@@ -37,21 +38,21 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
     const newKeyObj = availableKeys[0];
     console.log("newKeyObj", newKeyObj);
     console.log("requestData", requestData);
-    
+
     const newKey = newKeyObj.license_key;
 
     // 5️⃣ Find old key
     const oldKey = requestData.old_key;
     const oldKeyObj = (await findAll('license_keys', { license_key: oldKey, product_id: productId }))[0];
-console.log("products",products);
+    console.log("products", products);
 
     // 6️⃣ Update products array in order
     const productIndex = products.findIndex((p) => p.productId === productId);
     if (productIndex === -1) throw new Error('Product not found in order');
     const product = products[productIndex];
-    console.log("product proooo",product);
-    console.log("oldKey oldKey",oldKey);
-    
+    console.log("product proooo", product);
+    console.log("oldKey oldKey", oldKey);
+
     const oldKeyIndex = product.licenseKeys.findIndex((k) => k.key === oldKey && k.status === 'active');
     if (oldKeyIndex === -1) throw new Error('Old key not found or already replaced');
     product.licenseKeys[oldKeyIndex] = {
@@ -139,28 +140,28 @@ console.log("products",products);
 
     // 12️⃣ Email
     const emailContent = generateKeyReplacementEmail(companyCountry);
-    try {
-      await sendEmailWithAttachment(
-        emailContent.subject,
-        emailContent.html,
-        email,
-        process.env.EMAIL_USER,
-        process.env.EMAIL_USER,
-        [
-          {
-            filename: `License-${orderNumber}.pdf`,
-            content: pdfBuffer,
-            contentType: 'application/pdf',
-          },
-        ]
-      );
-    } catch (error) {
-       console.log("error key replacment email", error);
-       
-    }
+    // try {
+    //   await sendEmailWithAttachment(
+    //     emailContent.subject,
+    //     emailContent.html,
+    //     email,
+    //     process.env.EMAIL_USER,
+    //     process.env.EMAIL_USER,
+    //     [
+    //       {
+    //         filename: `License-${orderNumber}.pdf`,
+    //         content: pdfBuffer,
+    //         contentType: 'application/pdf',
+    //       },
+    //     ]
+    //   );
+    // } catch (error) {
+    //   console.log("error key replacment email", error);
+
+    // }
     res.status(200).json({
       success: true,
-      message: 'Email with PDF sent successfully',
+      message: 'key replaced successfully',
       oldKey,
       newKey,
     });
@@ -170,6 +171,121 @@ console.log("products",products);
   }
 };
 
+
+const generateLicensePdf = async (req, res) => {
+  const {
+    orderId
+  } = req.params;
+
+  try {
+    if (!orderId) throw new Error('Order ID is required');
+    const userProfileFields = ['company_name', 'email', 'company_country', 'company_city', 'tax_id', 'company_house_number', 'company_street', 'company_zip_code'];
+    const orderData = await getOrderWithProfile(orderId, userProfileFields);
+    const {
+      user_id,
+      order_number,
+      internal_status,
+      payment_status,
+      po_number,
+      total_amount,
+      currency,
+      created_at,
+      products,
+      payment_due_date,
+      profiles: {
+        company_name,
+        email,
+        company_country,
+        company_city,
+        tax_id,
+        company_house_number,
+        company_street,
+        company_zip_code
+      } = {}
+    } = orderData || {};
+
+    // ✅ Now you can use them directly:
+    console.log(company_name);
+    console.log(total_amount);
+
+    const data = {
+      user_id: user_id,
+      order_number: order_number,
+      internal_status: internal_status,
+      payment_status: payment_status,
+      email: email,
+      po_number: po_number,
+      total_amount: total_amount,
+      currency: currency,
+      created_at: created_at,
+      products: products.map((item) => ({
+        productId: item?.productId,
+        name: item?.name,
+        quantity: item?.quantity,
+        unitPrice: item?.unitPrice,
+        totalPrice:
+          item?.amount_total,
+        isDigital:
+          item?.isDigital === "true", // Retrieve from metadata
+        pn: item?.pn,
+        image_url: item?.image_url,
+      })),
+    };
+    console.log("orderData", orderData);
+
+
+    const licenseData = {
+      customer: {
+        name: company_name,
+        businessName: company_name,
+        address: {
+          line1: company_country,
+          postalCode: company_zip_code,
+          country: company_country,
+        },
+      },
+      order: {
+        id: orderId,
+        number: order_number,
+        date: new Date(),
+      },
+      products: products,
+    }
+
+
+
+    const pdfBuffer = await generateLicencePDFBuffer(
+      licenseData,
+      company_country,
+      false,
+      company_name, company_city, company_street, company_house_number, company_zip_code, tax_id
+    );
+
+
+
+    const licensePdfUrl = await uploadPDFToSupabaseStorage(
+      order_number,
+      pdfBuffer,
+      "License",
+    );
+
+    const result = await updateOrder(orderId, {
+      license_url: licensePdfUrl,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'license generated successfully',
+    });
+  } catch (error) {
+    console.error('❌ Error generate license:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+
 export default {
   replaceKeyAndGenerateLicensePdf,
+  generateLicensePdf
 };

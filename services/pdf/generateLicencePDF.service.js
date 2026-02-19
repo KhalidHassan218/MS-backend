@@ -11,14 +11,14 @@ const isLocalMac = process.platform === "darwin" && process.arch === "arm64";
 async function generateLicencePDFBuffer(
   licenseData,
   companyCountryCode,
-  keyReplacement = false
+  keyReplacement = false ,  company_name , company_city , company_street, company_house_number,company_zip_code,taxId
 ) {
   let browser;
 
   try {
     const htmlContent = keyReplacement
       ? generateReplacmentLicenseHTML(licenseData, companyCountryCode, true)
-      : generateLicenceHTML(licenseData, companyCountryCode);
+      : generateLicenceHTML(licenseData, companyCountryCode,  company_name , company_city , company_street, company_house_number,  company_zip_code , taxId);
 
     browser = await puppeteer.launch(
       isLocalMac
