@@ -36,7 +36,7 @@ export async function insertOrder(orderData) {
 
 // Update an order by id
 export async function updateOrder(orderId, updateData) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('orders')
     .update(updateData)
     .eq('id', orderId)
@@ -46,7 +46,7 @@ export async function updateOrder(orderId, updateData) {
 }
 // Get a single order by its ID
 export async function getOrderById(orderId) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('orders')
     .select('*')
     .eq('id', orderId)
@@ -61,15 +61,15 @@ export async function getOrderById(orderId) {
 
 export async function getOrderWithProfile(orderId, profileFields = '*') {
   // 1. Handle if the user passes an array ['name', 'email'] or a string 'name, email'
-  const fieldsString = Array.isArray(profileFields) 
-    ? profileFields.join(', ') 
+  const fieldsString = Array.isArray(profileFields)
+    ? profileFields.join(', ')
     : profileFields;
 
   // 2. Construct the dynamic select query
   // This results in something like: "*, profiles(full_name, avatar_url)"
   const selectQuery = `*, profiles(${fieldsString})`;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('orders')
     .select(selectQuery)
     .eq('id', orderId)
