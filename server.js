@@ -28,7 +28,7 @@ import generateClientStatusEmailHTML from "./templates/Emails/ClientNewRegistera
 import { uploadPDFToSupabaseStorage } from "./services/supabaseStorage.service.js";
 import generateLicencePDFBuffer from "./services/pdf/generateLicencePDF.service.js";
 import { generateProformaPDFBuffer } from "./services/pdf/generateProformaPDF.service.js";
-import { supabase, supabaseAdmin } from "./config/supabase.js";
+import { supabaseAdmin } from "./config/supabase.js";
 
 // import savePDFRecord from "./services/pdf/savePdfRecord.service.js";
 puppeteer.use(StealthPlugin());
@@ -926,7 +926,7 @@ async function reserveLicenseKeys(
   console.log("b2b_supplier_id", b2b_supplier_id);
 
   try {
-    const { data: reservedDbKeys, error } = await supabase.rpc("reserve_keys", {
+    const { data: reservedDbKeys, error } = await supabaseAdmin.rpc("reserve_keys", {
       p_order_id: orderId,
       p_order_number: orderNumber,
       p_product_id: productId,
@@ -1269,7 +1269,6 @@ async function processPaidOrder(session) {
       const orderNumber = fullSession?.metadata?.orderNumber;
 
       const orderRef = await getOrderById(orderId);
-      console.log("orderRef0999", orderRef);
 
       const allProducts = orderRef.products ?? [];
 
@@ -1293,13 +1292,6 @@ async function processPaidOrder(session) {
         "Invoice",
       );
 
-      // let emailAttachemnts = [
-      //   {
-      //     filename: `Invoice-${orderNumber}.pdf`,
-      //     content: invoicePdfBuffer, // Buffer or string
-      //     contentType: invoicePdfBuffer.contentType || "application/pdf",
-      //   },
-      // ];
 
       // Update order as completed with both URLs
       await updateOrder(orderRef?.id, {
@@ -1695,7 +1687,7 @@ app.get("/api/verify", async (req, res) => {
     }
 
     // Fetch profile from Supabase profiles table
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("*")
       .eq("id", uid)
@@ -1722,7 +1714,7 @@ app.get("/api/verify", async (req, res) => {
       verification_expires_at: null,
       verified_at: now.toISOString(),
     }
-    // Check if billing email is same 100% as work email and verify as well 
+    // Check if billing email is same 100% as work email and verify as well
     if (
       profile.billing_contact?.email &&
       profile.email.toLowerCase().trim() === profile.billing_contact.email.toLowerCase().trim()
@@ -1732,7 +1724,7 @@ app.get("/api/verify", async (req, res) => {
         verified_at: now.toISOString(),
       };
     }
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from("profiles")
       .update(updatePayload)
       .eq("id", uid);
@@ -1773,7 +1765,7 @@ app.post("/api/send-verification", async (req, res) => {
     }
 
     // Fetch profile from Supabase
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("*")
       .eq("id", uid)
@@ -1816,7 +1808,7 @@ app.post("/api/send-verification", async (req, res) => {
     ).toISOString();
 
     // Update profile with new token and expiry
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from("profiles")
       .update({
         verification_token,
@@ -1867,7 +1859,7 @@ app.post("/api/send-billing-verification", async (req, res) => {
       return res.status(400).json({ success: false, message: getVerificationMsg(lang, "missingData") });
     }
 
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("billing_contact")
       .eq("id", uid)
@@ -1911,7 +1903,7 @@ app.post("/api/send-billing-verification", async (req, res) => {
       verification_expires_at: expiresAt
     };
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from("profiles")
       .update({ billing_contact: updatedBillingContact })
       .eq("id", uid);
@@ -1946,7 +1938,7 @@ app.get("/api/verify-billing", async (req, res) => {
       return res.status(400).json({ success: false, message: getVerificationMsg(lang, "missing") });
     }
 
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("billing_contact")
       .eq("id", uid)
@@ -1976,7 +1968,7 @@ app.get("/api/verify-billing", async (req, res) => {
       verified_at: now.toISOString(),
     };
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from("profiles")
       .update({ billing_contact: updatedBillingContact })
       .eq("id", uid);
@@ -2126,7 +2118,7 @@ app.post(
         // 2. Create the Payment Link
         const orderNumber = await getNextOrderNumber();
 
-        const { data: order, error } = await supabase
+        const { data: order, error } = await supabaseAdmin
           .from('orders')
           .upsert(
             {
@@ -2351,7 +2343,7 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
 
     if (existingUser) {
       // User exists - check if they have a pending registration
-      const { data: pendingReg } = await supabase
+      const { data: pendingReg } = await supabaseAdmin
         .from('pending_registrations')
         .select('*')
         .eq('email', email)
@@ -2389,7 +2381,7 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
     }
 
     // 2. Insert pending registration
-    const { error: regError } = await supabase
+    const { error: regError } = await supabaseAdmin
       .from('pending_registrations')
       .insert([{
         uid: userId,
@@ -2476,7 +2468,7 @@ const getNextB2BAccountId = async () => {
   // Use a transaction to ensure atomic increment and prevent race conditions
   // Assumes a 'settings' table with a row where id = 'b2b_account_id_counter'
   let newId;
-  const { data: counterRows, error: fetchError } = await supabase
+  const { data: counterRows, error: fetchError } = await supabaseAdmin
     .from("settings")
     .select("*")
     .eq("id", "b2b_account_id_counter")
@@ -2492,7 +2484,7 @@ const getNextB2BAccountId = async () => {
 
   // Use a Postgres function or upsert to ensure atomicity
   // Here, we use a single update and check for race conditions (Supabase does not support JS-side transactions)
-  const { error: updateError } = await supabase
+  const { error: updateError } = await supabaseAdmin
     .from("settings")
     .update({ last_id: nextIdNumber })
     .eq("id", "b2b_account_id_counter");
@@ -2522,7 +2514,7 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
     }
 
     // 2. Get Pending Registration Details
-    const { data: pendingRegistration, error: pendingError } = await supabase
+    const { data: pendingRegistration, error: pendingError } = await supabaseAdmin
       .from("pending_registrations")
       .select("*")
       .eq("id", docId)
@@ -2559,7 +2551,7 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
       invoice_settings: { enabled: false, overDueDay: null },
     };
 
-    const { error: profileError } = await supabase
+    const { error: profileError } = await supabaseAdmin
       .from("profiles")
       .upsert([newUserData]);
     if (profileError) {
@@ -2567,7 +2559,7 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
     }
 
     // 4. Delete pending registration
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await supabaseAdmin
       .from("pending_registrations")
       .delete()
       .eq("id", docId);
@@ -2576,7 +2568,7 @@ app.post("/api/accept-pendingRegistration", async (req, res) => {
     }
 
     // 5. Add to registrations_history
-    const { error: regHistError } = await supabase
+    const { error: regHistError } = await supabaseAdmin
       .from("registrations_history")
       .insert([{
         uid: uid,
@@ -2617,7 +2609,7 @@ app.post("/api/decline-pendingRegistration", async (req, res) => {
 
   try {
     // 1. Get user's language preference
-    const { data: pendingRegistration } = await supabase
+    const { data: pendingRegistration } = await supabaseAdmin
       .from("pending_registrations")
       .select("company_country")
       .eq("id", docId)
@@ -2643,7 +2635,7 @@ app.post("/api/decline-pendingRegistration", async (req, res) => {
     }
 
     // 4. Delete pending registration
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await supabaseAdmin
       .from("pending_registrations")
       .delete()
       .eq("id", docId);
@@ -2652,7 +2644,7 @@ app.post("/api/decline-pendingRegistration", async (req, res) => {
     }
 
     // 5. Add to registrations_history
-    const { error: regHistError } = await supabase
+    const { error: regHistError } = await supabaseAdmin
       .from("registrations_history")
       .insert([{
         uid: uid,

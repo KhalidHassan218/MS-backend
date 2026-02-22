@@ -1,8 +1,8 @@
-import { supabase } from "../config/supabase.js";
+import { supabaseAdmin } from "../config/supabase.js";
 
 export const getUserProfile = async (userId) => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('profiles')
       .select('*')
       .eq('id', userId)

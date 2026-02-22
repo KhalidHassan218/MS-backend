@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase.js';
+import { supabaseAdmin } from '../config/supabase.js';
 
 // Insert a new order
 export async function insertOrder(orderData) {
@@ -29,7 +29,7 @@ export async function insertOrder(orderData) {
     company_info
     // Add more mappings as needed
   };
-  const { data, error } = await supabase.from('orders').insert([insertData]).select();
+  const { data, error } = await supabaseAdmin.from('orders').insert([insertData]).select();
   if (error) throw error;
   return data[0];
 }

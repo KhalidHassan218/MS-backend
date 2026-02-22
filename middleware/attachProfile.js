@@ -1,7 +1,7 @@
 // middleware/attachProfile.js
 
 // Ensure you use the correct path and .js extension if using ESM
-import { supabase } from "../config/supabase.js";
+import { supabaseAdmin } from "../config/supabase.js";
 
 const attachProfile = async (req, res, next) => {
   try {
@@ -11,10 +11,9 @@ const attachProfile = async (req, res, next) => {
       return res.status(401).json({ error: 'User not authenticated. Please run requireAuth first.' });
     }
 
-    // 2. Determine which client to use
-    // If requireAuth created a 'scoped client' (req.supabase), use it to respect RLS.
-    // Otherwise, fall back to the global 'supabase' client.
-    const client = req.supabase || supabase;
+    // 2. Use supabaseAdmin to fetch any user's profile server-side.
+    // This is safe because requireAuth already validated the JWT and set req.user.
+    const client = supabaseAdmin;
 
     // 3. Fetch the profile
     const { data: profile, error } = await client
