@@ -994,7 +994,7 @@ async function reserveLicenseKeys(
       if (parts.length === 5 && parts.every(p => p.length === 5)) {
         return parts[4];
       }
-      // Otherwise, just return last 5 chars
+      // Otherwise, just return last 5 chars 
       return key.slice(-5);
     }
     // Format to match your original return object exactly
