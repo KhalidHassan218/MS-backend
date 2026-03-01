@@ -986,17 +986,32 @@ async function reserveLicenseKeys(
     });
 
     if (error) throw new Error(error.message);
-
+ // Helper to mask license key, keeping only the last 5 characters
+    function maskLicenseKey(key) {
+      if (!key) return "";
+      // If key is in format XXXXX-XXXXX-XXXXX-XXXXX-XXXXX
+      const parts = key.split("-");
+      if (parts.length === 5 && parts.every(p => p.length === 5)) {
+        return parts[4];
+      }
+      // Otherwise, just return last 5 chars 
+      return key.slice(-5);
+    }
     // Format to match your original return object exactly
     const formattedKeys = reservedDbKeys.map((item) => ({
-      key: item.license_key,
+      key: maskLicenseKey(item.license_key),
       status: "active",
+      licenseDocId: item.id,
+      revealedAt: null,
+      copiedAt: null,
       isReplacement: false,
       addedAt: Date.now(),
       replacedAt: null,
       replacementReason: null,
       licenseDocId: item.id,
     }));
+
+   
 
     console.log(`✅ Reserved keys for product ${productId}:`, formattedKeys);
     return formattedKeys;
