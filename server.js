@@ -2362,7 +2362,7 @@ app.post(
               item?.price_data?.product_data?.metadata?.amount_total,
             isDigital:
               item?.price_data?.product_data?.metadata?.isDigital === "true", // Retrieve from metadata
-            pn: item?.price_data?.product_data?.metadata?.pn,
+            PN: item?.price_data?.product_data?.metadata?.pn,
             company_country,
             image_url: item?.price_data?.product_data?.metadata?.image_url,
           })),
