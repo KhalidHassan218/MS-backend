@@ -30,6 +30,13 @@ import { uploadPDFToSupabaseStorage } from "./services/supabaseStorage.service.j
 import generateLicencePDFBuffer from "./services/pdf/generateLicencePDF.service.js";
 import { generateProformaPDFBuffer } from "./services/pdf/generateProformaPDF.service.js";
 import { supabaseAdmin } from "./config/supabase.js";
+import {
+  logPaymentEvent,
+  logOrderEvent,
+  logDocumentEvent,
+  logEmailEvent,
+  logSecurityEvent,
+} from "./services/auditTrail.service.js";
 
 // import savePDFRecord from "./services/pdf/savePdfRecord.service.js";
 puppeteer.use(StealthPlugin());
@@ -97,6 +104,20 @@ async function processPayByInvoiceOrder(
   try {
     console.log("pay_by_invoice_order", orderId);
 
+    const _customerId = data.user_id || null;
+
+    // Audit: order created via pay-by-invoice
+    logOrderEvent.created(orderId, orderNumber, _customerId, {
+      totalAmount:   data.total_amount || data.total,
+      currency:      data.currency,
+      itemsCount:    (productsWithKeys?.length || 0) + (phisycalProducts?.length || 0),
+      paymentMethod: 'invoice',
+    });
+    // Audit: keys assigned
+    logOrderEvent.keysAssigned(orderId, orderNumber, _customerId, {
+      licensesCount: productsWithKeys?.reduce((sum, p) => sum + (p.licenseKeys?.length || 0), 0),
+      productsCount: productsWithKeys?.length,
+    });
 
     const allProducts = [...productsWithKeys, ...phisycalProducts];
     await updateOrder(orderId, {
@@ -161,6 +182,17 @@ async function processPayByInvoiceOrder(
       proformaPdfBuffer,
       "Proforma",
     );
+
+    // Audit: PDFs generated and uploaded
+    logDocumentEvent.generated('license', orderId, orderNumber, _customerId, {
+      fileName:   `License-${orderNumber}.pdf`,
+      storageUrl: licensePdfUrl,
+    });
+    logDocumentEvent.generated('proforma', orderId, orderNumber, _customerId, {
+      fileName:   `Proforma-${orderNumber}.pdf`,
+      storageUrl: proformaPdfUrl,
+    });
+
     // Update order as completed with both URLs
     await updateOrder(orderId, {
       proforma_generated_at: new Date().toISOString(),
@@ -207,14 +239,31 @@ async function processPayByInvoiceOrder(
     // Send one email per recipient with all their attachments
     for (const [email, attachments] of Object.entries(recipientMap)) {
       console.log("sending to:", email, "attachments:", attachments.map(a => a.filename));
-      await sendOrderConfirmationEmail(
-        data?.name,
-        email,
-        attachments,
-        companyCountry,
-        'proforma'
-      );
+      try {
+        await sendOrderConfirmationEmail(
+          data?.name,
+          email,
+          attachments,
+          companyCountry,
+          'proforma'
+        );
+        // Audit: proforma email sent
+        logEmailEvent.proformaSent(orderId, orderNumber, _customerId, email);
+      } catch (emailErr) {
+        console.error('❌ Email send failed:', emailErr.message);
+        logEmailEvent.sendFailed(orderId, orderNumber, _customerId, email, {
+          failureReason: emailErr.message,
+          emailType: 'proforma',
+        });
+      }
     }
+
+    // Audit: pay-by-invoice order fully completed
+    logOrderEvent.completed(orderId, orderNumber, _customerId, {
+      proforma_url: proformaPdfUrl,
+      license_url:  licensePdfUrl,
+      payment_method: 'invoice',
+    });
 
     console.log("✅ Order completed:", orderId);
   } catch (err) {
@@ -938,17 +987,32 @@ async function reserveLicenseKeys(
     });
 
     if (error) throw new Error(error.message);
-
+ // Helper to mask license key, keeping only the last 5 characters
+    function maskLicenseKey(key) {
+      if (!key) return "";
+      // If key is in format XXXXX-XXXXX-XXXXX-XXXXX-XXXXX
+      const parts = key.split("-");
+      if (parts.length === 5 && parts.every(p => p.length === 5)) {
+        return parts[4];
+      }
+      // Otherwise, just return last 5 chars 
+      return key.slice(-5);
+    }
     // Format to match your original return object exactly
     const formattedKeys = reservedDbKeys.map((item) => ({
-      key: item.license_key,
+      key: maskLicenseKey(item.license_key),
       status: "active",
+      licenseDocId: item.id,
+      revealedAt: null,
+      copiedAt: null,
       isReplacement: false,
       addedAt: Date.now(),
       replacedAt: null,
       replacementReason: null,
       licenseDocId: item.id,
     }));
+
+   
 
     console.log(`✅ Reserved keys for product ${productId}:`, formattedKeys);
     return formattedKeys;
@@ -980,10 +1044,20 @@ app.post(
       if (event.type === "checkout.session.completed") {
         const session = event.data.object;
 
+        // Audit: payment webhook received
+        const _customerId = session?.metadata?.id || null;
+        logPaymentEvent.webhookReceived(session.id, _customerId, {
+          amount:   session.amount_total ? session.amount_total / 100 : null,
+          currency: session.currency,
+          orderNumber: session?.metadata?.orderNumber || null,
+        });
+
         processPaidOrder(session); // Fire and forget
       }
     } catch (err) {
       console.log("❌ Webhook verification failed:", err.message);
+      // Audit: webhook signature verification failure
+      logSecurityEvent.webhookVerificationFailed({ failureReason: err.message });
       return response.status(400).json({ error: err.message });
     }
   },
@@ -1247,6 +1321,7 @@ async function processPaidOrder(session) {
     if (user_id) {
       userProfile = await getUserProfile(user_id);
     }
+console.log("user_profile", userProfile);
 
     const {
       id,
@@ -1293,6 +1368,11 @@ async function processPaidOrder(session) {
         "Invoice",
       );
 
+      // Audit: invoice PDF generated + uploaded
+      logDocumentEvent.generated('invoice', orderId, orderNumber, id, {
+        fileName:   `Invoice-${orderNumber}.pdf`,
+        storageUrl: invoicePdfUrl,
+      });
 
       // Update order as completed with both URLs
       await updateOrder(orderRef?.id, {
@@ -1301,8 +1381,12 @@ async function processPaidOrder(session) {
         invoice_url: invoicePdfUrl,
       });
 
-
-
+      // Audit: order paid (existing order re-paid)
+      logOrderEvent.paid(orderId, orderNumber, id, {
+        amount:        fullSession?.amount_total ? fullSession.amount_total / 100 : null,
+        currency:      fullSession?.currency,
+        paymentMethod: 'stripe',
+      });
 
 
 
@@ -1340,15 +1424,29 @@ async function processPaidOrder(session) {
       // Send one email per recipient with all their attachments
       for (const [email, attachments] of Object.entries(recipientMap)) {
         console.log("sending to:", email, "attachments:", attachments.map(a => a.filename));
-        await sendOrderConfirmationEmail(
-          "",
-          email,
-          attachments,
-          company_country, // 'NL', 'EN', 'FR', or 'DE'
-          'invoice'
-        );
+        try {
+          await sendOrderConfirmationEmail(
+            "",
+            email,
+            attachments,
+            company_country, // 'NL', 'EN', 'FR', or 'DE'
+            'invoice'
+          );
+          // Audit: invoice email sent
+          logEmailEvent.invoiceSent(orderId, orderNumber, id, email);
+        } catch (emailErr) {
+          console.error('❌ Email send failed:', emailErr.message);
+          logEmailEvent.sendFailed(orderId, orderNumber, id, email, {
+            failureReason: emailErr.message,
+            emailType: 'invoice',
+          });
+        }
       }
 
+      // Audit: order fully completed (existing order re-paid)
+      logOrderEvent.completed(orderId, orderNumber, id, {
+        invoice_url: invoicePdfUrl,
+      });
 
     } else {
       const orderNumber = await getNextOrderNumber();
@@ -1390,6 +1488,21 @@ async function processPaidOrder(session) {
         data.products?.filter((product) => !product.isDigital) ?? [];
       const order = await insertOrder(data);
       const orderId = order.id;
+
+      // Audit: new order created
+      logOrderEvent.created(orderId, orderNumber, id, {
+        totalAmount:   data.total_amount,
+        currency:      data.currency,
+        itemsCount:    data.products?.length,
+        paymentMethod: 'stripe',
+      });
+      // Audit: payment confirmed by Stripe
+      logPaymentEvent.initiated(orderId, orderNumber, id, {
+        amount:        data.total_amount,
+        currency:      data.currency,
+        paymentMethod: 'stripe',
+      });
+
       let productsWithKeys;
       try {
         productsWithKeys = await assignKeysToProducts(
@@ -1412,6 +1525,12 @@ async function processPaidOrder(session) {
           invoice_generated_at: null,
         });
 
+        // Audit: payment / key assignment failed
+        logPaymentEvent.failed(orderId, orderNumber, id, {
+          failureReason: err.message,
+          paymentMethod: 'stripe',
+        });
+
         // optional: notify admin or send email to customer here
         return;
       }
@@ -1420,6 +1539,12 @@ async function processPaidOrder(session) {
         // Add products to a related table if needed
         products: allProducts,
         internal_status: "keys assigned",
+      });
+
+      // Audit: license keys assigned
+      logOrderEvent.keysAssigned(orderId, orderNumber, id, {
+        licensesCount: productsWithKeys?.reduce((sum, p) => sum + (p.licenseKeys?.length || 0), 0),
+        productsCount: productsWithKeys?.length,
       });
       const licenseData = extractLicenseDataFromSession(
         session,
@@ -1458,6 +1583,17 @@ async function processPaidOrder(session) {
         invoicePdfBuffer,
         "Invoice",
       );
+
+      // Audit: PDFs generated and uploaded
+      logDocumentEvent.generated('license', orderId, orderNumber, id, {
+        fileName:   `License-${orderNumber}.pdf`,
+        storageUrl: licensePdfUrl,
+      });
+      logDocumentEvent.generated('invoice', orderId, orderNumber, id, {
+        fileName:   `Invoice-${orderNumber}.pdf`,
+        storageUrl: invoicePdfUrl,
+      });
+
       // Update order as completed with both URLs
       await updateOrder(orderId, {
         invoice_generated_at: new Date().toISOString(),
@@ -1465,6 +1601,13 @@ async function processPaidOrder(session) {
         payment_status: "paid",
         invoice_url: invoicePdfUrl,
         license_url: licensePdfUrl,
+      });
+
+      // Audit: order paid and completed
+      logOrderEvent.paid(orderId, orderNumber, id, {
+        amount:        data.total_amount,
+        currency:      data.currency,
+        paymentMethod: 'stripe',
       });
 
 
@@ -1512,15 +1655,30 @@ async function processPaidOrder(session) {
       // Send one email per recipient with all their attachments
       for (const [email, attachments] of Object.entries(recipientMap)) {
         console.log("sending to:", email, "attachments:", attachments.map(a => a.filename));
-        await sendOrderConfirmationEmail(
-          data?.name,
-          email,
-          attachments,
-          company_country, // 'NL', 'EN', 'FR', or 'DE'
-          'invoice'
-        );
+        try {
+          await sendOrderConfirmationEmail(
+            data?.name,
+            email,
+            attachments,
+            company_country, // 'NL', 'EN', 'FR', or 'DE'
+            'invoice'
+          );
+          // Audit: invoice email sent to recipient
+          logEmailEvent.invoiceSent(orderId, orderNumber, id, email);
+        } catch (emailErr) {
+          console.error('❌ Email send failed:', emailErr.message);
+          logEmailEvent.sendFailed(orderId, orderNumber, id, email, {
+            failureReason: emailErr.message,
+            emailType: 'invoice',
+          });
+        }
       }
 
+      // Audit: new order fully completed
+      logOrderEvent.completed(orderId, orderNumber, id, {
+        invoice_url: invoicePdfUrl,
+        license_url: licensePdfUrl,
+      });
 
     }
   } catch (err) {
@@ -2204,7 +2362,7 @@ app.post(
               item?.price_data?.product_data?.metadata?.amount_total,
             isDigital:
               item?.price_data?.product_data?.metadata?.isDigital === "true", // Retrieve from metadata
-            pn: item?.price_data?.product_data?.metadata?.pn,
+            PN: item?.price_data?.product_data?.metadata?.pn,
             company_country,
             image_url: item?.price_data?.product_data?.metadata?.image_url,
           })),

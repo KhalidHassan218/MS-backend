@@ -8,6 +8,8 @@ import generateKeyReplacementEmail from "../../services/emails/generateKeyReplac
 
 import { getById, updateById, findOne, findAll } from '../../Utils/supabaseDbUtils.js';
 import { getOrderWithProfile, updateOrder } from "../../Utils/supabaseOrderService.js";
+import { supabaseAdmin } from '../../config/supabase.js';
+import { logDocumentEvent } from '../../services/auditTrail.service.js';
 
 const replaceKeyAndGenerateLicensePdf = async (req, res) => {
   const {
@@ -285,7 +287,243 @@ const generateLicensePdf = async (req, res) => {
 
 
 
+/**
+ * POST /api/licenses/generate-customer-license/:orderId
+ *
+ * Generates a Customer License PDF containing ONLY the keys that the user has
+ * revealed. The frontend sends the revealed key identifiers in the request body
+ * (source of truth), so this endpoint does NOT rely on revealedAt being
+ * persisted in the JSONB — it uses the client-supplied list to match keys,
+ * fetches full values from license_keys table, generates the PDF, and also
+ * persists revealedAt back into the JSONB via supabaseAdmin (service role)
+ * so future page loads see the correct state.
+ *
+ * Body: { revealedKeys: [{ licenseDocId?, key? }, ...] }
+ *
+ * Flow:
+ * 1. Auth — user must own the order or be admin
+ * 2. Match client-supplied revealed keys against order products
+ * 3. Fetch actual key values from license_keys table
+ * 4. Persist revealedAt into order JSONB via supabaseAdmin (reliable)
+ * 5. Generate PDF via Puppeteer pipeline
+ * 6. Upload to Supabase Storage
+ * 7. Update order with customer_license_url + customer_license_generated_at
+ * 8. Log audit event
+ * 9. Return { success, url, generatedAt, revealedKeysCount }
+ */
+const generateCustomerLicensePdf = async (req, res) => {
+  const { orderId } = req.params;
+  const { revealedKeys: clientRevealedKeys } = req.body || {};
+
+  try {
+    if (!orderId) throw new Error('Order ID is required');
+
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    console.log(`📄 [CustomerLicense] orderId=${orderId}, clientRevealedKeys count=${Array.isArray(clientRevealedKeys) ? clientRevealedKeys.length : 0}`);
+    console.log(`📄 [CustomerLicense] clientRevealedKeys:`, JSON.stringify(clientRevealedKeys));
+
+    if (!Array.isArray(clientRevealedKeys) || clientRevealedKeys.length === 0) {
+      return res.status(400).json({ success: false, message: 'No revealed keys provided' });
+    }
+
+    // 1. Fetch order with profile data
+    const userProfileFields = [
+      'company_name', 'email', 'company_country', 'company_city',
+      'tax_id', 'company_house_number', 'company_street', 'company_zip_code',
+    ];
+    const orderData = await getOrderWithProfile(orderId, userProfileFields);
+
+    if (!orderData) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // 2. Auth check — user must own the order or be admin
+    if (orderData.user_id !== userId && !req.isAdmin) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    const {
+      order_number,
+      products,
+      profiles: {
+        company_name,
+        company_country,
+        company_city,
+        tax_id,
+        company_house_number,
+        company_street,
+        company_zip_code,
+      } = {},
+    } = orderData;
+
+    // 3. Build a lookup Set from the client-supplied revealed key identifiers
+    const revealedByDocId = new Set();
+    const revealedByKey = new Set();
+    for (const rk of clientRevealedKeys) {
+      if (rk.licenseDocId) revealedByDocId.add(rk.licenseDocId);
+      else if (rk.key) revealedByKey.add(rk.key);
+    }
+
+    // 4. Match revealed keys, batch-fetch full values in ONE query, collect for PDF
+    const revealedProducts = [];
+    const now = new Date().toISOString();
+    const updatedProducts = JSON.parse(JSON.stringify(products || []));
+
+    // First pass: identify which keys are revealed and collect their licenseDocIds
+    const allDocIds = []; // UUIDs to batch-fetch from license_keys table
+    const revealedMap = []; // { pIdx, kIdx, keyId, fallbackKey }
+
+    for (let pIdx = 0; pIdx < updatedProducts.length; pIdx++) {
+      const product = updatedProducts[pIdx];
+      for (let kIdx = 0; kIdx < (product.licenseKeys || []).length; kIdx++) {
+        const k = product.licenseKeys[kIdx];
+        if (k.status === 'replaced') continue;
+
+        const isRevealed =
+          (k.licenseDocId && revealedByDocId.has(k.licenseDocId)) ||
+          (k.key && revealedByKey.has(k.key));
+        if (!isRevealed) continue;
+
+        // Stamp revealedAt if missing
+        if (!k.revealedAt) {
+          updatedProducts[pIdx].licenseKeys[kIdx].revealedAt = now;
+        }
+
+        const keyId = k.licenseDocId || k.id;
+        if (keyId) allDocIds.push(keyId);
+        revealedMap.push({ pIdx, kIdx, keyId, fallbackKey: k.key });
+      }
+    }
+
+    // Batch-fetch all full key values in ONE query (handles 1000+ keys)
+    const keyLookup = new Map(); // id -> license_key
+    if (allDocIds.length > 0) {
+      // Supabase .in() supports up to ~1000 items; chunk for safety
+      const CHUNK = 500;
+      for (let i = 0; i < allDocIds.length; i += CHUNK) {
+        const chunk = allDocIds.slice(i, i + CHUNK);
+        const { data: rows } = await supabaseAdmin
+          .from('license_keys')
+          .select('id, license_key')
+          .in('id', chunk);
+        if (rows) {
+          for (const row of rows) {
+            keyLookup.set(row.id, row.license_key);
+          }
+        }
+      }
+    }
+
+    // Second pass: build revealedProducts using the lookup map
+    // Group by product index
+    const productKeysMap = new Map(); // pIdx -> [fullKeyValue, ...]
+    for (const entry of revealedMap) {
+      const fullKey = entry.keyId
+        ? (keyLookup.get(entry.keyId) || entry.fallbackKey)
+        : entry.fallbackKey;
+      if (!fullKey) continue;
+
+      if (!productKeysMap.has(entry.pIdx)) productKeysMap.set(entry.pIdx, []);
+      productKeysMap.get(entry.pIdx).push({ key: fullKey });
+    }
+
+    for (const [pIdx, keysWithValues] of productKeysMap) {
+      const product = updatedProducts[pIdx];
+      revealedProducts.push({
+        name: product.name,
+        quantity: keysWithValues.length,
+        pn: product.PN || product.pn || '',
+        licenseKeys: keysWithValues,
+      });
+    }
+
+    console.log(`📄 [CustomerLicense] revealedByDocId: ${[...revealedByDocId].length}, revealedByKey: ${[...revealedByKey].length}`);
+    console.log(`📄 [CustomerLicense] matched revealedProducts: ${revealedProducts.length}, total keys: ${revealedProducts.reduce((s, p) => s + p.licenseKeys.length, 0)}`);
+
+    if (revealedProducts.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No matching revealed keys found for this order',
+      });
+    }
+
+    // 5. Build license data structure for PDF generation
+    const licenseData = {
+      customer: {
+        name: company_name,
+        businessName: company_name,
+        address: {
+          line1: company_country,
+          postalCode: company_zip_code,
+          country: company_country,
+        },
+      },
+      order: {
+        id: orderId,
+        number: order_number,
+        date: new Date(),
+      },
+      products: revealedProducts,
+    };
+
+    // 6. Generate PDF
+    const pdfBuffer = await generateLicencePDFBuffer(
+      licenseData,
+      company_country,
+      false,
+      company_name, company_city, company_street, company_house_number, company_zip_code, tax_id
+    );
+
+    // 7. Upload to Supabase Storage
+    const licensePdfUrl = await uploadPDFToSupabaseStorage(
+      order_number,
+      pdfBuffer,
+      'CustomerLicense',
+    );
+
+    // 8. Persist revealedAt + license URL in one update via supabaseAdmin
+    const generatedAt = new Date().toISOString();
+    await updateOrder(orderId, {
+      products: updatedProducts,
+      customer_license_url: licensePdfUrl,
+      customer_license_generated_at: generatedAt,
+    });
+
+    // 9. Log audit event
+    const totalRevealedKeys = revealedProducts.reduce((sum, p) => sum + p.licenseKeys.length, 0);
+
+    logDocumentEvent.generated(
+      'customer_license',
+      orderId,
+      order_number,
+      orderData.user_id,
+      {
+        fileName: `CustomerLicense-${order_number}.pdf`,
+        storageUrl: licensePdfUrl,
+        revealedKeysCount: totalRevealedKeys,
+      }
+    );
+
+    // Append cache-bust param so the browser always fetches the fresh PDF
+    const cacheBustedUrl = `${licensePdfUrl}?v=${Date.now()}`;
+
+    res.status(200).json({
+      success: true,
+      url: cacheBustedUrl,
+      generatedAt,
+      revealedKeysCount: totalRevealedKeys,
+    });
+  } catch (error) {
+    console.error('❌ Error generating customer license:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
 export default {
   replaceKeyAndGenerateLicensePdf,
-  generateLicensePdf
+  generateLicensePdf,
+  generateCustomerLicensePdf,
 };

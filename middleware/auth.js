@@ -1,7 +1,7 @@
 // middleware/auth.js
 import { createClient } from '@supabase/supabase-js';
 // Import the KEYS, not the global client
-import { supabaseUrl, supabaseAnonKey } from "../config/supabase.js"; 
+import { supabaseUrl, supabaseAnonKey } from "../config/supabase.js";
 
 const requireAuth = async (req, res, next) => {
   try {
@@ -34,9 +34,26 @@ const requireAuth = async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // 3. Attach both User and the Client
-    req.user = user;
-    req.supabase = scopedClient; // Pass this to your routes
+    // 3. Read user_role from the JWT claim set by custom_access_token_hook.
+    //    The claim is: { ..., user_role: "admin" | "user" }
+    //    We decode the payload (middle segment, base64url) without re-verifying
+    //    the signature — Supabase already verified it in step 2.
+    let userRole = 'user';
+    try {
+      const jwtPayload = JSON.parse(
+        Buffer.from(token.split('.')[1], 'base64url').toString('utf8')
+      );
+      userRole = jwtPayload.user_role || 'user';
+    } catch (jwtErr) {
+      // Non-fatal: fall back to 'user' if decode fails
+      console.warn('[Auth] Could not decode JWT payload:', jwtErr.message);
+    }
+
+    // 4. Attach user, role flags, and scoped client to the request
+    req.user     = user;
+    req.userRole = userRole;
+    req.isAdmin  = userRole === 'admin';
+    req.supabase = scopedClient;
 
     next();
   } catch (err) {
