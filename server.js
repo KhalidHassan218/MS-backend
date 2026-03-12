@@ -1479,6 +1479,12 @@ console.log("user_profile", userProfile);
           isDigital: item?.price?.product?.metadata?.isDigital === "true", // Retrieve from metadata
           PN: item?.price?.product?.metadata?.pn,
           image_url: item?.price?.product?.metadata?.image_url,
+          install_url_en: item?.price?.product?.metadata?.install_url_en || "",
+          install_url_de: item?.price?.product?.metadata?.install_url_de || "",
+          install_url_fr: item?.price?.product?.metadata?.install_url_fr || "",
+          install_url_nl: item?.price?.product?.metadata?.install_url_nl || "",
+          subscription_type: item?.price?.product?.metadata?.subscription_type || "",
+          product_category: item?.price?.product?.metadata?.product_category || "",
         })),
       };
 
@@ -2208,9 +2214,15 @@ app.post(
           b2b_supplier_id: b2b_supplier_id,
           po_number: po_number,
           image_url: product.image_url,
+          install_url_en: product.install_url_en || "",
+          install_url_de: product.install_url_de || "",
+          install_url_fr: product.install_url_fr || "",
+          install_url_nl: product.install_url_nl || "",
+          subscription_type: product.subscription_type || "",
+          product_category: product.product_category || "",
           // tax_id: tax_id,
         };
-        description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.pn}`;
+        description = `Language: ${product.selectedLangObj.lang}  MPN/SKU: ${product.selectedLangObj.pn}`;
       } else {
         customFields = {
           language: `Language: English`,
@@ -2221,6 +2233,12 @@ app.post(
           b2b_supplier_id: b2b_supplier_id,
           po_number: po_number,
           image_url: product.image_url,
+          install_url_en: product.install_url_en || "",
+          install_url_de: product.install_url_de || "",
+          install_url_fr: product.install_url_fr || "",
+          install_url_nl: product.install_url_nl || "",
+          subscription_type: product.subscription_type || "",
+          product_category: product.product_category || "",
           // tax_id: tax_id,
         };
         description = `Language: English`;
@@ -2249,7 +2267,7 @@ app.post(
           const b2bpriceWVat = parseFloat(product?.priceWVat);
           const isDigital = product?.type === "digital software";
           const description = product?.selectedLangObj?.id
-            ? `Language: ${product.selectedLangObj.lang} PN: ${product.selectedLangObj.pn}`
+            ? `Language: ${product.selectedLangObj.lang} MPN/SKU: ${product.selectedLangObj.pn}`
             : `Language: English`;
 
           const unit_amount = Math.round(b2bpriceWVat * 100);
@@ -2267,6 +2285,12 @@ app.post(
                   isDigital: String(isDigital),
                   language: product?.selectedLangObj?.lang || "English",
                   image_url: product.image_url,
+                  install_url_en: product.install_url_en || "",
+                  install_url_de: product.install_url_de || "",
+                  install_url_fr: product.install_url_fr || "",
+                  install_url_nl: product.install_url_nl || "",
+                  subscription_type: product.subscription_type || "",
+                  product_category: product.product_category || "",
                 },
               },
             },
@@ -2365,6 +2389,12 @@ app.post(
             PN: item?.price_data?.product_data?.metadata?.pn,
             company_country,
             image_url: item?.price_data?.product_data?.metadata?.image_url,
+            install_url_en: item?.price_data?.product_data?.metadata?.install_url_en || "",
+            install_url_de: item?.price_data?.product_data?.metadata?.install_url_de || "",
+            install_url_fr: item?.price_data?.product_data?.metadata?.install_url_fr || "",
+            install_url_nl: item?.price_data?.product_data?.metadata?.install_url_nl || "",
+            subscription_type: item?.price_data?.product_data?.metadata?.subscription_type || "",
+            product_category: item?.price_data?.product_data?.metadata?.product_category || "",
           })),
         };
 
