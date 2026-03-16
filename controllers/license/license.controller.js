@@ -117,11 +117,33 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
       processed_by: uid,
     });
 
-    // 10️⃣ Prepare PDF data
+    // 10️⃣ Prepare PDF data — fetch current install URLs from products table
+    const replProductIds = products.map((p) => p.productId).filter(Boolean);
+    const replInstallUrlLookup = {};
+    if (replProductIds.length > 0) {
+      const { data: currentProducts } = await supabaseAdmin
+        .from('products')
+        .select('id, install_url_en, install_url_de, install_url_fr, install_url_nl')
+        .in('id', replProductIds);
+      if (currentProducts) {
+        for (const cp of currentProducts) {
+          replInstallUrlLookup[cp.id] = cp;
+        }
+      }
+    }
     const updatedProducts = products.map((p) => {
       const activeKeys = p.licenseKeys.filter((k) => k.status === 'active').map((k) => k.key);
       const newKeys = p.licenseKeys.filter((k) => k.status === 'active' && k.isReplacement).map((k) => k.key);
-      return { ...p, licenseKeys: activeKeys, newLicenseKeys: newKeys };
+      const currentUrls = replInstallUrlLookup[p.productId] || {};
+      return {
+        ...p,
+        licenseKeys: activeKeys,
+        newLicenseKeys: newKeys,
+        install_url_en: p.install_url_en || currentUrls.install_url_en || '',
+        install_url_de: p.install_url_de || currentUrls.install_url_de || '',
+        install_url_fr: p.install_url_fr || currentUrls.install_url_fr || '',
+        install_url_nl: p.install_url_nl || currentUrls.install_url_nl || '',
+      };
     });
     const fullOrderDataForPDF = {
       customer: orderData.customer || {
@@ -429,13 +451,33 @@ const generateCustomerLicensePdf = async (req, res) => {
       productKeysMap.get(entry.pIdx).push({ key: fullKey });
     }
 
+    // Fetch current install URLs from the products table (order data may predate these fields)
+    const productIds = [...productKeysMap.keys()].map((pIdx) => updatedProducts[pIdx]?.productId).filter(Boolean);
+    const installUrlLookup = {};
+    if (productIds.length > 0) {
+      const { data: currentProducts } = await supabaseAdmin
+        .from('products')
+        .select('id, install_url_en, install_url_de, install_url_fr, install_url_nl')
+        .in('id', productIds);
+      if (currentProducts) {
+        for (const cp of currentProducts) {
+          installUrlLookup[cp.id] = cp;
+        }
+      }
+    }
+
     for (const [pIdx, keysWithValues] of productKeysMap) {
       const product = updatedProducts[pIdx];
+      const currentUrls = installUrlLookup[product.productId] || {};
       revealedProducts.push({
         name: product.name,
         quantity: keysWithValues.length,
         pn: product.PN || product.pn || '',
         licenseKeys: keysWithValues,
+        install_url_en: product.install_url_en || currentUrls.install_url_en || '',
+        install_url_de: product.install_url_de || currentUrls.install_url_de || '',
+        install_url_fr: product.install_url_fr || currentUrls.install_url_fr || '',
+        install_url_nl: product.install_url_nl || currentUrls.install_url_nl || '',
       });
     }
 
