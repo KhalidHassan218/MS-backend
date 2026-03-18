@@ -9,7 +9,7 @@ import generateKeyReplacementEmail from "../../services/emails/generateKeyReplac
 import { getById, updateById, findOne, findAll } from '../../Utils/supabaseDbUtils.js';
 import { getOrderWithProfile, updateOrder } from "../../Utils/supabaseOrderService.js";
 import { supabaseAdmin } from '../../config/supabase.js';
-import { logDocumentEvent } from '../../services/auditTrail.service.js';
+import { logDocumentEvent, getMasqueradeFromRequest } from '../../services/auditTrail.service.js';
 
 const replaceKeyAndGenerateLicensePdf = async (req, res) => {
   const {
@@ -545,7 +545,8 @@ const generateCustomerLicensePdf = async (req, res) => {
         fileName: `CustomerLicense-${order_number}.pdf`,
         storageUrl: licensePdfUrl,
         revealedKeysCount: totalRevealedKeys,
-      }
+      },
+      getMasqueradeFromRequest(req)
     );
 
     // Append cache-bust param so the browser always fetches the fresh PDF

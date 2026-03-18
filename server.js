@@ -36,6 +36,7 @@ import {
   logDocumentEvent,
   logEmailEvent,
   logSecurityEvent,
+  getMasqueradeFromRequest,
 } from "./services/auditTrail.service.js";
 
 // import savePDFRecord from "./services/pdf/savePdfRecord.service.js";
@@ -99,7 +100,8 @@ async function processPayByInvoiceOrder(
   company_name,
   over_due_date,
   billing_contact,
-  billing_documents
+  billing_documents,
+  masquerade = null
 ) {
   try {
     console.log("pay_by_invoice_order", orderId);
@@ -112,12 +114,12 @@ async function processPayByInvoiceOrder(
       currency:      data.currency,
       itemsCount:    (productsWithKeys?.length || 0) + (phisycalProducts?.length || 0),
       paymentMethod: 'invoice',
-    });
+    }, masquerade);
     // Audit: keys assigned
     logOrderEvent.keysAssigned(orderId, orderNumber, _customerId, {
       licensesCount: productsWithKeys?.reduce((sum, p) => sum + (p.licenseKeys?.length || 0), 0),
       productsCount: productsWithKeys?.length,
-    });
+    }, masquerade);
 
     const allProducts = [...productsWithKeys, ...phisycalProducts];
     await updateOrder(orderId, {
@@ -187,11 +189,11 @@ async function processPayByInvoiceOrder(
     logDocumentEvent.generated('license', orderId, orderNumber, _customerId, {
       fileName:   `License-${orderNumber}.pdf`,
       storageUrl: licensePdfUrl,
-    });
+    }, masquerade);
     logDocumentEvent.generated('proforma', orderId, orderNumber, _customerId, {
       fileName:   `Proforma-${orderNumber}.pdf`,
       storageUrl: proformaPdfUrl,
-    });
+    }, masquerade);
 
     // Update order as completed with both URLs
     await updateOrder(orderId, {
@@ -248,13 +250,13 @@ async function processPayByInvoiceOrder(
           'proforma'
         );
         // Audit: proforma email sent
-        logEmailEvent.proformaSent(orderId, orderNumber, _customerId, email);
+        logEmailEvent.proformaSent(orderId, orderNumber, _customerId, email, masquerade);
       } catch (emailErr) {
         console.error('❌ Email send failed:', emailErr.message);
         logEmailEvent.sendFailed(orderId, orderNumber, _customerId, email, {
           failureReason: emailErr.message,
           emailType: 'proforma',
-        });
+        }, masquerade);
       }
     }
 
@@ -263,7 +265,7 @@ async function processPayByInvoiceOrder(
       proforma_url: proformaPdfUrl,
       license_url:  licensePdfUrl,
       payment_method: 'invoice',
-    });
+    }, masquerade);
 
     console.log("✅ Order completed:", orderId);
   } catch (err) {
@@ -2447,7 +2449,8 @@ app.post(
           company_name,
           over_due_date,
           billing_contact,
-          billing_documents
+          billing_documents,
+          getMasqueradeFromRequest(req)
         );
         // 4. Return the link to be attached to your Firebase orders doc
         res.status(200).send();
