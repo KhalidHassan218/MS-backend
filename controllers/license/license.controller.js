@@ -64,7 +64,7 @@ const replaceKeyAndGenerateLicensePdf = async (req, res) => {
       replacementReason: requestData.reason,
     };
     product.licenseKeys.push({
-      key: newKey,
+      key: newKey.slice(-5),
       status: 'active',
       isReplacement: true,
       addedAt: new Date().toISOString(),
