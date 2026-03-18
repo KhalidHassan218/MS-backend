@@ -36,13 +36,16 @@ import { supabaseAdmin } from '../config/supabase.js';
  * @param {string}  [event.documentId]
  * @param {string}  [event.documentType]
  * @param {Object}  [event.details]     - arbitrary JSON payload
+ * @param {Object}  [event.masquerade]  - { adminId, adminEmail, targetId, targetEmail }
  */
 async function logEvent(event) {
   try {
+    const masq = event.masquerade || null;
+
     const row = {
       timestamp_utc:  new Date().toISOString(),
       customer_id:    event.customerId    || null,
-      actor_type:     event.actorType     || 'system',
+      actor_type:     masq ? 'masquerade' : (event.actorType || 'system'),
       actor_user_id:  event.actorUserId   || null,
       actor_org_id:   event.actorOrgId    || event.customerId || null,
       action:         event.action,
@@ -58,7 +61,18 @@ async function logEvent(event) {
       document_type:  event.documentType  || null,
       ip_address:     null,   // backend has no client IP at this point
       user_agent:     'backend-server',
-      details:        event.details       || {},
+      masqueraded_by: masq?.adminId || null,
+      details: {
+        ...(event.details || {}),
+        ...(masq ? {
+          masquerade: {
+            admin_id: masq.adminId,
+            admin_email: masq.adminEmail,
+            acting_as_user: masq.targetId,
+            acting_as_email: masq.targetEmail,
+          },
+        } : {}),
+      },
     };
 
     const { error } = await supabaseAdmin
@@ -72,6 +86,21 @@ async function logEvent(event) {
     // Audit logging must never crash the application
     console.error('[AuditTrail] logEvent error:', err.message);
   }
+}
+
+/**
+ * Extract masquerade context from Express request headers.
+ * Returns null if not masquerading.
+ */
+function getMasqueradeFromRequest(req) {
+  const adminId = req?.headers?.['x-masquerade-by'];
+  if (!adminId) return null;
+  return {
+    adminId,
+    adminEmail: req?.headers?.['x-masquerade-by-email'] || null,
+    targetId: req?.headers?.['x-masquerade-target'] || null,
+    targetEmail: req?.headers?.['x-masquerade-target-email'] || null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +135,7 @@ export const logPaymentEvent = {
    * @param {string} customerId
    * @param {Object} details  - { amount, currency, payment_method }
    */
-  initiated: (orderId, orderNumber, customerId, details = {}) =>
+  initiated: (orderId, orderNumber, customerId, details = {}, masquerade = null) =>
     logEvent({
       action:      'payment.initiated',
       entityType:  'payment',
@@ -115,6 +144,7 @@ export const logPaymentEvent = {
       actorType:   'system',
       orderId,
       orderNumber,
+      masquerade,
       details: {
         amount:         details.amount,
         currency:       details.currency,
@@ -129,7 +159,7 @@ export const logPaymentEvent = {
    * @param {string} customerId
    * @param {Object} details  - { amount, currency, failure_reason }
    */
-  failed: (orderId, orderNumber, customerId, details = {}) =>
+  failed: (orderId, orderNumber, customerId, details = {}, masquerade = null) =>
     logEvent({
       action:      'payment.failed',
       entityType:  'payment',
@@ -138,6 +168,7 @@ export const logPaymentEvent = {
       actorType:   'system',
       orderId,
       orderNumber,
+      masquerade,
       details: {
         amount:         details.amount,
         currency:       details.currency,
@@ -179,7 +210,7 @@ export const logOrderEvent = {
   /**
    * New order created from a Stripe session or pay-by-invoice flow.
    */
-  created: (orderId, orderNumber, customerId, details = {}) =>
+  created: (orderId, orderNumber, customerId, details = {}, masquerade = null) =>
     logEvent({
       action:      'order.created',
       entityType:  'order',
@@ -188,6 +219,7 @@ export const logOrderEvent = {
       actorType:   'system',
       orderId,
       orderNumber,
+      masquerade,
       details: {
         total_amount:   details.totalAmount,
         currency:       details.currency,
@@ -199,7 +231,7 @@ export const logOrderEvent = {
   /**
    * Order marked as paid (Stripe webhook completed).
    */
-  paid: (orderId, orderNumber, customerId, details = {}) =>
+  paid: (orderId, orderNumber, customerId, details = {}, masquerade = null) =>
     logEvent({
       action:      'order.paid',
       entityType:  'order',
@@ -208,6 +240,7 @@ export const logOrderEvent = {
       actorType:   'system',
       orderId,
       orderNumber,
+      masquerade,
       details: {
         amount:         details.amount,
         currency:       details.currency,
@@ -218,7 +251,7 @@ export const logOrderEvent = {
   /**
    * Order fully processed (keys assigned, PDFs uploaded, emails sent).
    */
-  completed: (orderId, orderNumber, customerId, details = {}) =>
+  completed: (orderId, orderNumber, customerId, details = {}, masquerade = null) =>
     logEvent({
       action:      'order.completed',
       entityType:  'order',
@@ -227,13 +260,14 @@ export const logOrderEvent = {
       actorType:   'system',
       orderId,
       orderNumber,
+      masquerade,
       details,
     }),
 
   /**
    * License keys assigned to the order.
    */
-  keysAssigned: (orderId, orderNumber, customerId, details = {}) =>
+  keysAssigned: (orderId, orderNumber, customerId, details = {}, masquerade = null) =>
     logEvent({
       action:      'order.keys_assigned',
       entityType:  'order',
@@ -242,6 +276,7 @@ export const logOrderEvent = {
       actorType:   'system',
       orderId,
       orderNumber,
+      masquerade,
       details: {
         licenses_count: details.licensesCount,
         products_count: details.productsCount,
@@ -262,7 +297,7 @@ export const logDocumentEvent = {
    * @param {string} customerId
    * @param {Object} details       - { file_name, storage_url }
    */
-  generated: (documentType, orderId, orderNumber, customerId, details = {}) =>
+  generated: (documentType, orderId, orderNumber, customerId, details = {}, masquerade = null) =>
     logEvent({
       action:       'document.generated',
       entityType:   'document',
@@ -272,6 +307,7 @@ export const logDocumentEvent = {
       orderId,
       orderNumber,
       documentType,
+      masquerade,
       details: {
         file_name:    details.fileName,
         storage_url:  details.storageUrl,
@@ -281,7 +317,7 @@ export const logDocumentEvent = {
   /**
    * A PDF was uploaded to cloud storage.
    */
-  uploaded: (documentType, orderId, orderNumber, customerId, details = {}) =>
+  uploaded: (documentType, orderId, orderNumber, customerId, details = {}, masquerade = null) =>
     logEvent({
       action:       'document.uploaded',
       entityType:   'document',
@@ -291,6 +327,7 @@ export const logDocumentEvent = {
       orderId,
       orderNumber,
       documentType,
+      masquerade,
       details: {
         file_name:   details.fileName,
         storage_url: details.storageUrl,
@@ -329,7 +366,7 @@ export const logEmailEvent = {
   /**
    * Invoice PDF emailed to customer / billing contact.
    */
-  invoiceSent: (orderId, orderNumber, customerId, recipientEmail) =>
+  invoiceSent: (orderId, orderNumber, customerId, recipientEmail, masquerade = null) =>
     logEvent({
       action:      'email.invoice_sent',
       entityType:  'email',
@@ -338,6 +375,7 @@ export const logEmailEvent = {
       actorType:   'system',
       orderId,
       orderNumber,
+      masquerade,
       details: {
         recipient:  recipientEmail,
         email_type: 'invoice',
@@ -365,7 +403,7 @@ export const logEmailEvent = {
   /**
    * Proforma invoice emailed (pay-by-invoice flow).
    */
-  proformaSent: (orderId, orderNumber, customerId, recipientEmail) =>
+  proformaSent: (orderId, orderNumber, customerId, recipientEmail, masquerade = null) =>
     logEvent({
       action:      'email.invoice_sent',
       entityType:  'email',
@@ -374,6 +412,7 @@ export const logEmailEvent = {
       actorType:   'system',
       orderId,
       orderNumber,
+      masquerade,
       details: {
         recipient:  recipientEmail,
         email_type: 'proforma',
@@ -383,7 +422,7 @@ export const logEmailEvent = {
   /**
    * Email sending failed.
    */
-  sendFailed: (orderId, orderNumber, customerId, recipientEmail, details = {}) =>
+  sendFailed: (orderId, orderNumber, customerId, recipientEmail, details = {}, masquerade = null) =>
     logEvent({
       action:      'email.send_failed',
       entityType:  'email',
@@ -392,6 +431,7 @@ export const logEmailEvent = {
       actorType:   'system',
       orderId,
       orderNumber,
+      masquerade,
       details: {
         recipient:      recipientEmail,
         failure_reason: details.failureReason,
@@ -519,4 +559,4 @@ export const logBulkEvent = {
 };
 
 // Export the raw logEvent for any one-off use
-export { logEvent };
+export { logEvent, getMasqueradeFromRequest };
