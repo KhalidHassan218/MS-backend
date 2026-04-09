@@ -438,6 +438,7 @@ function generateInvoiceHTML(
   if (currency.toLowerCase() === "eur") currencySymbol = "€";
   else if (currency.toLowerCase() === "usd") currencySymbol = "$";
   else if (currency.toLowerCase() === "gbp") currencySymbol = "£";
+  else if (currency.toLowerCase() === "sek") currencySymbol = "kr";
 
   // Calculate tax based on country and currency
   let subtotal, tax, vatPercentage;
@@ -1486,6 +1487,7 @@ console.log("user_profile", userProfile);
           install_url_de: item?.price?.product?.metadata?.install_url_de || "",
           install_url_fr: item?.price?.product?.metadata?.install_url_fr || "",
           install_url_nl: item?.price?.product?.metadata?.install_url_nl || "",
+          install_url_sv: item?.price?.product?.metadata?.install_url_sv || "",
           subscription_type: item?.price?.product?.metadata?.subscription_type || "",
           product_category: item?.price?.product?.metadata?.product_category || "",
         })),
@@ -2184,6 +2186,7 @@ app.post(
       billing_documents
     } = req.profile;
     const cart = req.body.cart;
+    const userLang = req.body?.userLang || "en";
 
     const po_number = req.body?.po_number || null;
 
@@ -2196,8 +2199,11 @@ app.post(
 
     over_due_date.setDate(currentDate.getDate() + over_due_day);
     const isUSCompany = company_country === "US";
+    const isSECompany = company_country === "SE";
     let currency;
-    currency = isUSCompany ? "usd" : "eur";
+    currency = isUSCompany ? "usd" : isSECompany ? "sek" : "eur";
+    const LANG_TO_STRIPE_LOCALE = { en: "en", sv: "sv", de: "de", fr: "fr", nl: "nl", es: "es", it: "it", pt: "pt", pl: "pl", da: "da", fi: "fi", nb: "nb" };
+    const stripeLocale = LANG_TO_STRIPE_LOCALE[userLang] || "auto";
     const lineItems = cart?.map((product) => {
 
       let b2bpriceWVat = parseFloat(product?.priceWVat);
@@ -2221,6 +2227,7 @@ app.post(
           install_url_de: product.install_url_de || "",
           install_url_fr: product.install_url_fr || "",
           install_url_nl: product.install_url_nl || "",
+          install_url_sv: product.install_url_sv || "",
           subscription_type: product.subscription_type || "",
           product_category: product.product_category || "",
           // tax_id: tax_id,
@@ -2240,6 +2247,7 @@ app.post(
           install_url_de: product.install_url_de || "",
           install_url_fr: product.install_url_fr || "",
           install_url_nl: product.install_url_nl || "",
+          install_url_sv: product.install_url_sv || "",
           subscription_type: product.subscription_type || "",
           product_category: product.product_category || "",
           // tax_id: tax_id,
@@ -2323,6 +2331,7 @@ app.post(
         const payByLinkSessionData = {
           line_items: paymentLinkLineItems,
           currency: currency,
+          locale: stripeLocale,
           metadata: {
             po_number: po_number || "N/A",
             orderType: "pay_by_invoice",
@@ -2396,6 +2405,7 @@ app.post(
             install_url_de: item?.price_data?.product_data?.metadata?.install_url_de || "",
             install_url_fr: item?.price_data?.product_data?.metadata?.install_url_fr || "",
             install_url_nl: item?.price_data?.product_data?.metadata?.install_url_nl || "",
+            install_url_sv: item?.price_data?.product_data?.metadata?.install_url_sv || "",
             subscription_type: item?.price_data?.product_data?.metadata?.subscription_type || "",
             product_category: item?.price_data?.product_data?.metadata?.product_category || "",
           })),
@@ -2464,6 +2474,7 @@ app.post(
       const sessionData = {
         line_items: lineItems,
         mode: "payment",
+        locale: stripeLocale,
         name_collection: {
           business: {
             enabled: false, // show Business Name field

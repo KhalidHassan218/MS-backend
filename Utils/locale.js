@@ -2,7 +2,8 @@ export const COUNTRY_TO_LANG = {
   NL: 'nl',
   EN: 'en',
   FR: 'fr',
-  DE: 'de'
+  DE: 'de',
+  SE: 'sv'
 };
 
 

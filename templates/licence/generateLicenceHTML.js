@@ -42,7 +42,7 @@ function generateLicenceHTML(licenseData, companyCountryCode = "EN", company_nam
   // 2. Product's EN install URL (fallback)
   // 3. Original template downloadUrl (hardcoded fallback)
   const countryKey = companyCountryCode.toUpperCase();
-  const installUrlFieldMap = { EN: "install_url_en", DE: "install_url_de", FR: "install_url_fr", NL: "install_url_nl" };
+  const installUrlFieldMap = { EN: "install_url_en", DE: "install_url_de", FR: "install_url_fr", NL: "install_url_nl", SE: "install_url_sv" };
 
   function resolveInstallUrl(product) {
     const countryField = installUrlFieldMap[countryKey] || "install_url_en";

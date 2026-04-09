@@ -123,7 +123,9 @@ export function generateProformaHTML(
   ) {
     vatLabel = `${t.vat}: 0% – Export outside EU`;
   } else if (companyCountryCode.toUpperCase() === "FR") {
-    vatLabel = `${t.vat} ${vatPercentage}% incl`;
+    vatLabel = `${t.vat} ${vatPercentage}% – Autoliquidation`;
+  } else if (companyCountryCode.toUpperCase() === "SE") {
+    vatLabel = t.vat; // "Moms enligt unionsreglerna"
   } else {
     vatLabel = `${t.vat}`;
   }
@@ -351,8 +353,8 @@ export function generateProformaHTML(
   )} ${escapeHtml(company_city || "CITY")}</div>
             <div>${escapeHtml(companyCountryCode || "COUNTRY")}</div>
             ${taxId
-      ? `<div>${escapeHtml(taxId)}</div>`
-      : "<div>Company Tax ID</div>"
+      ? `<div>${t.vatNumberLabel || "BTW"}: ${escapeHtml(taxId)}</div>`
+      : `<div>(${t.vatNumberLabel || "VAT number"} not provided)</div>`
     }
           </div>
           
@@ -412,7 +414,6 @@ export function generateProformaHTML(
       ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
       : ""
     }
-        ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ""}
 
         <div style="display: flex; justify-content: space-between;">
           <div class="payment-info">
@@ -426,9 +427,15 @@ export function generateProformaHTML(
           <div class="professional-info">
             <h3>${t.businessInfo}</h3>
             <div>KVK: 65 26 84 23</div>
-            <div>BTW: NL00 2264 923B 25</div>
+            <div>${t.vatNumberLabel || "BTW"}: NL00 2264 923B 25</div>
           </div>
         </div>
+
+        ${t.taxNote ? `
+        <div class="tax-note">
+          <strong>${t.comments || "Comments"}:</strong><br>
+          ${t.taxNote.replace(/\n/g, "<br>")}
+        </div>` : ""}
 
         <div class="bottom-section">
           <div class="terms-section">

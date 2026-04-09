@@ -20,6 +20,8 @@ const invoiceTemplates = {
             subtotal: "Subtotaal",
             paid: "Betaald",
             vat: "BTW",
+            vatLabel: "BTW",
+            vatNumberLabel: "BTW-nummer",
             finalTotal: "Eindtotaal",
             paymentInfo: "Betalingsinformatie",
             bankName: "Banknaam",
@@ -29,10 +31,11 @@ const invoiceTemplates = {
             terms: "Algemene voorwaarden",
             termsText:
                 "Nadat wij een bevestiging van uw betaling hebben ontvangen,\nzullen wij uw aanvraag binnen 24 uur in behandeling nemen.",
+            comments: "Opmerkingen",
             signature: "Handtekening",
             location: "Europa – Nederland - Utrecht",
             city: "IJsselstein - Osakastraat 9, 3404DR",
-            taxNote: null, // No special tax note for NL
+            taxNote: null,
         },
     },
     EN: {
@@ -50,6 +53,8 @@ const invoiceTemplates = {
             subtotal: "Subtotal",
             paid: "Paid",
             vat: "VAT",
+            vatLabel: "VAT",
+            vatNumberLabel: "VAT Number",
             finalTotal: "Total",
             paymentInfo: "Payment Information",
             bankName: "Bank Name",
@@ -59,6 +64,7 @@ const invoiceTemplates = {
             terms: "General Terms & Conditions",
             termsText:
                 "After we receive confirmation of your payment,\nwe will process your request within 24 hours.",
+            comments: "Comments",
             signature: "Signature",
             location: "Europe – Netherlands - Utrecht",
             city: "IJsselstein - Osakastraat 9, 3404DR",
@@ -81,6 +87,8 @@ const invoiceTemplates = {
             subtotal: "Sous-total",
             paid: "Payé",
             vat: "TVA",
+            vatLabel: "TVA",
+            vatNumberLabel: "N° TVA",
             finalTotal: "Total final",
             paymentInfo: "Informations de paiement",
             bankName: "Nom de la banque",
@@ -90,11 +98,12 @@ const invoiceTemplates = {
             terms: "Conditions générales",
             termsText:
                 "Dès réception de votre paiement,\nnous traiterons votre demande dans un délai de 24 heures.",
+            comments: "Commentaires",
             signature: "Signature",
             location: "Europe – Pays-Bas – Utrecht",
-            city: "IJsselstein - Osakstraat 9, 3404DR",
+            city: "IJsselstein - Osakastraat 9, 3404DR",
             taxNote:
-                "livraison intracommunautaire (NL → FR, B2B)\nAutoliquidation de la TVA – Article 196 de la directive TVA de l'UE.",
+                "Livraison intracommunautaire (NL → FR, B2B)\nAutoliquidation de la TVA – Article 196 de la directive TVA de l'UE.",
         },
     },
     DE: {
@@ -112,6 +121,8 @@ const invoiceTemplates = {
             subtotal: "Zwischensumme",
             paid: "Bezahlt",
             vat: "MwSt",
+            vatLabel: "MwSt",
+            vatNumberLabel: "USt-IdNr",
             finalTotal: "Endsumme",
             paymentInfo: "Zahlungsinformationen",
             bankName: "Bankname",
@@ -121,10 +132,46 @@ const invoiceTemplates = {
             terms: "Allgemeine Geschäftsbedingungen",
             termsText:
                 "Nach Erhalt Ihrer Zahlungsbestätigung,\nwerden wir Ihre Anfrage innerhalb von 24 Stunden bearbeiten.",
+            comments: "Kommentare",
             signature: "Unterschrift",
             location: "Europa – Niederlande - Utrecht",
             city: "IJsselstein - Osakastraat 9, 3404DR",
             taxNote: null,
+        },
+    },
+    SE: {
+        language: "sv-SE",
+        translations: {
+            invoiceNumber: "Fakturanummer",
+            po_number: "Ordernummer",
+            invoiceDate: "Fakturadatum",
+            expiryDate: "Förfallodatum",
+            date: "DATUM",
+            description: "BESKRIVNING",
+            price: "PRIS",
+            amount: "ANTAL",
+            total: "TOTAL",
+            subtotal: "Delsumma",
+            paid: "Betald",
+            notPaid: "Ej betald",
+            vat: "Moms enligt unionsreglerna",
+            vatLabel: "Moms",
+            vatNumberLabel: "Momsnummer",
+            finalTotal: "Total",
+            paymentInfo: "Betalningsinformation",
+            bankName: "Bankens namn",
+            accountNumber: "Kontonummer",
+            accountHolder: "Kontoinnehavare",
+            businessInfo: "Företagsinformation",
+            terms: "Allmänna villkor",
+            termsText:
+                "När vi har mottagit bekräftelse på din betalning,\nkommer vi att behandla din förfrågan inom 24 timmar.",
+            comments: "Kommentarer",
+            signature: "Underskrift",
+            location: "Europa – Nederland - Utrecht",
+            city: "IJsselstein - Osakastraat 9, 3404DR",
+            taxNote:
+                "Denna faktura har utfärdats enligt unionsreglerna.\nMomsen överförs till köparen enligt artikel 196 i direktiv 2006/112/EG.",
         },
     },
 };
@@ -255,7 +302,9 @@ function generateInvoiceHTML(
     ) {
         vatLabel = `${t.vat}: 0% – Export outside EU`;
     } else if (companyCountryCode.toUpperCase() === "FR") {
-        vatLabel = `${t.vat} ${vatPercentage}% incl`;
+        vatLabel = `${t.vat} ${vatPercentage}% – Autoliquidation`;
+    } else if (companyCountryCode.toUpperCase() === "SE") {
+        vatLabel = t.vat; // "Moms enligt unionsreglerna"
     } else {
         vatLabel = `${t.vat}`;
     }
@@ -551,8 +600,8 @@ function generateInvoiceHTML(
     )} ${escapeHtml(company_city || "CITY")}</div>
             <div>${escapeHtml(companyCountryCode || "COUNTRY")}</div>
             ${taxId
-            ? `<div>${escapeHtml(taxId)}</div>`
-            : "<div>Company Tax ID</div>"
+            ? `<div>${t.vatNumberLabel || "BTW"}: ${escapeHtml(taxId)}</div>`
+            : `<div>(${t.vatNumberLabel || "VAT number"} not provided)</div>`
         }
           </div>
           
@@ -614,7 +663,6 @@ function generateInvoiceHTML(
             ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
             : ""
         }
-        ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ""}
 
         <div style="display: flex; justify-content: space-between;">
           <div class="payment-info">
@@ -628,9 +676,15 @@ function generateInvoiceHTML(
           <div class="professional-info">
             <h3>${t.businessInfo}</h3>
             <div>KVK: 65 26 84 23</div>
-            <div>BTW: NL00 2264 923B 25</div>
+            <div>${t.vatNumberLabel || "BTW"}: NL00 2264 923B 25</div>
           </div>
         </div>
+
+        ${t.taxNote ? `
+        <div class="tax-note">
+          <strong>${t.comments || "Comments"}:</strong><br>
+          ${t.taxNote.replace(/\n/g, "<br>")}
+        </div>` : ""}
 
         <div class="bottom-section">
           <div class="terms-section">

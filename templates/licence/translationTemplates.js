@@ -67,6 +67,23 @@ export const licenceTranslationTemplate = {
     },
     downloadUrl: "https://www.microsoft.com/de-de/software-download/windows11",
   },
+  SE: {
+    language: "sv-SE",
+    translations: {
+      documentTitle: "Licensdokument",
+      date: "Datum",
+      position: "Pos",
+      itemNo: "Artikelnr.",
+      description: "Beskrivning",
+      quantity: "Antal",
+      licenseKeys: "Licensnycklar",
+      installationMedia: "*Installationsmedia",
+      location: "Europa – Nederländerna – Utrecht",
+      city: "IJsselstein – Osakastraat 9, 3404DR",
+      new: "Ny",
+    },
+    downloadUrl: "https://www.microsoft.com/sv-se/software-download/windows11",
+  },
 };
 
 

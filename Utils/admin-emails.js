@@ -68,6 +68,22 @@ const translations = {
       reviewButton: 'Revisar solicitud',
       footer: 'Esta es una notificación automática de Microsoft Supplier.'
     }
+  },
+  sv: {
+    pendingRegistration: {
+      subject: 'Ny väntande registrering',
+      title: 'Ny företagsregistreringsbegäran',
+      intro: 'Ett nytt företag har skickat in en registreringsbegäran och väntar på godkännande.',
+      companyDetails: 'Företagsuppgifter',
+      email: 'E-post',
+      company: 'Företagsnamn',
+      country: 'Land',
+      taxId: 'Momsregistreringsnummer',
+      action: 'Åtgärd krävs',
+      actionText: 'Granska denna registrering i adminpanelen och godkänn eller avvisa ansökan.',
+      reviewButton: 'Granska ansökan',
+      footer: 'Detta är ett automatiskt meddelande från Microsoft Supplier.'
+    }
   }
 };
 
