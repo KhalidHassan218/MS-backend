@@ -1189,6 +1189,30 @@ const emailTemplates = {
     footer: "MICROSOFT SUPPLIER",
     copyright: "© 2026",
   },
+  SE: {
+    subject: "Din Microsoft Supplier-beställning",
+    title: "Beställning bekräftad",
+    greeting: "Hej",
+    thankYou: "Tack för din beställning.",
+    processed: "Licenserna har behandlats och dokumenten är nu tillgängliga.",
+    attachmentsTitle: "BILAGOR",
+    attachments: {
+      invoice: "Fakturan",
+      proforma: "Proformafakturan",
+      license: "Licensdokumentet (med alla licensnycklar)",
+    },
+    importantTitle: "VIKTIG INFORMATION",
+    importantInfo: [
+      "Licenserna aktiveras direkt online (ingen telefonaktivering krävs)",
+      "Garanti: 36 månader",
+      "Licenserna levereras via vårt interna distributionssystem",
+    ],
+    contactText: "Frågor? Svara på detta e-postmeddelande",
+    closing: "Vänliga hälsningar",
+    founder: "Grundare @ Sertic",
+    footer: "MICROSOFT SUPPLIER",
+    copyright: "© 2026",
+  },
 };
 
 function generateEmailContent(customerName, companyCountryCode = "EN", type) {
@@ -1837,6 +1861,19 @@ const verificationApiMessages = {
     firebaseNotFound: "Benutzer in Firebase Auth nicht gefunden",
     unauthorized: "Nicht autorisiert: UID stimmt nicht überein",
     missingData: "Fehlende Daten",
+  },
+  SV: {
+    missing: "Token eller uid saknas",
+    notFound: "Användaren hittades inte",
+    invalid: "Ogiltig eller utgången verifieringslänk",
+    verified: "E-postadressen verifierades",
+    error: "Ett fel uppstod",
+    alreadySent: "Verifieringsmejl har redan skickats. Kontrollera din inkorg.",
+    alreadyVerified: "E-postadressen är redan verifierad. Inget e-postmeddelande skickades.",
+    sent: "Verifieringsmejl skickades",
+    firebaseNotFound: "Användaren hittades inte i Firebase Auth",
+    unauthorized: "Ej behörig: UID stämmer inte",
+    missingData: "Data saknas",
   },
 };
 
