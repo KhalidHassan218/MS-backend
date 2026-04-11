@@ -190,16 +190,50 @@ function escapeHtml(str) {
 }
 
 /** Map ISO country codes to localized country names */
+const COUNTRY_CODE_TO_NAME = {
+    NL: "Nederland", DE: "Deutschland", FR: "France",
+    SE: "Sverige", GB: "United Kingdom", US: "United States",
+    BE: "België", AT: "Österreich", CH: "Schweiz",
+    IT: "Italia", ES: "España", PL: "Polska",
+    DK: "Danmark", NO: "Norge", FI: "Finland",
+    IE: "Ireland", LU: "Luxembourg", PT: "Portugal",
+};
+
 function getCountryName(code) {
-    const names = {
-        NL: "Nederland", DE: "Deutschland", FR: "France",
-        SE: "Sverige", GB: "United Kingdom", US: "United States",
-        BE: "België", AT: "Österreich", CH: "Schweiz",
-        IT: "Italia", ES: "España", PL: "Polska",
-        DK: "Danmark", NO: "Norge", FI: "Finland",
-        IE: "Ireland", LU: "Luxembourg", PT: "Portugal",
-    };
-    return names[(code || "").toUpperCase()] || null;
+    return COUNTRY_CODE_TO_NAME[(code || "").toUpperCase()] || null;
+}
+
+/**
+ * Normalize country input to ISO 2-letter code.
+ * Handles both ISO codes ("SE") and full names ("Sweden", "Sverige").
+ * Falls back to "EN" if unrecognized.
+ */
+const COUNTRY_NAME_TO_CODE = {
+    // English names
+    "netherlands": "NL", "the netherlands": "NL", "holland": "NL",
+    "germany": "DE", "france": "FR", "sweden": "SE",
+    "united kingdom": "GB", "uk": "GB", "great britain": "GB",
+    "united states": "US", "usa": "US",
+    "belgium": "BE", "austria": "AT", "switzerland": "CH",
+    "italy": "IT", "spain": "ES", "poland": "PL",
+    "denmark": "DK", "norway": "NO", "finland": "FI",
+    "ireland": "IE", "luxembourg": "LU", "portugal": "PT",
+    "iceland": "IS", "liechtenstein": "LI",
+    // Native names
+    "nederland": "NL", "deutschland": "DE",
+    "sverige": "SE", "belgique": "BE", "belgien": "BE", "belgië": "BE",
+    "österreich": "AT", "schweiz": "CH", "suisse": "CH",
+    "italia": "IT", "españa": "ES", "polska": "PL",
+    "danmark": "DK", "norge": "NO",
+};
+
+function resolveCountryCode(input) {
+    if (!input) return "EN";
+    const upper = input.trim().toUpperCase();
+    // Already a 2-letter code?
+    if (upper.length === 2) return upper;
+    // Try name lookup
+    return COUNTRY_NAME_TO_CODE[input.trim().toLowerCase()] || "EN";
 }
 // Main function to generate invoice HTML
 function generateInvoiceHTML(
@@ -207,7 +241,7 @@ function generateInvoiceHTML(
     invoiceNumber,
     orderNumber,
     productsWithKeys,
-    companyCountryCode = "EN",
+    companyCountryInput = "EN",
     taxId,
     company_city,
     company_house_number,
@@ -215,7 +249,8 @@ function generateInvoiceHTML(
     company_zip_code,
     company_name
 ) {
-
+    // Normalize: "Sweden" / "Sverige" / "SE" → "SE"
+    const companyCountryCode = resolveCountryCode(companyCountryInput);
 
     // Map country codes to invoice language templates.
     // Countries without their own template use the closest language match.
@@ -244,6 +279,7 @@ function generateInvoiceHTML(
     if (currency.toLowerCase() === "eur") currencySymbol = "€";
     else if (currency.toLowerCase() === "usd") currencySymbol = "$";
     else if (currency.toLowerCase() === "gbp") currencySymbol = "£";
+    else if (currency.toLowerCase() === "sek") currencySymbol = "kr";
 
     // Calculate tax based on country and currency
     let subtotal, tax, vatPercentage;
@@ -265,8 +301,18 @@ function generateInvoiceHTML(
         vatPercentage = 21;
         subtotal = total;
         tax = 0;
+    } else if (companyCountryCode.toUpperCase() === "SE") {
+        // Sweden: EU reverse charge (B2B) — seller does not charge VAT
+        vatPercentage = 0;
+        subtotal = total;
+        tax = 0;
+    } else if (companyCountryCode.toUpperCase() === "DE") {
+        // Germany: EU reverse charge (B2B)
+        vatPercentage = 0;
+        subtotal = total;
+        tax = 0;
     } else {
-        // Default
+        // Default: no VAT for other countries
         subtotal = total;
         tax = 0;
         vatPercentage = 0;

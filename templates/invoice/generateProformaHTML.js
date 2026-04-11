@@ -8,22 +8,48 @@ function escapeHtml(str) {
     .replace(/'/g, "&#39;");
 }
 
+const COUNTRY_CODE_TO_NAME = {
+  NL: "Nederland", DE: "Deutschland", FR: "France",
+  SE: "Sverige", GB: "United Kingdom", US: "United States",
+  BE: "België", AT: "Österreich", CH: "Schweiz",
+  IT: "Italia", ES: "España", PL: "Polska",
+  DK: "Danmark", NO: "Norge", FI: "Finland",
+  IE: "Ireland", LU: "Luxembourg", PT: "Portugal",
+};
+
 function getCountryName(code) {
-  const names = {
-    NL: "Nederland", DE: "Deutschland", FR: "France",
-    SE: "Sverige", GB: "United Kingdom", US: "United States",
-    BE: "België", AT: "Österreich", CH: "Schweiz",
-    IT: "Italia", ES: "España", PL: "Polska",
-    DK: "Danmark", NO: "Norge", FI: "Finland",
-    IE: "Ireland", LU: "Luxembourg", PT: "Portugal",
-  };
-  return names[(code || "").toUpperCase()] || null;
+  return COUNTRY_CODE_TO_NAME[(code || "").toUpperCase()] || null;
 }
+
+const COUNTRY_NAME_TO_CODE = {
+  "netherlands": "NL", "the netherlands": "NL", "holland": "NL",
+  "germany": "DE", "france": "FR", "sweden": "SE",
+  "united kingdom": "GB", "uk": "GB", "great britain": "GB",
+  "united states": "US", "usa": "US",
+  "belgium": "BE", "austria": "AT", "switzerland": "CH",
+  "italy": "IT", "spain": "ES", "poland": "PL",
+  "denmark": "DK", "norway": "NO", "finland": "FI",
+  "ireland": "IE", "luxembourg": "LU", "portugal": "PT",
+  "iceland": "IS", "liechtenstein": "LI",
+  "nederland": "NL", "deutschland": "DE",
+  "sverige": "SE", "belgique": "BE", "belgien": "BE", "belgië": "BE",
+  "österreich": "AT", "schweiz": "CH", "suisse": "CH",
+  "italia": "IT", "españa": "ES", "polska": "PL",
+  "danmark": "DK", "norge": "NO",
+};
+
+function resolveCountryCode(input) {
+  if (!input) return "EN";
+  const upper = input.trim().toUpperCase();
+  if (upper.length === 2) return upper;
+  return COUNTRY_NAME_TO_CODE[input.trim().toLowerCase()] || "EN";
+}
+
 export function generateProformaHTML(
   data,
   orderNumber,
   productsWithKeys,
-  companyCountryCode = "EN",
+  companyCountryInput = "EN",
   taxId,
   company_city,
   company_house_number,
@@ -32,6 +58,8 @@ export function generateProformaHTML(
   company_name,
   over_due_date
 ) {
+  // Normalize: "Sweden" / "Sverige" / "SE" → "SE"
+  const companyCountryCode = resolveCountryCode(companyCountryInput);
 
   // Map country codes to invoice language templates.
   const COUNTRY_TO_TEMPLATE = {
@@ -40,7 +68,7 @@ export function generateProformaHTML(
     SR: "NL", CW: "NL", BQ: "NL",
     FI: "SE", DK: "SE", NO: "SE", IS: "SE",
   };
-  const code = (companyCountryCode || "EN").toUpperCase();
+  const code = companyCountryCode;
   const templateKey = COUNTRY_TO_TEMPLATE[code] || code;
   const template = invoiceTranslationTemplates[templateKey] || invoiceTranslationTemplates.EN;
   const t = template.translations;
