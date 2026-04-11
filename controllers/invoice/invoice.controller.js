@@ -22,6 +22,7 @@ const invoiceTemplates = {
             vat: "BTW",
             vatLabel: "BTW",
             vatNumberLabel: "BTW-nummer",
+            vatNotProvided: "BTW-nummer niet verstrekt",
             finalTotal: "Eindtotaal",
             paymentInfo: "Betalingsinformatie",
             bankName: "Banknaam",
@@ -55,6 +56,7 @@ const invoiceTemplates = {
             vat: "VAT",
             vatLabel: "VAT",
             vatNumberLabel: "VAT Number",
+            vatNotProvided: "VAT number not provided",
             finalTotal: "Total",
             paymentInfo: "Payment Information",
             bankName: "Bank Name",
@@ -89,6 +91,7 @@ const invoiceTemplates = {
             vat: "TVA",
             vatLabel: "TVA",
             vatNumberLabel: "N° TVA",
+            vatNotProvided: "N° TVA non fourni",
             finalTotal: "Total final",
             paymentInfo: "Informations de paiement",
             bankName: "Nom de la banque",
@@ -123,6 +126,7 @@ const invoiceTemplates = {
             vat: "MwSt",
             vatLabel: "MwSt",
             vatNumberLabel: "USt-IdNr",
+            vatNotProvided: "USt-IdNr nicht angegeben",
             finalTotal: "Endsumme",
             paymentInfo: "Zahlungsinformationen",
             bankName: "Bankname",
@@ -157,6 +161,7 @@ const invoiceTemplates = {
             vat: "Moms enligt unionsreglerna",
             vatLabel: "Moms",
             vatNumberLabel: "Momsnummer",
+            vatNotProvided: "Momsregistreringsnummer ej mottaget",
             finalTotal: "Total",
             paymentInfo: "Betalningsinformation",
             bankName: "Bankens namn",
@@ -182,6 +187,19 @@ function escapeHtml(str) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
+}
+
+/** Map ISO country codes to localized country names */
+function getCountryName(code) {
+    const names = {
+        NL: "Nederland", DE: "Deutschland", FR: "France",
+        SE: "Sverige", GB: "United Kingdom", US: "United States",
+        BE: "België", AT: "Österreich", CH: "Schweiz",
+        IT: "Italia", ES: "España", PL: "Polska",
+        DK: "Danmark", NO: "Norge", FI: "Finland",
+        IE: "Ireland", LU: "Luxembourg", PT: "Portugal",
+    };
+    return names[(code || "").toUpperCase()] || null;
 }
 // Main function to generate invoice HTML
 function generateInvoiceHTML(
@@ -592,16 +610,14 @@ function generateInvoiceHTML(
             <div><strong>${escapeHtml(
         company_name || "COMPANY NAME",
     )}</strong></div>
-            <div>${escapeHtml(
-        company_street, company_house_number || "STREET NAME & STREET NUMBER",
-    )}</div>
+            <div>${escapeHtml(company_street || "")}${company_house_number ? " " + escapeHtml(company_house_number) : ""}</div>
             <div>${escapeHtml(
         company_zip_code || "POSTAL CODE",
     )} ${escapeHtml(company_city || "CITY")}</div>
-            <div>${escapeHtml(companyCountryCode || "COUNTRY")}</div>
+            <div>${escapeHtml(getCountryName(companyCountryCode) || companyCountryCode || "COUNTRY")}</div>
             ${taxId
             ? `<div>${t.vatNumberLabel || "BTW"}: ${escapeHtml(taxId)}</div>`
-            : `<div>(${t.vatNumberLabel || "VAT number"} not provided)</div>`
+            : `<div>${t.vatNumberLabel || "VAT Number"}: (${t.vatNotProvided || "not provided"})</div>`
         }
           </div>
           

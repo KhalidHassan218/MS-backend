@@ -25,6 +25,8 @@ export const invoiceTranslationTemplates = {
             signature: "Handtekening",
             location: "Europa – Nederland - Utrecht",
             city: "IJsselstein - Osakastraat 9, 3404DR",
+            vatNumberLabel: "BTW-nummer",
+            vatNotProvided: "BTW-nummer niet verstrekt",
             taxNote: null,
             overdueDate: "Vervaldatum"
         },
@@ -55,6 +57,8 @@ export const invoiceTranslationTemplates = {
             signature: "Signature",
             location: "Europe – Netherlands - Utrecht",
             city: "IJsselstein - Osakastraat 9, 3404DR",
+            vatNumberLabel: "VAT Number",
+            vatNotProvided: "VAT number not provided",
             taxNote: "Digital goods — exempt from US sales tax (seller located outside US)",
             overdueDate: "Overdue date"
 
@@ -86,7 +90,9 @@ export const invoiceTranslationTemplates = {
             signature: "Signature",
             location: "Europe – Pays-Bas – Utrecht",
             city: "IJsselstein - Osakstraat 9, 3404DR",
-            taxNote: "livraison intracommunautaire (NL → FR, B2B)\nAutoliquidation de la TVA – Article 196 de la directive TVA de l'UE.",
+            vatNumberLabel: "N° TVA",
+            vatNotProvided: "N° TVA non fourni",
+            taxNote: "livraison intracommunautaire (NL → FR, B2B)\nAutoliquidation de la TVA – Article 196 de la directive TVA de l’UE.",
             overdueDate: "Date d’échéance"
 
         },
@@ -117,6 +123,8 @@ export const invoiceTranslationTemplates = {
             signature: "Unterschrift",
             location: "Europa – Niederlande - Utrecht",
             city: "IJsselstein - Osakastraat 9, 3404DR",
+            vatNumberLabel: "USt-IdNr",
+            vatNotProvided: "USt-IdNr nicht angegeben",
             taxNote: null,
             overdueDate: "Fälligkeitsdatum"
 
@@ -139,6 +147,7 @@ export const invoiceTranslationTemplates = {
             vat: "Moms enligt unionsreglerna",
             vatLabel: "Moms",
             vatNumberLabel: "Momsnummer",
+            vatNotProvided: "Momsregistreringsnummer ej mottaget",
             finalTotal: "Total",
             paymentInfo: "Betalningsinformation",
             bankName: "Bankens namn",

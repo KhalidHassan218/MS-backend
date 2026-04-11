@@ -7,6 +7,18 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+function getCountryName(code) {
+  const names = {
+    NL: "Nederland", DE: "Deutschland", FR: "France",
+    SE: "Sverige", GB: "United Kingdom", US: "United States",
+    BE: "België", AT: "Österreich", CH: "Schweiz",
+    IT: "Italia", ES: "España", PL: "Polska",
+    DK: "Danmark", NO: "Norge", FI: "Finland",
+    IE: "Ireland", LU: "Luxembourg", PT: "Portugal",
+  };
+  return names[(code || "").toUpperCase()] || null;
+}
 export function generateProformaHTML(
   data,
   orderNumber,
@@ -345,16 +357,14 @@ export function generateProformaHTML(
             <div><strong>${escapeHtml(
     company_name || "COMPANY NAME",
   )}</strong></div>
-            <div>${escapeHtml(
-    company_street, company_house_number || "STREET NAME & STREET NUMBER",
-  )}</div>
+            <div>${escapeHtml(company_street || "")}${company_house_number ? " " + escapeHtml(company_house_number) : ""}</div>
             <div>${escapeHtml(
     company_zip_code || "POSTAL CODE",
   )} ${escapeHtml(company_city || "CITY")}</div>
-            <div>${escapeHtml(companyCountryCode || "COUNTRY")}</div>
+            <div>${escapeHtml(getCountryName(companyCountryCode) || companyCountryCode || "COUNTRY")}</div>
             ${taxId
       ? `<div>${t.vatNumberLabel || "BTW"}: ${escapeHtml(taxId)}</div>`
-      : `<div>(${t.vatNumberLabel || "VAT number"} not provided)</div>`
+      : `<div>${t.vatNumberLabel || "VAT Number"}: (${t.vatNotProvided || "not provided"})</div>`
     }
           </div>
           
