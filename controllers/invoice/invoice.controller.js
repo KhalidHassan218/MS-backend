@@ -217,9 +217,17 @@ function generateInvoiceHTML(
 ) {
 
 
-    // Get template based on country code, fallback to EN if not found
-    const template =
-        invoiceTemplates[companyCountryCode.toUpperCase()] || invoiceTemplates.EN;
+    // Map country codes to invoice language templates.
+    // Countries without their own template use the closest language match.
+    const COUNTRY_TO_TEMPLATE = {
+        AT: "DE", CH: "DE", LI: "DE",       // German-speaking
+        BE: "FR", LU: "FR", MC: "FR",       // French-speaking
+        SR: "NL", CW: "NL", BQ: "NL",      // Dutch-speaking
+        FI: "SE", DK: "SE", NO: "SE", IS: "SE", // Nordic → Swedish as closest
+    };
+    const code = (companyCountryCode || "EN").toUpperCase();
+    const templateKey = COUNTRY_TO_TEMPLATE[code] || code;
+    const template = invoiceTemplates[templateKey] || invoiceTemplates.EN;
     const t = template.translations;
 
     const customer = session.customer_details || {};

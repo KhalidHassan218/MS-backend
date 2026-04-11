@@ -33,9 +33,16 @@ export function generateProformaHTML(
   over_due_date
 ) {
 
-  // Get template based on country code, fallback to EN if not found
-  const template =
-    invoiceTranslationTemplates[companyCountryCode.toUpperCase()] || invoiceTranslationTemplates.EN;
+  // Map country codes to invoice language templates.
+  const COUNTRY_TO_TEMPLATE = {
+    AT: "DE", CH: "DE", LI: "DE",
+    BE: "FR", LU: "FR", MC: "FR",
+    SR: "NL", CW: "NL", BQ: "NL",
+    FI: "SE", DK: "SE", NO: "SE", IS: "SE",
+  };
+  const code = (companyCountryCode || "EN").toUpperCase();
+  const templateKey = COUNTRY_TO_TEMPLATE[code] || code;
+  const template = invoiceTranslationTemplates[templateKey] || invoiceTranslationTemplates.EN;
   const t = template.translations;
 
   const customer = data.customer_details || {};
