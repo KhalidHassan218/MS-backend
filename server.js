@@ -395,16 +395,63 @@ const invoiceTemplates = {
       location: "Europa – Niederlande - Utrecht",
       city: "IJsselstein - Osakastraat 9, 3404DR",
       taxNote: null,
+      vatNumberLabel: "USt-IdNr",
+      vatNotProvided: "USt-IdNr nicht angegeben",
+    },
+  },
+  SE: {
+    language: "sv-SE",
+    translations: {
+      invoiceNumber: "Fakturanummer",
+      po_number: "Ordernummer",
+      invoiceDate: "Fakturadatum",
+      expiryDate: "Förfallodatum",
+      date: "DATUM",
+      description: "BESKRIVNING",
+      price: "PRIS",
+      amount: "ANTAL",
+      total: "TOTAL",
+      subtotal: "Delsumma",
+      paid: "Betald",
+      notPaid: "Ej betald",
+      vat: "Moms enligt unionsreglerna",
+      vatLabel: "Moms",
+      vatNumberLabel: "Momsnummer",
+      vatNotProvided: "Momsregistreringsnummer ej mottaget",
+      finalTotal: "Total",
+      paymentInfo: "Betalningsinformation",
+      bankName: "Bankens namn",
+      accountNumber: "Kontonummer",
+      accountHolder: "Kontoinnehavare",
+      businessInfo: "Företagsinformation",
+      terms: "Allmänna villkor",
+      termsText:
+        "När vi har mottagit bekräftelse på din betalning,\nkommer vi att behandla din förfrågan inom 24 timmar.",
+      comments: "Kommentarer",
+      signature: "Underskrift",
+      location: "Europa – Nederland - Utrecht",
+      city: "IJsselstein - Osakastraat 9, 3404DR",
+      taxNote:
+        "Denna faktura har utfärdats enligt unionsreglerna.\nMomsen överförs till köparen enligt artikel 196 i direktiv 2006/112/EG.",
     },
   },
 };
+
+// Also add vatNotProvided to the other templates that are missing it
+invoiceTemplates.NL.translations.vatNumberLabel = invoiceTemplates.NL.translations.vatNumberLabel || "BTW-nummer";
+invoiceTemplates.NL.translations.vatNotProvided = invoiceTemplates.NL.translations.vatNotProvided || "BTW-nummer niet verstrekt";
+invoiceTemplates.EN.translations.vatNumberLabel = invoiceTemplates.EN.translations.vatNumberLabel || "VAT Number";
+invoiceTemplates.EN.translations.vatNotProvided = invoiceTemplates.EN.translations.vatNotProvided || "VAT number not provided";
+invoiceTemplates.FR.translations.vatNumberLabel = invoiceTemplates.FR.translations.vatNumberLabel || "N° TVA";
+invoiceTemplates.FR.translations.vatNotProvided = invoiceTemplates.FR.translations.vatNotProvided || "N° TVA non fourni";
+
 // Main function to generate invoice HTML
 function generateInvoiceHTML(
   session,
   invoiceNumber,
   orderNumber,
   productsWithKeys,
-  companyCountryCode = "EN",
+  companyCountryInput = "EN",
   taxId,
   company_city,
   company_house_number,
@@ -412,16 +459,18 @@ function generateInvoiceHTML(
   company_zip_code,
   company_name
 ) {
-  console.log("company_city", company_city);
-  console.log("company_name", company_name);
-  console.log("company_street", company_street);
-  console.log("company_zip_code", company_zip_code);
+  // Normalize: "Sweden" / "Sverige" / "SE" → "SE"
+  const companyCountryCode = resolveCountryCode(companyCountryInput);
 
-
-
-  // Get template based on country code, fallback to EN if not found
-  const template =
-    invoiceTemplates[companyCountryCode.toUpperCase()] || invoiceTemplates.EN;
+  // Map country codes to invoice language templates.
+  const COUNTRY_TO_TEMPLATE = {
+    AT: "DE", CH: "DE", LI: "DE",
+    BE: "FR", LU: "FR", MC: "FR",
+    SR: "NL", CW: "NL", BQ: "NL",
+    FI: "SE", DK: "SE", NO: "SE", IS: "SE",
+  };
+  const templateKey = COUNTRY_TO_TEMPLATE[companyCountryCode] || companyCountryCode;
+  const template = invoiceTemplates[templateKey] || invoiceTemplates.EN;
   const t = template.translations;
 
   const customer = session.customer_details || {};
@@ -460,8 +509,18 @@ function generateInvoiceHTML(
     vatPercentage = 21;
     subtotal = total;
     tax = 0;
+  } else if (companyCountryCode.toUpperCase() === "SE") {
+    // Sweden: EU reverse charge (B2B)
+    vatPercentage = 0;
+    subtotal = total;
+    tax = 0;
+  } else if (companyCountryCode.toUpperCase() === "DE") {
+    // Germany: EU reverse charge (B2B)
+    vatPercentage = 0;
+    subtotal = total;
+    tax = 0;
   } else {
-    // Default
+    // Default: no VAT for other countries
     subtotal = total;
     tax = 0;
     vatPercentage = 0;
@@ -811,16 +870,14 @@ function generateInvoiceHTML(
             <div><strong>${escapeHtml(
     company_name || "COMPANY NAME",
   )}</strong></div>
-            <div>${escapeHtml(
-    company_street, company_house_number || "STREET NAME & STREET NUMBER",
-  )}</div>
+            <div>${escapeHtml(company_street || "")}${company_house_number ? " " + escapeHtml(company_house_number) : ""}</div>
             <div>${escapeHtml(
     company_zip_code || "POSTAL CODE",
   )} ${escapeHtml(company_city || "CITY")}</div>
-            <div>${escapeHtml(companyCountryCode || "COUNTRY")}</div>
+            <div>${escapeHtml(getCountryName(companyCountryCode) || companyCountryCode || "COUNTRY")}</div>
             ${taxId
-      ? `<div>${escapeHtml(taxId)}</div>`
-      : "<div>Company Tax ID</div>"
+      ? `<div>${t.vatNumberLabel || "VAT Number"}: ${escapeHtml(taxId)}</div>`
+      : `<div>${t.vatNumberLabel || "VAT Number"}: (${t.vatNotProvided || "not provided"})</div>`
     }
           </div>
           
@@ -932,6 +989,45 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/** Map ISO country codes to localized display names */
+const COUNTRY_CODE_TO_NAME = {
+  NL: "Nederland", DE: "Deutschland", FR: "France",
+  SE: "Sverige", GB: "United Kingdom", US: "United States",
+  BE: "België", AT: "Österreich", CH: "Schweiz",
+  IT: "Italia", ES: "España", PL: "Polska",
+  DK: "Danmark", NO: "Norge", FI: "Finland",
+  IE: "Ireland", LU: "Luxembourg", PT: "Portugal",
+};
+
+function getCountryName(code) {
+  return COUNTRY_CODE_TO_NAME[(code || "").toUpperCase()] || null;
+}
+
+/** Normalize full country name or ISO code → 2-letter ISO code */
+const COUNTRY_NAME_TO_CODE = {
+  "netherlands": "NL", "the netherlands": "NL", "holland": "NL",
+  "germany": "DE", "france": "FR", "sweden": "SE",
+  "united kingdom": "GB", "uk": "GB", "great britain": "GB",
+  "united states": "US", "usa": "US",
+  "belgium": "BE", "austria": "AT", "switzerland": "CH",
+  "italy": "IT", "spain": "ES", "poland": "PL",
+  "denmark": "DK", "norway": "NO", "finland": "FI",
+  "ireland": "IE", "luxembourg": "LU", "portugal": "PT",
+  "iceland": "IS", "liechtenstein": "LI",
+  "nederland": "NL", "deutschland": "DE",
+  "sverige": "SE", "belgique": "BE", "belgien": "BE", "belgië": "BE",
+  "österreich": "AT", "schweiz": "CH", "suisse": "CH",
+  "italia": "IT", "españa": "ES", "polska": "PL",
+  "danmark": "DK", "norge": "NO",
+};
+
+function resolveCountryCode(input) {
+  if (!input) return "EN";
+  const upper = input.trim().toUpperCase();
+  if (upper.length === 2) return upper;
+  return COUNTRY_NAME_TO_CODE[input.trim().toLowerCase()] || "EN";
 }
 
 async function assignKeysToProducts(
