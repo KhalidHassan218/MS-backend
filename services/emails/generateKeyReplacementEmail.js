@@ -69,11 +69,33 @@ const emailTemplates = {
     footer: "MICROSOFT SUPPLIER",
     copyright: "© 2026",
   },
+  SV: {
+    subject: "Begäran om nyckelersättning – Microsoft Supplier",
+    title: "Licens ersatt",
+    greeting: "Hej",
+    message: "Din licens har ersatts. Det uppdaterade licensdokumentet är nu tillgängligt.",
+    attachmentsTitle: "BILAGA",
+    attachmentText: "Det uppdaterade licensdokumentet (som innehåller den nya licensnyckeln)",
+    noteTitle: "OBS",
+    noteText: "Den gamla nyckeln har inaktiverats. Använd den nya nyckeln från det bifogade dokumentet.",
+    contactText: "Frågor? Svara på detta e-postmeddelande",
+    closing: "Med vänliga hälsningar",
+    footer: "MICROSOFT SUPPLIER",
+    copyright: "© 2026",
+  },
+};
+
+// Map country codes to template language keys
+const COUNTRY_TO_LANG = {
+  SE: "SV",
+  BE: "FR",
 };
 
 function generateKeyReplacementEmail(companyCountryCode = "EN") {
+  const code = companyCountryCode.toUpperCase();
+  const langKey = COUNTRY_TO_LANG[code] ?? code;
   // Get template based on country code, fallback to EN if not found
-  const t = emailTemplates[companyCountryCode.toUpperCase()] || emailTemplates.EN;
+  const t = emailTemplates[langKey] || emailTemplates.EN;
 
   const htmlContent = `<!DOCTYPE html>
 <html>

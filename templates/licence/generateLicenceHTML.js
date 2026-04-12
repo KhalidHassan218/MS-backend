@@ -19,7 +19,30 @@ const chunkArray = (arr, size) => {
   return chunks;
 };
 
-function generateLicenceHTML(licenseData, companyCountryCode = "EN", company_name, company_city, company_street, company_house_number, company_zip_code, taxId) {
+const COUNTRY_NAME_TO_CODE = {
+  "netherlands": "NL", "the netherlands": "NL", "holland": "NL",
+  "germany": "DE", "france": "FR", "sweden": "SE",
+  "united kingdom": "GB", "uk": "GB", "united states": "US", "usa": "US",
+  "belgium": "BE", "austria": "AT", "switzerland": "CH",
+  "italy": "IT", "spain": "ES", "poland": "PL",
+  "denmark": "DK", "norway": "NO", "finland": "FI",
+  "ireland": "IE", "luxembourg": "LU", "portugal": "PT",
+  "nederland": "NL", "deutschland": "DE", "sverige": "SE",
+  "belgique": "BE", "belgien": "BE", "belgië": "BE",
+  "österreich": "AT", "schweiz": "CH", "suisse": "CH",
+  "italia": "IT", "españa": "ES", "polska": "PL",
+  "danmark": "DK", "norge": "NO",
+};
+
+function resolveCountryCode(input) {
+  if (!input) return "EN";
+  const upper = input.trim().toUpperCase();
+  if (upper.length === 2) return upper;
+  return COUNTRY_NAME_TO_CODE[input.trim().toLowerCase()] || "EN";
+}
+
+function generateLicenceHTML(licenseData, companyCountryInput = "EN", company_name, company_city, company_street, company_house_number, company_zip_code, taxId) {
+  const companyCountryCode = resolveCountryCode(companyCountryInput);
   const { customer, order, products } = licenseData;
 
   const template = licenceTranslationTemplate[companyCountryCode.toUpperCase()] || licenceTranslationTemplate.EN;
@@ -42,7 +65,7 @@ function generateLicenceHTML(licenseData, companyCountryCode = "EN", company_nam
   // 2. Product's EN install URL (fallback)
   // 3. Original template downloadUrl (hardcoded fallback)
   const countryKey = companyCountryCode.toUpperCase();
-  const installUrlFieldMap = { EN: "install_url_en", DE: "install_url_de", FR: "install_url_fr", NL: "install_url_nl" };
+  const installUrlFieldMap = { EN: "install_url_en", DE: "install_url_de", FR: "install_url_fr", NL: "install_url_nl", SE: "install_url_sv" };
 
   function resolveInstallUrl(product) {
     const countryField = installUrlFieldMap[countryKey] || "install_url_en";
