@@ -33,10 +33,9 @@ export async function requestPasswordReset(req, res) {
     const user = users.users.find((u) => u.email === email);
 
     if (!user) {
-      // Don't reveal that user doesn't exist for security
-      return res.status(200).json({
-        success: true,
-        message: 'If an account with that email exists, we sent a password reset link.',
+      return res.status(404).json({
+        success: false,
+        message: 'USER_NOT_FOUND',
       });
     }
 

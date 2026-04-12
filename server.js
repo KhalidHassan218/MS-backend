@@ -429,7 +429,7 @@ const invoiceTemplates = {
         "När vi har mottagit bekräftelse på din betalning,\nkommer vi att behandla din förfrågan inom 24 timmar.",
       comments: "Kommentarer",
       signature: "Underskrift",
-      location: "Europa – Nederland - Utrecht",
+      location: "Europa – Nederländerna - Utrecht",
       city: "IJsselstein - Osakastraat 9, 3404DR",
       taxNote:
         "Denna faktura har utfärdats enligt unionsreglerna.\nMomsen överförs till köparen enligt artikel 196 i direktiv 2006/112/EG.",
@@ -461,6 +461,7 @@ function generateInvoiceHTML(
 ) {
   // Normalize: "Sweden" / "Sverige" / "SE" → "SE"
   const companyCountryCode = resolveCountryCode(companyCountryInput);
+  console.log("[INVOICE DEBUG] companyCountryInput:", companyCountryInput, "→ resolved:", companyCountryCode, "→ template exists:", !!invoiceTemplates[companyCountryCode]);
 
   // Map country codes to invoice language templates.
   const COUNTRY_TO_TEMPLATE = {
@@ -1135,7 +1136,7 @@ app.post(
         process.env.WEBHOOK_SECRET,
       );
 
-      console.log("🔔 Webhook received:", event.type);
+      console.log("🔔 Webhook received:", event.type, "| event.id:", event.id);
 
       // 🔥 Respond immediately before doing any slow work
       response.json({ received: true });
@@ -1143,6 +1144,7 @@ app.post(
       // Continue processing in background
       if (event.type === "checkout.session.completed") {
         const session = event.data.object;
+        console.log("🔔 [DUPLICATE DEBUG] checkout.session.completed | session.id:", session.id, "| metadata.orderId:", session?.metadata?.orderId);
 
         // Audit: payment webhook received
         const _customerId = session?.metadata?.id || null;
@@ -1439,7 +1441,6 @@ async function processPaidOrder(session) {
     const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
       expand: ["line_items.data.price.product"],
     });
-    // console.log("fullSession123", fullSession);
     const user_id = fullSession?.metadata?.id;
     let userProfile = null;
     if (user_id) {
