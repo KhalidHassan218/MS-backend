@@ -173,7 +173,7 @@ const invoiceTemplates = {
                 "När vi har mottagit bekräftelse på din betalning,\nkommer vi att behandla din förfrågan inom 24 timmar.",
             comments: "Kommentarer",
             signature: "Underskrift",
-            location: "Europa – Nederland - Utrecht",
+            location: "Europa – Nederländerna - Utrecht",
             city: "IJsselstein - Osakastraat 9, 3404DR",
             taxNote:
                 "Denna faktura har utfärdats enligt unionsreglerna.\nMomsen överförs till köparen enligt artikel 196 i direktiv 2006/112/EG.",
