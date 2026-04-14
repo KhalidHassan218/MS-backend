@@ -2465,7 +2465,6 @@ app.post(
         const payByLinkSessionData = {
           line_items: paymentLinkLineItems,
           currency: currency,
-          locale: stripeLocale,
           metadata: {
             po_number: po_number || "N/A",
             orderType: "pay_by_invoice",
