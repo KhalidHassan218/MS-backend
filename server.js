@@ -4,6 +4,8 @@ import proformaRoutes from "./routes/proforma/proforma.routes.js";
 import invoiceRoutes from "./routes/invoice/invoice.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import contactRoutes from "./routes/contact/contact.routes.js";
+import { registrationLimiter } from "./middleware/rateLimiters.js";
+import { verifyTurnstileToken } from "./Utils/verifyTurnstile.js";
 import express from "express";
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY; //sergio test
 import Stripe from "stripe";
@@ -2658,7 +2660,7 @@ app.post(
 //     res.status(500).json(error.message);
 //   }
 // });
-app.post("/api/registerNewPendingUser", async (req, res) => {
+app.post("/api/registerNewPendingUser", registrationLimiter, async (req, res) => {
   const {
     email,
     company_name,
@@ -2669,9 +2671,15 @@ app.post("/api/registerNewPendingUser", async (req, res) => {
     company_zip_code,
     company_city,
     billing_email,
-    password
+    password,
+    captchaToken,
   } = req.body;
   try {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+    const captchaValid = await verifyTurnstileToken(captchaToken, ip);
+    if (!captchaValid) {
+      return res.status(400).json({ success: false, message: 'Security check failed. Please try again.' });
+    }
     // 1. Check if user already exists in Auth
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(u => u.email === email);

@@ -2,20 +2,25 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '../config/supabase.js';
 import { sendMail } from '../Utils/mailersend.js';
 import generatePasswordResetEmail from '../services/emails/generatePasswordResetEmail.js';
+import { verifyTurnstileToken } from '../Utils/verifyTurnstile.js';
 
-/**
- * Request a password reset
- * Creates a reset token and sends email
- */
+const GENERIC_RESET_RESPONSE = {
+  success: true,
+  message: 'If an account with that email exists, we sent a password reset link.',
+};
+
 export async function requestPasswordReset(req, res) {
   try {
-    const { email, language = 'EN' } = req.body;
+    const { email, language = 'EN', captchaToken } = req.body;
 
     if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email is required',
-      });
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+
+    const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+    const captchaValid = await verifyTurnstileToken(captchaToken, ip);
+    if (!captchaValid) {
+      return res.status(400).json({ success: false, message: 'Security check failed. Please try again.' });
     }
 
     // Check if user exists in Supabase Auth
@@ -23,20 +28,14 @@ export async function requestPasswordReset(req, res) {
 
     if (userError) {
       console.error('Error fetching users:', userError);
-      // Don't reveal if user exists or not for security
-      return res.status(200).json({
-        success: true,
-        message: 'If an account with that email exists, we sent a password reset link.',
-      });
+      return res.status(200).json(GENERIC_RESET_RESPONSE);
     }
 
     const user = users.users.find((u) => u.email === email);
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'USER_NOT_FOUND',
-      });
+      // Return generic success — never reveal whether the email exists
+      return res.status(200).json(GENERIC_RESET_RESPONSE);
     }
 
     // Generate secure reset token
