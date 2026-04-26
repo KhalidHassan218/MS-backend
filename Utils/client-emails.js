@@ -163,7 +163,7 @@ function generateAcceptedEmailHTML({ email, supplierId, lang = 'en' }) {
 
       <!-- Logo -->
       <div class="mobile-padding" style="padding: 50px 40px 40px; text-align: center;">
-        <img class="mobile-logo" src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2FMSlogo.png?alt=media&token=f5524581-bc40-41c6-8c56-61906b61b4b0"
+        <img class="mobile-logo" src="https://yaodjyiimubilqhamwlx.supabase.co/storage/v1/object/sign/MS%20Files/Screenshot%202026-04-26%20at%204.34.42%20PM.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iOGZhOGVlZi01NmI4LTRlYjUtOGJjYS1lZjFjYTlkZDkyOGMiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJNUyBGaWxlcy9TY3JlZW5zaG90IDIwMjYtMDQtMjYgYXQgNC4zNC40MiBQTS5wbmciLCJpYXQiOjE3NzcyMDcxODQsImV4cCI6NDkzMDgwNzE4NH0.cyDgOySfJl4Wb_cMRKXHTApYt-aI1U9ymPJeALha8Hk"
              alt="Microsoft Supplier"
              style="height: 48px;">
       </div>
@@ -244,7 +244,7 @@ function generateDeclinedEmailHTML({ email, lang = 'en' }) {
 
       <!-- Logo -->
       <div class="mobile-padding" style="padding: 50px 40px 40px; text-align: center;">
-        <img class="mobile-logo" src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2FMSlogo.png?alt=media&token=f5524581-bc40-41c6-8c56-61906b61b4b0"
+        <img class="mobile-logo" src="https://yaodjyiimubilqhamwlx.supabase.co/storage/v1/object/sign/MS%20Files/Screenshot%202026-04-26%20at%204.34.42%20PM.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iOGZhOGVlZi01NmI4LTRlYjUtOGJjYS1lZjFjYTlkZDkyOGMiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJNUyBGaWxlcy9TY3JlZW5zaG90IDIwMjYtMDQtMjYgYXQgNC4zNC40MiBQTS5wbmciLCJpYXQiOjE3NzcyMDcxODQsImV4cCI6NDkzMDgwNzE4NH0.cyDgOySfJl4Wb_cMRKXHTApYt-aI1U9ymPJeALha8Hk"
              alt="Microsoft Supplier"
              style="height: 48px;">
       </div>

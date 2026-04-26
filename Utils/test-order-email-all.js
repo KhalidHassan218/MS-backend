@@ -142,7 +142,7 @@ function generateEmailContent(lang) {
   <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
     <div style="background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0;">
       <div class="mobile-padding" style="padding: 50px 40px 40px; text-align: center;">
-        <img class="mobile-logo" src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2FMSlogo.png?alt=media&token=f5524581-bc40-41c6-8c56-61906b61b4b0" alt="Microsoft Supplier" style="height: 48px;">
+        <img class="mobile-logo" src="https://yaodjyiimubilqhamwlx.supabase.co/storage/v1/object/sign/MS%20Files/Screenshot%202026-04-26%20at%204.34.42%20PM.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iOGZhOGVlZi01NmI4LTRlYjUtOGJjYS1lZjFjYTlkZDkyOGMiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJNUyBGaWxlcy9TY3JlZW5zaG90IDIwMjYtMDQtMjYgYXQgNC4zNC40MiBQTS5wbmciLCJpYXQiOjE3NzcyMDcxODQsImV4cCI6NDkzMDgwNzE4NH0.cyDgOySfJl4Wb_cMRKXHTApYt-aI1U9ymPJeALha8Hk" alt="Microsoft Supplier" style="height: 48px;">
       </div>
       <div class="mobile-content" style="padding: 0 40px 50px; text-align: center;">
         <h1 class="mobile-title" style="color: #1a202c; margin: 0 0 30px 0; font-size: 26px; font-weight: 400; letter-spacing: -0.3px;">

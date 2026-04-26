@@ -104,7 +104,7 @@ function generateReplacmentLicenseHTML(
       .banner {
         width: 100%;
         aspect-ratio: 4 / 1;
-        background-image: url("https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2Fimage.png?alt=media&token=104e6658-bbf5-482e-8f0a-314a9d3875e0");
+        background-image: url("https://yaodjyiimubilqhamwlx.supabase.co/storage/v1/object/sign/MS%20Files/sertic-banner.webp?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iOGZhOGVlZi01NmI4LTRlYjUtOGJjYS1lZjFjYTlkZDkyOGMiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJNUyBGaWxlcy9zZXJ0aWMtYmFubmVyLndlYnAiLCJpYXQiOjE3NzcyMDc2ODUsImV4cCI6NDkzMDgwNzY4NX0.4UidB3UAPmwMoLaMH3v9nm_W4zPpGR4Jf8yPRXfHegM");
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
@@ -364,7 +364,7 @@ function generateReplacmentLicenseHTML(
       ${productsHtml}
       
       <div class="footer">
-        <img src="https://firebasestorage.googleapis.com/v0/b/supplier-34b95.appspot.com/o/assets%2FMSlogo.png?alt=media&token=f5524581-bc40-41c6-8c56-61906b61b4b0" alt="Microsoft Supplier Logo">
+        <img src="https://yaodjyiimubilqhamwlx.supabase.co/storage/v1/object/sign/MS%20Files/Screenshot%202026-04-26%20at%204.34.42%20PM.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9iOGZhOGVlZi01NmI4LTRlYjUtOGJjYS1lZjFjYTlkZDkyOGMiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJNUyBGaWxlcy9TY3JlZW5zaG90IDIwMjYtMDQtMjYgYXQgNC4zNC40MiBQTS5wbmciLCJpYXQiOjE3NzcyMDcxODQsImV4cCI6NDkzMDgwNzE4NH0.cyDgOySfJl4Wb_cMRKXHTApYt-aI1U9ymPJeALha8Hk" alt="Microsoft Supplier Logo">
       </div>
     </div>
   </body>
