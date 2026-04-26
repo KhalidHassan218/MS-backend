@@ -20,6 +20,9 @@ const invoiceTemplates = {
             subtotal: "Subtotaal",
             paid: "Betaald",
             vat: "BTW",
+            vatLabel: "BTW",
+            vatNumberLabel: "BTW-nummer",
+            vatNotProvided: "BTW-nummer niet verstrekt",
             finalTotal: "Eindtotaal",
             paymentInfo: "Betalingsinformatie",
             bankName: "Banknaam",
@@ -29,10 +32,11 @@ const invoiceTemplates = {
             terms: "Algemene voorwaarden",
             termsText:
                 "Nadat wij een bevestiging van uw betaling hebben ontvangen,\nzullen wij uw aanvraag binnen 24 uur in behandeling nemen.",
+            comments: "Opmerkingen",
             signature: "Handtekening",
             location: "Europa – Nederland - Utrecht",
             city: "IJsselstein - Osakastraat 9, 3404DR",
-            taxNote: null, // No special tax note for NL
+            taxNote: null,
         },
     },
     EN: {
@@ -50,6 +54,9 @@ const invoiceTemplates = {
             subtotal: "Subtotal",
             paid: "Paid",
             vat: "VAT",
+            vatLabel: "VAT",
+            vatNumberLabel: "VAT Number",
+            vatNotProvided: "VAT number not provided",
             finalTotal: "Total",
             paymentInfo: "Payment Information",
             bankName: "Bank Name",
@@ -59,6 +66,7 @@ const invoiceTemplates = {
             terms: "General Terms & Conditions",
             termsText:
                 "After we receive confirmation of your payment,\nwe will process your request within 24 hours.",
+            comments: "Comments",
             signature: "Signature",
             location: "Europe – Netherlands - Utrecht",
             city: "IJsselstein - Osakastraat 9, 3404DR",
@@ -81,6 +89,9 @@ const invoiceTemplates = {
             subtotal: "Sous-total",
             paid: "Payé",
             vat: "TVA",
+            vatLabel: "TVA",
+            vatNumberLabel: "N° TVA",
+            vatNotProvided: "N° TVA non fourni",
             finalTotal: "Total final",
             paymentInfo: "Informations de paiement",
             bankName: "Nom de la banque",
@@ -90,11 +101,12 @@ const invoiceTemplates = {
             terms: "Conditions générales",
             termsText:
                 "Dès réception de votre paiement,\nnous traiterons votre demande dans un délai de 24 heures.",
+            comments: "Commentaires",
             signature: "Signature",
             location: "Europe – Pays-Bas – Utrecht",
-            city: "IJsselstein - Osakstraat 9, 3404DR",
+            city: "IJsselstein - Osakastraat 9, 3404DR",
             taxNote:
-                "livraison intracommunautaire (NL → FR, B2B)\nAutoliquidation de la TVA – Article 196 de la directive TVA de l'UE.",
+                "Livraison intracommunautaire (NL → FR, B2B)\nAutoliquidation de la TVA – Article 196 de la directive TVA de l'UE.",
         },
     },
     DE: {
@@ -112,6 +124,9 @@ const invoiceTemplates = {
             subtotal: "Zwischensumme",
             paid: "Bezahlt",
             vat: "MwSt",
+            vatLabel: "MwSt",
+            vatNumberLabel: "USt-IdNr",
+            vatNotProvided: "USt-IdNr nicht angegeben",
             finalTotal: "Endsumme",
             paymentInfo: "Zahlungsinformationen",
             bankName: "Bankname",
@@ -121,10 +136,47 @@ const invoiceTemplates = {
             terms: "Allgemeine Geschäftsbedingungen",
             termsText:
                 "Nach Erhalt Ihrer Zahlungsbestätigung,\nwerden wir Ihre Anfrage innerhalb von 24 Stunden bearbeiten.",
+            comments: "Kommentare",
             signature: "Unterschrift",
             location: "Europa – Niederlande - Utrecht",
             city: "IJsselstein - Osakastraat 9, 3404DR",
             taxNote: null,
+        },
+    },
+    SE: {
+        language: "sv-SE",
+        translations: {
+            invoiceNumber: "Fakturanummer",
+            po_number: "Ordernummer",
+            invoiceDate: "Fakturadatum",
+            expiryDate: "Förfallodatum",
+            date: "DATUM",
+            description: "BESKRIVNING",
+            price: "PRIS",
+            amount: "ANTAL",
+            total: "TOTAL",
+            subtotal: "Delsumma",
+            paid: "Betald",
+            notPaid: "Ej betald",
+            vat: "Moms enligt unionsreglerna",
+            vatLabel: "Moms",
+            vatNumberLabel: "Momsnummer",
+            vatNotProvided: "Momsregistreringsnummer ej mottaget",
+            finalTotal: "Total",
+            paymentInfo: "Betalningsinformation",
+            bankName: "Bankens namn",
+            accountNumber: "Kontonummer",
+            accountHolder: "Kontoinnehavare",
+            businessInfo: "Företagsinformation",
+            terms: "Allmänna villkor",
+            termsText:
+                "När vi har mottagit bekräftelse på din betalning,\nkommer vi att behandla din förfrågan inom 24 timmar.",
+            comments: "Kommentarer",
+            signature: "Underskrift",
+            location: "Europa – Nederländerna - Utrecht",
+            city: "IJsselstein - Osakastraat 9, 3404DR",
+            taxNote:
+                "Denna faktura har utfärdats enligt unionsreglerna.\nMomsen överförs till köparen enligt artikel 196 i direktiv 2006/112/EG.",
         },
     },
 };
@@ -136,13 +188,60 @@ function escapeHtml(str) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
 }
+
+/** Map ISO country codes to localized country names */
+const COUNTRY_CODE_TO_NAME = {
+    NL: "Nederland", DE: "Deutschland", FR: "France",
+    SE: "Sverige", GB: "United Kingdom", US: "United States",
+    BE: "België", AT: "Österreich", CH: "Schweiz",
+    IT: "Italia", ES: "España", PL: "Polska",
+    DK: "Danmark", NO: "Norge", FI: "Finland",
+    IE: "Ireland", LU: "Luxembourg", PT: "Portugal",
+};
+
+function getCountryName(code) {
+    return COUNTRY_CODE_TO_NAME[(code || "").toUpperCase()] || null;
+}
+
+/**
+ * Normalize country input to ISO 2-letter code.
+ * Handles both ISO codes ("SE") and full names ("Sweden", "Sverige").
+ * Falls back to "EN" if unrecognized.
+ */
+const COUNTRY_NAME_TO_CODE = {
+    // English names
+    "netherlands": "NL", "the netherlands": "NL", "holland": "NL",
+    "germany": "DE", "france": "FR", "sweden": "SE",
+    "united kingdom": "GB", "uk": "GB", "great britain": "GB",
+    "united states": "US", "usa": "US",
+    "belgium": "BE", "austria": "AT", "switzerland": "CH",
+    "italy": "IT", "spain": "ES", "poland": "PL",
+    "denmark": "DK", "norway": "NO", "finland": "FI",
+    "ireland": "IE", "luxembourg": "LU", "portugal": "PT",
+    "iceland": "IS", "liechtenstein": "LI",
+    // Native names
+    "nederland": "NL", "deutschland": "DE",
+    "sverige": "SE", "belgique": "BE", "belgien": "BE", "belgië": "BE",
+    "österreich": "AT", "schweiz": "CH", "suisse": "CH",
+    "italia": "IT", "españa": "ES", "polska": "PL",
+    "danmark": "DK", "norge": "NO",
+};
+
+function resolveCountryCode(input) {
+    if (!input) return "EN";
+    const upper = input.trim().toUpperCase();
+    // Already a 2-letter code?
+    if (upper.length === 2) return upper;
+    // Try name lookup
+    return COUNTRY_NAME_TO_CODE[input.trim().toLowerCase()] || "EN";
+}
 // Main function to generate invoice HTML
 function generateInvoiceHTML(
     session,
     invoiceNumber,
     orderNumber,
     productsWithKeys,
-    companyCountryCode = "EN",
+    companyCountryInput = "EN",
     taxId,
     company_city,
     company_house_number,
@@ -150,11 +249,20 @@ function generateInvoiceHTML(
     company_zip_code,
     company_name
 ) {
+    // Normalize: "Sweden" / "Sverige" / "SE" → "SE"
+    const companyCountryCode = resolveCountryCode(companyCountryInput);
 
-
-    // Get template based on country code, fallback to EN if not found
-    const template =
-        invoiceTemplates[companyCountryCode.toUpperCase()] || invoiceTemplates.EN;
+    // Map country codes to invoice language templates.
+    // Countries without their own template use the closest language match.
+    const COUNTRY_TO_TEMPLATE = {
+        AT: "DE", CH: "DE", LI: "DE",       // German-speaking
+        BE: "FR", LU: "FR", MC: "FR",       // French-speaking
+        SR: "NL", CW: "NL", BQ: "NL",      // Dutch-speaking
+        FI: "SE", DK: "SE", NO: "SE", IS: "SE", // Nordic → Swedish as closest
+    };
+    const code = (companyCountryCode || "EN").toUpperCase();
+    const templateKey = COUNTRY_TO_TEMPLATE[code] || code;
+    const template = invoiceTemplates[templateKey] || invoiceTemplates.EN;
     const t = template.translations;
 
     const customer = session.customer_details || {};
@@ -171,6 +279,7 @@ function generateInvoiceHTML(
     if (currency.toLowerCase() === "eur") currencySymbol = "€";
     else if (currency.toLowerCase() === "usd") currencySymbol = "$";
     else if (currency.toLowerCase() === "gbp") currencySymbol = "£";
+    else if (currency.toLowerCase() === "sek") currencySymbol = "kr";
 
     // Calculate tax based on country and currency
     let subtotal, tax, vatPercentage;
@@ -192,8 +301,18 @@ function generateInvoiceHTML(
         vatPercentage = 21;
         subtotal = total;
         tax = 0;
+    } else if (companyCountryCode.toUpperCase() === "SE") {
+        // Sweden: EU reverse charge (B2B) — seller does not charge VAT
+        vatPercentage = 0;
+        subtotal = total;
+        tax = 0;
+    } else if (companyCountryCode.toUpperCase() === "DE") {
+        // Germany: EU reverse charge (B2B)
+        vatPercentage = 0;
+        subtotal = total;
+        tax = 0;
     } else {
-        // Default
+        // Default: no VAT for other countries
         subtotal = total;
         tax = 0;
         vatPercentage = 0;
@@ -255,7 +374,9 @@ function generateInvoiceHTML(
     ) {
         vatLabel = `${t.vat}: 0% – Export outside EU`;
     } else if (companyCountryCode.toUpperCase() === "FR") {
-        vatLabel = `${t.vat} ${vatPercentage}% incl`;
+        vatLabel = `${t.vat} ${vatPercentage}% – Autoliquidation`;
+    } else if (companyCountryCode.toUpperCase() === "SE") {
+        vatLabel = t.vat; // "Moms enligt unionsreglerna"
     } else {
         vatLabel = `${t.vat}`;
     }
@@ -543,16 +664,14 @@ function generateInvoiceHTML(
             <div><strong>${escapeHtml(
         company_name || "COMPANY NAME",
     )}</strong></div>
-            <div>${escapeHtml(
-        company_street, company_house_number || "STREET NAME & STREET NUMBER",
-    )}</div>
+            <div>${escapeHtml(company_street || "")}${company_house_number ? " " + escapeHtml(company_house_number) : ""}</div>
             <div>${escapeHtml(
         company_zip_code || "POSTAL CODE",
     )} ${escapeHtml(company_city || "CITY")}</div>
-            <div>${escapeHtml(companyCountryCode || "COUNTRY")}</div>
+            <div>${escapeHtml(getCountryName(companyCountryCode) || companyCountryCode || "COUNTRY")}</div>
             ${taxId
-            ? `<div>${escapeHtml(taxId)}</div>`
-            : "<div>Company Tax ID</div>"
+            ? `<div>${t.vatNumberLabel || "BTW"}: ${escapeHtml(taxId)}</div>`
+            : `<div>${t.vatNumberLabel || "VAT Number"}: (${t.vatNotProvided || "not provided"})</div>`
         }
           </div>
           
@@ -614,7 +733,6 @@ function generateInvoiceHTML(
             ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
             : ""
         }
-        ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ""}
 
         <div style="display: flex; justify-content: space-between;">
           <div class="payment-info">
@@ -628,9 +746,15 @@ function generateInvoiceHTML(
           <div class="professional-info">
             <h3>${t.businessInfo}</h3>
             <div>KVK: 65 26 84 23</div>
-            <div>BTW: NL00 2264 923B 25</div>
+            <div>${t.vatNumberLabel || "BTW"}: NL00 2264 923B 25</div>
           </div>
         </div>
+
+        ${t.taxNote ? `
+        <div class="tax-note">
+          <strong>${t.comments || "Comments"}:</strong><br>
+          ${t.taxNote.replace(/\n/g, "<br>")}
+        </div>` : ""}
 
         <div class="bottom-section">
           <div class="terms-section">

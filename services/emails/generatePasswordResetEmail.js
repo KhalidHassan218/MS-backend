@@ -69,6 +69,20 @@ const emailTemplates = {
     footer: "MICROSOFT SUPPLIER",
     copyright: "© 2026",
   },
+  SV: {
+    subject: "Återställ ditt lösenord – Microsoft Supplier",
+    title: "Återställ ditt lösenord",
+    greeting: "Hej",
+    message: "Vi har tagit emot en begäran om att återställa lösenordet för ditt konto.",
+    buttonText: "Återställ lösenord",
+    expiryText: "Denna länk upphör att gälla om 1 timme av säkerhetsskäl.",
+    ignoreText: "Om du inte begärde detta kan du ignorera detta e-postmeddelande.",
+    noteTitle: "OBS",
+    noteText: "Dela aldrig denna länk med någon annan. Microsoft Supplier kommer aldrig att be om ditt lösenord.",
+    closing: "Med vänliga hälsningar",
+    footer: "MICROSOFT SUPPLIER",
+    copyright: "© 2026",
+  },
 };
 
 function generatePasswordResetEmail(resetUrl, language = "EN") {

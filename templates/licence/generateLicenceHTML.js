@@ -19,7 +19,30 @@ const chunkArray = (arr, size) => {
   return chunks;
 };
 
-function generateLicenceHTML(licenseData, companyCountryCode = "EN", company_name, company_city, company_street, company_house_number, company_zip_code, taxId) {
+const COUNTRY_NAME_TO_CODE = {
+  "netherlands": "NL", "the netherlands": "NL", "holland": "NL",
+  "germany": "DE", "france": "FR", "sweden": "SE",
+  "united kingdom": "GB", "uk": "GB", "united states": "US", "usa": "US",
+  "belgium": "BE", "austria": "AT", "switzerland": "CH",
+  "italy": "IT", "spain": "ES", "poland": "PL",
+  "denmark": "DK", "norway": "NO", "finland": "FI",
+  "ireland": "IE", "luxembourg": "LU", "portugal": "PT",
+  "nederland": "NL", "deutschland": "DE", "sverige": "SE",
+  "belgique": "BE", "belgien": "BE", "belgië": "BE",
+  "österreich": "AT", "schweiz": "CH", "suisse": "CH",
+  "italia": "IT", "españa": "ES", "polska": "PL",
+  "danmark": "DK", "norge": "NO",
+};
+
+function resolveCountryCode(input) {
+  if (!input) return "EN";
+  const upper = input.trim().toUpperCase();
+  if (upper.length === 2) return upper;
+  return COUNTRY_NAME_TO_CODE[input.trim().toLowerCase()] || "EN";
+}
+
+function generateLicenceHTML(licenseData, companyCountryInput = "EN", company_name, company_city, company_street, company_house_number, company_zip_code, taxId) {
+  const companyCountryCode = resolveCountryCode(companyCountryInput);
   const { customer, order, products } = licenseData;
 
   const template = licenceTranslationTemplate[companyCountryCode.toUpperCase()] || licenceTranslationTemplate.EN;
@@ -37,10 +60,23 @@ function generateLicenceHTML(licenseData, companyCountryCode = "EN", company_nam
   // Define the dynamic title string for reuse in head and content
   const dynamicDocTitle = `${t.documentTitle}: ${escapeHtml(order.number)}`;
 
+  // Resolve the install URL for a product using 3-tier fallback:
+  // 1. Product's install URL matching the company's country code
+  // 2. Product's EN install URL (fallback)
+  // 3. Original template downloadUrl (hardcoded fallback)
+  const countryKey = companyCountryCode.toUpperCase();
+  const installUrlFieldMap = { EN: "install_url_en", DE: "install_url_de", FR: "install_url_fr", NL: "install_url_nl", SE: "install_url_sv" };
+
+  function resolveInstallUrl(product) {
+    const countryField = installUrlFieldMap[countryKey] || "install_url_en";
+    return product[countryField] || product.install_url_en || template.downloadUrl;
+  }
+
   // Map products to HTML blocks with 20-key chunking
   const productsHtml = (products || []).map((product) => {
     const keyChunks = chunkArray(product.licenseKeys || [], 20);
     const totalChunks = keyChunks.length;
+    const installUrl = resolveInstallUrl(product);
 
     return keyChunks.map((chunk, index) => {
       const keysHtml = chunk
@@ -57,7 +93,7 @@ function generateLicenceHTML(licenseData, companyCountryCode = "EN", company_nam
         <div class="product-title-blue">
           ${escapeHtml(product.name || "")} ${totalChunks > 1 ? `(${index + 1}/${totalChunks})` : ""} (x${product.quantity || 0})
         </div>
-        
+
         <div class="license-keys-grid">
           ${keysHtml}
         </div>
@@ -66,7 +102,7 @@ function generateLicenceHTML(licenseData, companyCountryCode = "EN", company_nam
         <div class="installation-support-box">
           <div class="support-header">*${t.installationMedia || "Support d'installation"}</div>
           <div class="support-product-name">${escapeHtml(product.name || "")}</div>
-          <a href="${template.downloadUrl}" class="support-link">${template.downloadUrl}</a>
+          <a href="${installUrl}" class="support-link">${installUrl}</a>
         </div>` : ""}
       </div>
     `;

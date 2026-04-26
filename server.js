@@ -3,6 +3,7 @@ import licenseRoutes from "./routes/license/license.routes.js";
 import proformaRoutes from "./routes/proforma/proforma.routes.js";
 import invoiceRoutes from "./routes/invoice/invoice.routes.js";
 import authRoutes from "./routes/auth.routes.js";
+import contactRoutes from "./routes/contact/contact.routes.js";
 import express from "express";
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY; //sergio test
 import Stripe from "stripe";
@@ -36,6 +37,7 @@ import {
   logDocumentEvent,
   logEmailEvent,
   logSecurityEvent,
+  getMasqueradeFromRequest,
 } from "./services/auditTrail.service.js";
 
 // import savePDFRecord from "./services/pdf/savePdfRecord.service.js";
@@ -99,7 +101,8 @@ async function processPayByInvoiceOrder(
   company_name,
   over_due_date,
   billing_contact,
-  billing_documents
+  billing_documents,
+  masquerade = null
 ) {
   try {
     console.log("pay_by_invoice_order", orderId);
@@ -112,12 +115,12 @@ async function processPayByInvoiceOrder(
       currency:      data.currency,
       itemsCount:    (productsWithKeys?.length || 0) + (phisycalProducts?.length || 0),
       paymentMethod: 'invoice',
-    });
+    }, masquerade);
     // Audit: keys assigned
     logOrderEvent.keysAssigned(orderId, orderNumber, _customerId, {
       licensesCount: productsWithKeys?.reduce((sum, p) => sum + (p.licenseKeys?.length || 0), 0),
       productsCount: productsWithKeys?.length,
-    });
+    }, masquerade);
 
     const allProducts = [...productsWithKeys, ...phisycalProducts];
     await updateOrder(orderId, {
@@ -187,11 +190,11 @@ async function processPayByInvoiceOrder(
     logDocumentEvent.generated('license', orderId, orderNumber, _customerId, {
       fileName:   `License-${orderNumber}.pdf`,
       storageUrl: licensePdfUrl,
-    });
+    }, masquerade);
     logDocumentEvent.generated('proforma', orderId, orderNumber, _customerId, {
       fileName:   `Proforma-${orderNumber}.pdf`,
       storageUrl: proformaPdfUrl,
-    });
+    }, masquerade);
 
     // Update order as completed with both URLs
     await updateOrder(orderId, {
@@ -248,13 +251,13 @@ async function processPayByInvoiceOrder(
           'proforma'
         );
         // Audit: proforma email sent
-        logEmailEvent.proformaSent(orderId, orderNumber, _customerId, email);
+        logEmailEvent.proformaSent(orderId, orderNumber, _customerId, email, masquerade);
       } catch (emailErr) {
         console.error('❌ Email send failed:', emailErr.message);
         logEmailEvent.sendFailed(orderId, orderNumber, _customerId, email, {
           failureReason: emailErr.message,
           emailType: 'proforma',
-        });
+        }, masquerade);
       }
     }
 
@@ -263,7 +266,7 @@ async function processPayByInvoiceOrder(
       proforma_url: proformaPdfUrl,
       license_url:  licensePdfUrl,
       payment_method: 'invoice',
-    });
+    }, masquerade);
 
     console.log("✅ Order completed:", orderId);
   } catch (err) {
@@ -392,16 +395,63 @@ const invoiceTemplates = {
       location: "Europa – Niederlande - Utrecht",
       city: "IJsselstein - Osakastraat 9, 3404DR",
       taxNote: null,
+      vatNumberLabel: "USt-IdNr",
+      vatNotProvided: "USt-IdNr nicht angegeben",
+    },
+  },
+  SE: {
+    language: "sv-SE",
+    translations: {
+      invoiceNumber: "Fakturanummer",
+      po_number: "Ordernummer",
+      invoiceDate: "Fakturadatum",
+      expiryDate: "Förfallodatum",
+      date: "DATUM",
+      description: "BESKRIVNING",
+      price: "PRIS",
+      amount: "ANTAL",
+      total: "TOTAL",
+      subtotal: "Delsumma",
+      paid: "Betald",
+      notPaid: "Ej betald",
+      vat: "Moms enligt unionsreglerna",
+      vatLabel: "Moms",
+      vatNumberLabel: "Momsnummer",
+      vatNotProvided: "Momsregistreringsnummer ej mottaget",
+      finalTotal: "Total",
+      paymentInfo: "Betalningsinformation",
+      bankName: "Bankens namn",
+      accountNumber: "Kontonummer",
+      accountHolder: "Kontoinnehavare",
+      businessInfo: "Företagsinformation",
+      terms: "Allmänna villkor",
+      termsText:
+        "När vi har mottagit bekräftelse på din betalning,\nkommer vi att behandla din förfrågan inom 24 timmar.",
+      comments: "Kommentarer",
+      signature: "Underskrift",
+      location: "Europa – Nederländerna - Utrecht",
+      city: "IJsselstein - Osakastraat 9, 3404DR",
+      taxNote:
+        "Denna faktura har utfärdats enligt unionsreglerna.\nMomsen överförs till köparen enligt artikel 196 i direktiv 2006/112/EG.",
     },
   },
 };
+
+// Also add vatNotProvided to the other templates that are missing it
+invoiceTemplates.NL.translations.vatNumberLabel = invoiceTemplates.NL.translations.vatNumberLabel || "BTW-nummer";
+invoiceTemplates.NL.translations.vatNotProvided = invoiceTemplates.NL.translations.vatNotProvided || "BTW-nummer niet verstrekt";
+invoiceTemplates.EN.translations.vatNumberLabel = invoiceTemplates.EN.translations.vatNumberLabel || "VAT Number";
+invoiceTemplates.EN.translations.vatNotProvided = invoiceTemplates.EN.translations.vatNotProvided || "VAT number not provided";
+invoiceTemplates.FR.translations.vatNumberLabel = invoiceTemplates.FR.translations.vatNumberLabel || "N° TVA";
+invoiceTemplates.FR.translations.vatNotProvided = invoiceTemplates.FR.translations.vatNotProvided || "N° TVA non fourni";
+
 // Main function to generate invoice HTML
 function generateInvoiceHTML(
   session,
   invoiceNumber,
   orderNumber,
   productsWithKeys,
-  companyCountryCode = "EN",
+  companyCountryInput = "EN",
   taxId,
   company_city,
   company_house_number,
@@ -409,16 +459,19 @@ function generateInvoiceHTML(
   company_zip_code,
   company_name
 ) {
-  console.log("company_city", company_city);
-  console.log("company_name", company_name);
-  console.log("company_street", company_street);
-  console.log("company_zip_code", company_zip_code);
+  // Normalize: "Sweden" / "Sverige" / "SE" → "SE"
+  const companyCountryCode = resolveCountryCode(companyCountryInput);
+  console.log("[INVOICE DEBUG] companyCountryInput:", companyCountryInput, "→ resolved:", companyCountryCode, "→ template exists:", !!invoiceTemplates[companyCountryCode]);
 
-
-
-  // Get template based on country code, fallback to EN if not found
-  const template =
-    invoiceTemplates[companyCountryCode.toUpperCase()] || invoiceTemplates.EN;
+  // Map country codes to invoice language templates.
+  const COUNTRY_TO_TEMPLATE = {
+    AT: "DE", CH: "DE", LI: "DE",
+    BE: "FR", LU: "FR", MC: "FR",
+    SR: "NL", CW: "NL", BQ: "NL",
+    FI: "SE", DK: "SE", NO: "SE", IS: "SE",
+  };
+  const templateKey = COUNTRY_TO_TEMPLATE[companyCountryCode] || companyCountryCode;
+  const template = invoiceTemplates[templateKey] || invoiceTemplates.EN;
   const t = template.translations;
 
   const customer = session.customer_details || {};
@@ -435,6 +488,7 @@ function generateInvoiceHTML(
   if (currency.toLowerCase() === "eur") currencySymbol = "€";
   else if (currency.toLowerCase() === "usd") currencySymbol = "$";
   else if (currency.toLowerCase() === "gbp") currencySymbol = "£";
+  else if (currency.toLowerCase() === "sek") currencySymbol = "kr";
 
   // Calculate tax based on country and currency
   let subtotal, tax, vatPercentage;
@@ -456,8 +510,18 @@ function generateInvoiceHTML(
     vatPercentage = 21;
     subtotal = total;
     tax = 0;
+  } else if (companyCountryCode.toUpperCase() === "SE") {
+    // Sweden: EU reverse charge (B2B)
+    vatPercentage = 0;
+    subtotal = total;
+    tax = 0;
+  } else if (companyCountryCode.toUpperCase() === "DE") {
+    // Germany: EU reverse charge (B2B)
+    vatPercentage = 0;
+    subtotal = total;
+    tax = 0;
   } else {
-    // Default
+    // Default: no VAT for other countries
     subtotal = total;
     tax = 0;
     vatPercentage = 0;
@@ -807,16 +871,14 @@ function generateInvoiceHTML(
             <div><strong>${escapeHtml(
     company_name || "COMPANY NAME",
   )}</strong></div>
-            <div>${escapeHtml(
-    company_street, company_house_number || "STREET NAME & STREET NUMBER",
-  )}</div>
+            <div>${escapeHtml(company_street || "")}${company_house_number ? " " + escapeHtml(company_house_number) : ""}</div>
             <div>${escapeHtml(
     company_zip_code || "POSTAL CODE",
   )} ${escapeHtml(company_city || "CITY")}</div>
-            <div>${escapeHtml(companyCountryCode || "COUNTRY")}</div>
+            <div>${escapeHtml(getCountryName(companyCountryCode) || companyCountryCode || "COUNTRY")}</div>
             ${taxId
-      ? `<div>${escapeHtml(taxId)}</div>`
-      : "<div>Company Tax ID</div>"
+      ? `<div>${t.vatNumberLabel || "VAT Number"}: ${escapeHtml(taxId)}</div>`
+      : `<div>${t.vatNumberLabel || "VAT Number"}: (${t.vatNotProvided || "not provided"})</div>`
     }
           </div>
           
@@ -930,6 +992,45 @@ function escapeHtml(str) {
     .replace(/'/g, "&#39;");
 }
 
+/** Map ISO country codes to localized display names */
+const COUNTRY_CODE_TO_NAME = {
+  NL: "Nederland", DE: "Deutschland", FR: "France",
+  SE: "Sverige", GB: "United Kingdom", US: "United States",
+  BE: "België", AT: "Österreich", CH: "Schweiz",
+  IT: "Italia", ES: "España", PL: "Polska",
+  DK: "Danmark", NO: "Norge", FI: "Finland",
+  IE: "Ireland", LU: "Luxembourg", PT: "Portugal",
+};
+
+function getCountryName(code) {
+  return COUNTRY_CODE_TO_NAME[(code || "").toUpperCase()] || null;
+}
+
+/** Normalize full country name or ISO code → 2-letter ISO code */
+const COUNTRY_NAME_TO_CODE = {
+  "netherlands": "NL", "the netherlands": "NL", "holland": "NL",
+  "germany": "DE", "france": "FR", "sweden": "SE",
+  "united kingdom": "GB", "uk": "GB", "great britain": "GB",
+  "united states": "US", "usa": "US",
+  "belgium": "BE", "austria": "AT", "switzerland": "CH",
+  "italy": "IT", "spain": "ES", "poland": "PL",
+  "denmark": "DK", "norway": "NO", "finland": "FI",
+  "ireland": "IE", "luxembourg": "LU", "portugal": "PT",
+  "iceland": "IS", "liechtenstein": "LI",
+  "nederland": "NL", "deutschland": "DE",
+  "sverige": "SE", "belgique": "BE", "belgien": "BE", "belgië": "BE",
+  "österreich": "AT", "schweiz": "CH", "suisse": "CH",
+  "italia": "IT", "españa": "ES", "polska": "PL",
+  "danmark": "DK", "norge": "NO",
+};
+
+function resolveCountryCode(input) {
+  if (!input) return "EN";
+  const upper = input.trim().toUpperCase();
+  if (upper.length === 2) return upper;
+  return COUNTRY_NAME_TO_CODE[input.trim().toLowerCase()] || "EN";
+}
+
 async function assignKeysToProducts(
   orderId,
   orderNumber,
@@ -1035,7 +1136,7 @@ app.post(
         process.env.WEBHOOK_SECRET,
       );
 
-      console.log("🔔 Webhook received:", event.type);
+      console.log("🔔 Webhook received:", event.type, "| event.id:", event.id);
 
       // 🔥 Respond immediately before doing any slow work
       response.json({ received: true });
@@ -1043,6 +1144,7 @@ app.post(
       // Continue processing in background
       if (event.type === "checkout.session.completed") {
         const session = event.data.object;
+        console.log("🔔 [DUPLICATE DEBUG] checkout.session.completed | session.id:", session.id, "| metadata.orderId:", session?.metadata?.orderId);
 
         // Audit: payment webhook received
         const _customerId = session?.metadata?.id || null;
@@ -1185,6 +1287,30 @@ const emailTemplates = {
     footer: "MICROSOFT SUPPLIER",
     copyright: "© 2026",
   },
+  SE: {
+    subject: "Din Microsoft Supplier-beställning",
+    title: "Beställning bekräftad",
+    greeting: "Hej",
+    thankYou: "Tack för din beställning.",
+    processed: "Licenserna har behandlats och dokumenten är nu tillgängliga.",
+    attachmentsTitle: "BILAGOR",
+    attachments: {
+      invoice: "Fakturan",
+      proforma: "Proformafakturan",
+      license: "Licensdokumentet (med alla licensnycklar)",
+    },
+    importantTitle: "VIKTIG INFORMATION",
+    importantInfo: [
+      "Licenserna aktiveras direkt online (ingen telefonaktivering krävs)",
+      "Garanti: 36 månader",
+      "Licenserna levereras via vårt interna distributionssystem",
+    ],
+    contactText: "Frågor? Svara på detta e-postmeddelande",
+    closing: "Vänliga hälsningar",
+    founder: "Grundare @ Sertic",
+    footer: "MICROSOFT SUPPLIER",
+    copyright: "© 2026",
+  },
 };
 
 function generateEmailContent(customerName, companyCountryCode = "EN", type) {
@@ -1315,7 +1441,6 @@ async function processPaidOrder(session) {
     const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
       expand: ["line_items.data.price.product"],
     });
-    // console.log("fullSession123", fullSession);
     const user_id = fullSession?.metadata?.id;
     let userProfile = null;
     if (user_id) {
@@ -1479,6 +1604,13 @@ console.log("user_profile", userProfile);
           isDigital: item?.price?.product?.metadata?.isDigital === "true", // Retrieve from metadata
           PN: item?.price?.product?.metadata?.pn,
           image_url: item?.price?.product?.metadata?.image_url,
+          install_url_en: item?.price?.product?.metadata?.install_url_en || "",
+          install_url_de: item?.price?.product?.metadata?.install_url_de || "",
+          install_url_fr: item?.price?.product?.metadata?.install_url_fr || "",
+          install_url_nl: item?.price?.product?.metadata?.install_url_nl || "",
+          install_url_sv: item?.price?.product?.metadata?.install_url_sv || "",
+          subscription_type: item?.price?.product?.metadata?.subscription_type || "",
+          product_category: item?.price?.product?.metadata?.product_category || "",
         })),
       };
 
@@ -1826,6 +1958,19 @@ const verificationApiMessages = {
     firebaseNotFound: "Benutzer in Firebase Auth nicht gefunden",
     unauthorized: "Nicht autorisiert: UID stimmt nicht überein",
     missingData: "Fehlende Daten",
+  },
+  SV: {
+    missing: "Token eller uid saknas",
+    notFound: "Användaren hittades inte",
+    invalid: "Ogiltig eller utgången verifieringslänk",
+    verified: "E-postadressen verifierades",
+    error: "Ett fel uppstod",
+    alreadySent: "Verifieringsmejl har redan skickats. Kontrollera din inkorg.",
+    alreadyVerified: "E-postadressen är redan verifierad. Inget e-postmeddelande skickades.",
+    sent: "Verifieringsmejl skickades",
+    firebaseNotFound: "Användaren hittades inte i Firebase Auth",
+    unauthorized: "Ej behörig: UID stämmer inte",
+    missingData: "Data saknas",
   },
 };
 
@@ -2175,6 +2320,7 @@ app.post(
       billing_documents
     } = req.profile;
     const cart = req.body.cart;
+    const userLang = req.body?.userLang || "en";
 
     const po_number = req.body?.po_number || null;
 
@@ -2187,8 +2333,11 @@ app.post(
 
     over_due_date.setDate(currentDate.getDate() + over_due_day);
     const isUSCompany = company_country === "US";
+    const isSECompany = company_country === "SE";
     let currency;
-    currency = isUSCompany ? "usd" : "eur";
+    currency = isUSCompany ? "usd" : isSECompany ? "sek" : "eur";
+    const LANG_TO_STRIPE_LOCALE = { en: "en", sv: "sv", de: "de", fr: "fr", nl: "nl", es: "es", it: "it", pt: "pt", pl: "pl", da: "da", fi: "fi", nb: "nb" };
+    const stripeLocale = LANG_TO_STRIPE_LOCALE[userLang] || "auto";
     const lineItems = cart?.map((product) => {
 
       let b2bpriceWVat = parseFloat(product?.priceWVat);
@@ -2208,9 +2357,16 @@ app.post(
           b2b_supplier_id: b2b_supplier_id,
           po_number: po_number,
           image_url: product.image_url,
+          install_url_en: product.install_url_en || "",
+          install_url_de: product.install_url_de || "",
+          install_url_fr: product.install_url_fr || "",
+          install_url_nl: product.install_url_nl || "",
+          install_url_sv: product.install_url_sv || "",
+          subscription_type: product.subscription_type || "",
+          product_category: product.product_category || "",
           // tax_id: tax_id,
         };
-        description = `Language: ${product.selectedLangObj.lang}  PN: ${product.selectedLangObj.pn}`;
+        description = `Language: ${product.selectedLangObj.lang}  MPN/SKU: ${product.selectedLangObj.pn}`;
       } else {
         customFields = {
           language: `Language: English`,
@@ -2221,6 +2377,13 @@ app.post(
           b2b_supplier_id: b2b_supplier_id,
           po_number: po_number,
           image_url: product.image_url,
+          install_url_en: product.install_url_en || "",
+          install_url_de: product.install_url_de || "",
+          install_url_fr: product.install_url_fr || "",
+          install_url_nl: product.install_url_nl || "",
+          install_url_sv: product.install_url_sv || "",
+          subscription_type: product.subscription_type || "",
+          product_category: product.product_category || "",
           // tax_id: tax_id,
         };
         description = `Language: English`;
@@ -2249,7 +2412,7 @@ app.post(
           const b2bpriceWVat = parseFloat(product?.priceWVat);
           const isDigital = product?.type === "digital software";
           const description = product?.selectedLangObj?.id
-            ? `Language: ${product.selectedLangObj.lang} PN: ${product.selectedLangObj.pn}`
+            ? `Language: ${product.selectedLangObj.lang} MPN/SKU: ${product.selectedLangObj.pn}`
             : `Language: English`;
 
           const unit_amount = Math.round(b2bpriceWVat * 100);
@@ -2267,6 +2430,12 @@ app.post(
                   isDigital: String(isDigital),
                   language: product?.selectedLangObj?.lang || "English",
                   image_url: product.image_url,
+                  install_url_en: product.install_url_en || "",
+                  install_url_de: product.install_url_de || "",
+                  install_url_fr: product.install_url_fr || "",
+                  install_url_nl: product.install_url_nl || "",
+                  subscription_type: product.subscription_type || "",
+                  product_category: product.product_category || "",
                 },
               },
             },
@@ -2365,6 +2534,13 @@ app.post(
             PN: item?.price_data?.product_data?.metadata?.pn,
             company_country,
             image_url: item?.price_data?.product_data?.metadata?.image_url,
+            install_url_en: item?.price_data?.product_data?.metadata?.install_url_en || "",
+            install_url_de: item?.price_data?.product_data?.metadata?.install_url_de || "",
+            install_url_fr: item?.price_data?.product_data?.metadata?.install_url_fr || "",
+            install_url_nl: item?.price_data?.product_data?.metadata?.install_url_nl || "",
+            install_url_sv: item?.price_data?.product_data?.metadata?.install_url_sv || "",
+            subscription_type: item?.price_data?.product_data?.metadata?.subscription_type || "",
+            product_category: item?.price_data?.product_data?.metadata?.product_category || "",
           })),
         };
 
@@ -2417,7 +2593,8 @@ app.post(
           company_name,
           over_due_date,
           billing_contact,
-          billing_documents
+          billing_documents,
+          getMasqueradeFromRequest(req)
         );
         // 4. Return the link to be attached to your Firebase orders doc
         res.status(200).send();
@@ -2430,6 +2607,7 @@ app.post(
       const sessionData = {
         line_items: lineItems,
         mode: "payment",
+        locale: stripeLocale,
         name_collection: {
           business: {
             enabled: false, // show Business Name field
@@ -2621,6 +2799,7 @@ app.use("/api/licenses", licenseRoutes);
 app.use("/api/proforma", proformaRoutes);
 app.use("/api/invoice", invoiceRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/contact", contactRoutes);
 
 
 // Function to safely generate the next sequential B2B Account ID

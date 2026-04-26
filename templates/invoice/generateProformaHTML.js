@@ -7,11 +7,49 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+const COUNTRY_CODE_TO_NAME = {
+  NL: "Nederland", DE: "Deutschland", FR: "France",
+  SE: "Sverige", GB: "United Kingdom", US: "United States",
+  BE: "België", AT: "Österreich", CH: "Schweiz",
+  IT: "Italia", ES: "España", PL: "Polska",
+  DK: "Danmark", NO: "Norge", FI: "Finland",
+  IE: "Ireland", LU: "Luxembourg", PT: "Portugal",
+};
+
+function getCountryName(code) {
+  return COUNTRY_CODE_TO_NAME[(code || "").toUpperCase()] || null;
+}
+
+const COUNTRY_NAME_TO_CODE = {
+  "netherlands": "NL", "the netherlands": "NL", "holland": "NL",
+  "germany": "DE", "france": "FR", "sweden": "SE",
+  "united kingdom": "GB", "uk": "GB", "great britain": "GB",
+  "united states": "US", "usa": "US",
+  "belgium": "BE", "austria": "AT", "switzerland": "CH",
+  "italy": "IT", "spain": "ES", "poland": "PL",
+  "denmark": "DK", "norway": "NO", "finland": "FI",
+  "ireland": "IE", "luxembourg": "LU", "portugal": "PT",
+  "iceland": "IS", "liechtenstein": "LI",
+  "nederland": "NL", "deutschland": "DE",
+  "sverige": "SE", "belgique": "BE", "belgien": "BE", "belgië": "BE",
+  "österreich": "AT", "schweiz": "CH", "suisse": "CH",
+  "italia": "IT", "españa": "ES", "polska": "PL",
+  "danmark": "DK", "norge": "NO",
+};
+
+function resolveCountryCode(input) {
+  if (!input) return "EN";
+  const upper = input.trim().toUpperCase();
+  if (upper.length === 2) return upper;
+  return COUNTRY_NAME_TO_CODE[input.trim().toLowerCase()] || "EN";
+}
+
 export function generateProformaHTML(
   data,
   orderNumber,
   productsWithKeys,
-  companyCountryCode = "EN",
+  companyCountryInput = "EN",
   taxId,
   company_city,
   company_house_number,
@@ -20,10 +58,19 @@ export function generateProformaHTML(
   company_name,
   over_due_date
 ) {
+  // Normalize: "Sweden" / "Sverige" / "SE" → "SE"
+  const companyCountryCode = resolveCountryCode(companyCountryInput);
 
-  // Get template based on country code, fallback to EN if not found
-  const template =
-    invoiceTranslationTemplates[companyCountryCode.toUpperCase()] || invoiceTranslationTemplates.EN;
+  // Map country codes to invoice language templates.
+  const COUNTRY_TO_TEMPLATE = {
+    AT: "DE", CH: "DE", LI: "DE",
+    BE: "FR", LU: "FR", MC: "FR",
+    SR: "NL", CW: "NL", BQ: "NL",
+    FI: "SE", DK: "SE", NO: "SE", IS: "SE",
+  };
+  const code = companyCountryCode;
+  const templateKey = COUNTRY_TO_TEMPLATE[code] || code;
+  const template = invoiceTranslationTemplates[templateKey] || invoiceTranslationTemplates.EN;
   const t = template.translations;
 
   const customer = data.customer_details || {};
@@ -123,7 +170,9 @@ export function generateProformaHTML(
   ) {
     vatLabel = `${t.vat}: 0% – Export outside EU`;
   } else if (companyCountryCode.toUpperCase() === "FR") {
-    vatLabel = `${t.vat} ${vatPercentage}% incl`;
+    vatLabel = `${t.vat} ${vatPercentage}% – Autoliquidation`;
+  } else if (companyCountryCode.toUpperCase() === "SE") {
+    vatLabel = t.vat; // "Moms enligt unionsreglerna"
   } else {
     vatLabel = `${t.vat}`;
   }
@@ -343,16 +392,14 @@ export function generateProformaHTML(
             <div><strong>${escapeHtml(
     company_name || "COMPANY NAME",
   )}</strong></div>
-            <div>${escapeHtml(
-    company_street, company_house_number || "STREET NAME & STREET NUMBER",
-  )}</div>
+            <div>${escapeHtml(company_street || "")}${company_house_number ? " " + escapeHtml(company_house_number) : ""}</div>
             <div>${escapeHtml(
     company_zip_code || "POSTAL CODE",
   )} ${escapeHtml(company_city || "CITY")}</div>
-            <div>${escapeHtml(companyCountryCode || "COUNTRY")}</div>
+            <div>${escapeHtml(getCountryName(companyCountryCode) || companyCountryCode || "COUNTRY")}</div>
             ${taxId
-      ? `<div>${escapeHtml(taxId)}</div>`
-      : "<div>Company Tax ID</div>"
+      ? `<div>${t.vatNumberLabel || "BTW"}: ${escapeHtml(taxId)}</div>`
+      : `<div>${t.vatNumberLabel || "VAT Number"}: (${t.vatNotProvided || "not provided"})</div>`
     }
           </div>
           
@@ -412,7 +459,6 @@ export function generateProformaHTML(
       ? `<div class="currency-note">Currency: USD (United States Dollar)</div>`
       : ""
     }
-        ${t.taxNote ? `<div class="tax-note">${t.taxNote}</div>` : ""}
 
         <div style="display: flex; justify-content: space-between;">
           <div class="payment-info">
@@ -426,9 +472,15 @@ export function generateProformaHTML(
           <div class="professional-info">
             <h3>${t.businessInfo}</h3>
             <div>KVK: 65 26 84 23</div>
-            <div>BTW: NL00 2264 923B 25</div>
+            <div>${t.vatNumberLabel || "BTW"}: NL00 2264 923B 25</div>
           </div>
         </div>
+
+        ${t.taxNote ? `
+        <div class="tax-note">
+          <strong>${t.comments || "Comments"}:</strong><br>
+          ${t.taxNote.replace(/\n/g, "<br>")}
+        </div>` : ""}
 
         <div class="bottom-section">
           <div class="terms-section">

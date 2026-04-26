@@ -131,6 +131,31 @@ const translations = {
       copyright: '© 2026',
     },
   },
+  sv: {
+    accepted: {
+      subject: 'Konto godkänt - Microsoft Supplier',
+      title: 'Konto godkänt',
+      message: 'Ditt Microsoft Supplier-konto är nu aktivt.',
+      accountDetails: 'KONTOUPPGIFTER',
+      button: 'LOGGA IN',
+      questions: 'Frågor? Svara på detta e-postmeddelande',
+      footer: 'MICROSOFT SUPPLIER',
+      copyright: '© 2026',
+    },
+    declined: {
+      subject: 'Ansökningsuppdatering - Microsoft Supplier',
+      title: 'Ansökningsuppdatering',
+      message: 'Vi kan för närvarande inte godkänna din ansökan.',
+      reason1: 'Uppgifter saknas',
+      reason2: 'Det går inte att verifiera uppgifterna',
+      reason3: 'Krav ej uppfyllda',
+      note: 'Du kan ansöka på nytt eller kontakta oss för förtydligande.',
+      button: 'KONTAKTA OSS',
+      closing: 'Tack för ditt intresse',
+      footer: 'MICROSOFT SUPPLIER',
+      copyright: '© 2026',
+    },
+  },
 };
 
 function generateAcceptedEmailHTML({ email, supplierId, lang = 'en' }) {

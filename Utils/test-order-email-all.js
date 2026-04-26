@@ -114,6 +114,29 @@ const emailTemplates = {
     footer: "MICROSOFT SUPPLIER",
     copyright: "© 2026",
   },
+  SE: {
+    subject: "Din Microsoft Supplier-beställning",
+    title: "Beställning bekräftad",
+    greeting: "Hej",
+    thankYou: "Tack för din beställning.",
+    processed: "Licenserna har behandlats och dokumenten är nu tillgängliga.",
+    attachmentsTitle: "BILAGOR",
+    attachments: {
+      invoice: "Fakturan",
+      proforma: "Proformafakturan",
+      license: "Licensdokumentet (med alla licensnycklar)"
+    },
+    importantTitle: "VIKTIG INFORMATION",
+    importantInfo: [
+      "Licenserna aktiveras direkt online (ingen telefonaktivering krävs)",
+      "Garanti: 36 månader",
+      "Licenserna levereras via vårt interna distributionssystem"
+    ],
+    contactText: "Frågor? Svara på detta e-postmeddelande",
+    closing: "Vänliga hälsningar",
+    footer: "MICROSOFT SUPPLIER",
+    copyright: "© 2026",
+  },
 };
 
 function generateEmailContent(lang) {

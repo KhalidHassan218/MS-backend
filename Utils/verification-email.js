@@ -79,6 +79,21 @@ export const verificationTemplates = {
     questions: "¿Preguntas? Responda a este correo",
     footer: "MICROSOFT SUPPLIER",
     copyright: "© 2026"
+  },
+  SV: {
+    subject: "Verifiera din e-postadress - Microsoft Supplier",
+    title: "Verifiera din e-postadress",
+    message: "Du har registrerat dig hos Microsoft Supplier. För att aktivera ditt konto behöver du verifiera din e-postadress.",
+    billingTitle: "Verifiera din faktura-e-post",
+    billingMessage: "Vänligen verifiera denna e-postadress för att ta emot fakturor och betalningsuppdateringar.",
+    button: "VERIFIERA E-POSTADRESS",
+    alternativeText: "Om knappen inte fungerar, kopiera och klistra in denna länk i din webbläsare:",
+    expiryNote: "⏱️ Denna verifieringslänk upphör att gälla om 24 timmar.",
+    securityTitle: "🔒 Säkerhetspåminnelse",
+    securityMessage: "Om du inte begärt denna verifiering, vänligen ignorera detta e-postmeddelande.",
+    questions: "Frågor? Svara på detta e-postmeddelande",
+    footer: "MICROSOFT SUPPLIER",
+    copyright: "© 2026"
   }
 };
 
